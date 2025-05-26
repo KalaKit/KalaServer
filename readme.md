@@ -6,18 +6,18 @@
 
 ![Logo](logo.png)
 
-KalaServer is a lightweight C++ 20 library for Windows that allows you to make a server locally, this is primarily aimed for websites but you're welcome to use this for other networking related things too.
+KalaServer is a lightweight C++ 20 library for Windows that allows you to make an HTTP server locally for websites using Windows sockets.
 
 # Prerequisites (when compiling from source code)
 
 - Visual Studio 2022 (with C++ CMake tools and Windows 10 or 11 SDK)
 - Ninja and CMake 3.30.3 or newer (or extract Windows_prerequsites.7z and run setup.bat)
 
-To compile from source code simply run 'build_windows_release.bat' or 'build_windows_debug.bat' depending on your preferences then copy and attach the dll, lib and header files with your preferred way to your program source directory.
+To compile from source code simply run 'build_all.bat' or 'build_debug.bat' or 'build_release.bat' depending on your preferences.
 
 # How to use
 
-The example project found in the example folder shows how to set up and run KalaServer.
+Run 'KalaServer_example.exe' inside 'build-release/example' or 'build-debug/example' to start the example server made with KalaServer.
 
 how to get access locally:
 - local port: 8080
