@@ -17,7 +17,7 @@ To compile from source code simply run 'build_all.bat' or 'build_debug.bat' or '
 
 # How to use
 
-Run 'KalaServer_example.exe' inside 'build-release/example' or 'build-debug/example' to start the example server made with KalaServer.
+Compile the project from source using the existing CMakeLists.txt at root by running 'build_all.bat' and then open 'KalaServer_example.exe' inside 'build-release/example' or 'build-debug/example' to start the example server made with KalaServer.
 
 how to get access locally:
 - local port: 8080
