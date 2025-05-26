@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <map>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -12,6 +13,8 @@ namespace KalaServer
 	using std::function;
 	using std::string;
 	using std::unique_ptr;
+	using std::map;
+
 	using RouteHandler = function<string(const string& request)>;
 
 	enum class PopupReason
@@ -38,8 +41,10 @@ namespace KalaServer
 			routeOrigin(routeOrigin),
 			port(port) {}
 
-		static void Initialize(const string& routeOrigin, int port);
-
+		static void Initialize(
+			const string& routeOrigin, 
+			int port,
+			map<string, string> initialRoutes);
 
 		string ServeFile(const string& filePath);
 		void Route(const string& path, RouteHandler handler);

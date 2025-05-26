@@ -26,7 +26,8 @@ namespace KalaServer
 
 	void Server::Initialize(
 		const string& routeOrigin,
-		int port)
+		int port,
+		map<string, string> initialRoutes)
 	{
 		server = make_unique<Server>(routeOrigin, port);
 
@@ -46,6 +47,14 @@ namespace KalaServer
 			{
 				return server->ServeFile("/errors/500.html");
 			});
+
+		for (const auto& [key, value] : initialRoutes)
+		{
+			Server::server->Route(key, [value](const string&)
+				{
+					return Server::server->ServeFile(value);
+				});
+		}
 	}
 
 	string Server::ServeFile(const string& filePath)

@@ -1,7 +1,4 @@
 #include <string>
-#include <iostream>
-#include <fstream>
-#include <sstream>
 #include <filesystem>
 
 #include "http_server.hpp"
@@ -9,27 +6,21 @@
 using KalaServer::Server;
 
 using std::string;
-using std::cout;
-using std::cin;
-using std::fstream;
-using std::stringstream;
-using std::filesystem::path;
 using std::filesystem::current_path;
+using std::map;
 
 int main()
 {
-	Server::Initialize("static", 8080);
-
 	static string fullPath = (current_path() / "static").string();
-	Server::server->Route("/", [](const string&)
-		{
-			return Server::server->ServeFile(fullPath + "/index.html");
-		});
 
-	Server::server->Route("/about", [](const string&)
-		{
-			return Server::server->ServeFile(fullPath + "/about.html");
-		});
+	map<string, string> initialRoutes{};
+	initialRoutes["/"] = fullPath + "/index.html";
+	initialRoutes["/about"] = fullPath + "/about.html";
+
+	Server::Initialize(
+		"static", 
+		8080,
+		initialRoutes);
 
 	Server::server->Run();
 
