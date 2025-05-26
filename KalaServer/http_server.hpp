@@ -20,14 +20,24 @@ namespace KalaServer
 		Reason_Warning
 	};
 
+	enum class ConsoleMessageType
+	{
+		Type_Error,
+		Type_Warning,
+		Type_Message
+	};
+
 	class Server
 	{
 	public:
 		static inline unique_ptr<Server> server;
 
-		Server(int port = 8080) : port(port) {}
+		Server(int port = 8080);
+		string ServeFile(const string& filePath);
 		void Route(const string& path, RouteHandler handler);
 		void Run() const;
+
+		void PrintConsoleMessage(ConsoleMessageType type, const string& message);
 
 		void CreatePopup(
 			PopupReason reason,

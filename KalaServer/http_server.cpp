@@ -2,6 +2,9 @@
 #include <iostream>
 #include <map>
 #include <Windows.h>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 #include "http_server.hpp"
 
@@ -9,10 +12,61 @@ using std::cout;
 using std::map;
 using std::exit;
 using std::to_string;
+using std::ifstream;
+using std::stringstream;
+using std::exception;
+using std::filesystem::path;
+using std::filesystem::current_path;
 
 namespace KalaServer
 {
 	static map<string, RouteHandler> routes;
+	static string fullPath = (current_path() / "static").string();
+
+	Server::Server
+		(int port) 
+		: port(port)
+	{
+		server->Route("/errors/403.html", [this](const string&)
+			{
+				return this->ServeFile("/errors/403.html");
+			});
+		server->Route("/errors/404.html", [this](const string&)
+			{
+				return this->ServeFile("/errors/404.html");
+			});
+		server->Route("/errors/500.html", [this](const string&)
+			{
+				return this->ServeFile("/errors/500.html");
+			});
+	}
+
+	string Server::ServeFile(const string& filePath)
+	{
+		path fullFilePath = path(filePath);
+		ifstream file(fullFilePath);
+		if (file)
+		{
+			stringstream buffer{};
+			buffer << file.rdbuf();
+			return buffer.str();
+		}
+		else
+		{
+			server->PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Page '" + path(filePath).filename().string() + "' does not exist!");
+
+			ifstream notFoundFile("static/errors/404.html");
+			if (notFoundFile)
+			{
+				stringstream buffer{};
+				buffer << notFoundFile.rdbuf();
+				return buffer.str();
+			}
+		}
+		return "";
+	}
 
 	void Server::Route(const string& path, RouteHandler handler)
 	{
@@ -89,17 +143,89 @@ namespace KalaServer
 				}
 
 				string body{};
+				string statusLine = "HTTP/1.1 200 OK";
+
+				server->PrintConsoleMessage(
+					ConsoleMessageType::Type_Message,
+					"Resolved path: '" + path + "'");
+
 				if (routes.contains(path))
 				{
-					body = routes[path](request);
+					bool isAllowedFile =
+						path.ends_with(".html")
+						|| path.ends_with(".png")
+						|| path.ends_with(".jpg")
+						|| path.ends_with(".jpeg")
+						|| path.ends_with(".gif")
+						|| path.ends_with(".webp")
+						|| path.ends_with(".mp4")
+						|| path.ends_with(".webm")
+						|| path.ends_with(".ogg")
+						|| path.ends_with(".mp3")
+						|| path.ends_with(".wav")
+						|| path.ends_with(".flac");
+
+					if (isAllowedFile)
+					{
+						try
+						{
+							body = routes[path](request);
+						}
+						catch (const exception& e)
+						{
+							server->PrintConsoleMessage(
+								ConsoleMessageType::Type_Error,
+								"Error 500 when requesting page ("
+								+ path
+								+ ").\nError:\n"
+								+ e.what());
+
+							string result = server->ServeFile(fullPath + "/errors/500.html");
+							if (result == "")
+							{
+								server->PrintConsoleMessage(
+									ConsoleMessageType::Type_Error,
+									"Page for error 500 cannot be accessed!");
+
+								body = "<h1>500 Not Found</h1>";
+							}
+							statusLine = "HTTP/1.1 500 Internal Server Error";
+						}
+					}
+					else
+					{
+						server->PrintConsoleMessage(
+							ConsoleMessageType::Type_Error,
+							"Error 403 when requesting file or path '" + path + "'!");
+
+						string result = server->ServeFile(fullPath + "/errors/403.html");
+						if (result == "")
+						{
+							server->PrintConsoleMessage(
+								ConsoleMessageType::Type_Error,
+								"File or page for error 403 cannot be accessed!");
+
+							body = "<h1>403 Forbidden</h1>";
+						}
+						statusLine = "HTTP/1.1 403 Forbidden";
+					}
 				}
 				else
 				{
-					body = "<h1>404 Not Found!</h1>";
+					string result = server->ServeFile(fullPath + "/errors/404.html");
+					if (result == "")
+					{
+						server->PrintConsoleMessage(
+							ConsoleMessageType::Type_Error,
+							"Page for error 404 cannot be accessed!");
+
+						body = "<h1>404 Not Found</h1>";
+					}
+					statusLine = "HTTP/1.1 404 Not Found";
 				}
 
 				string response =
-					"HTTP/1.1 200 OK\r\n"
+					statusLine + "\r\n"
 					"Content-Type: text/html\r\n"
 					"Content-Length: " + to_string(body.size()) + "\r\n"
 					"Connection: close\r\n\r\n" + body;
@@ -116,6 +242,29 @@ namespace KalaServer
 
 		closesocket(server->serverSocket);
 		WSACleanup();
+	}
+
+	void Server::PrintConsoleMessage(
+		ConsoleMessageType type,
+		const string& message)
+	{
+		string targetType{};
+
+		switch (type)
+		{
+		case ConsoleMessageType::Type_Error:
+			targetType = "[ERROR] ";
+			break;
+		case ConsoleMessageType::Type_Warning:
+			targetType = "[WARNING] ";
+			break;
+		case ConsoleMessageType::Type_Message:
+			targetType = "";
+			break;
+		}
+
+		string result = targetType + message;
+		cout << result + "\n";
 	}
 
 	void Server::CreatePopup(
