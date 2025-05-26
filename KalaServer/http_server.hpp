@@ -2,7 +2,6 @@
 
 #include <WinSock2.h>
 #include <string>
-#include <functional>
 #include <memory>
 #include <map>
 
@@ -10,12 +9,9 @@
 
 namespace KalaServer
 {
-	using std::function;
 	using std::string;
 	using std::unique_ptr;
 	using std::map;
-
-	using RouteHandler = function<string(const string& request)>;
 
 	enum class PopupReason
 	{
@@ -46,8 +42,9 @@ namespace KalaServer
 			int port,
 			map<string, string> initialRoutes);
 
-		string ServeFile(const string& filePath);
-		void Route(const string& path, RouteHandler handler);
+		string ServeFile(const string& route);
+		void Route(const string& route, const string& fullPath);
+
 		void Run() const;
 
 		void PrintConsoleMessage(ConsoleMessageType type, const string& message);

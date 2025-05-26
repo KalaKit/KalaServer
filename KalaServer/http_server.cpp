@@ -21,8 +21,8 @@ using std::make_unique;
 
 namespace KalaServer
 {
-	static map<string, RouteHandler> routes;
-	static string fullPath = (current_path() / "static").string();
+	static map<string, string> routes;
+	static string fullPath{};
 
 	void Server::Initialize(
 		const string& routeOrigin,
@@ -30,30 +30,19 @@ namespace KalaServer
 		map<string, string> initialRoutes)
 	{
 		server = make_unique<Server>(routeOrigin, port);
+		fullPath = (current_path() / routeOrigin).string();
 
 		server->PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Initializing KalaServer...");
 
-		server->Route("/errors/403.html", [](const string&)
-			{
-				return server->ServeFile("/errors/403.html");
-			});
-		server->Route("/errors/404.html", [](const string&)
-			{
-				return server->ServeFile("/errors/404.html");
-			});
-		server->Route("/errors/500.html", [](const string&)
-			{
-				return server->ServeFile("/errors/500.html");
-			});
+		server->Route("/errors/403.html", routeOrigin + "/errors/403.html");
+		server->Route("/errors/404.html", routeOrigin + "/errors/404.html");
+		server->Route("/errors/500.html", routeOrigin + "/errors/500.html");
 
 		for (const auto& [key, value] : initialRoutes)
 		{
-			Server::server->Route(key, [value](const string&)
-				{
-					return Server::server->ServeFile(value);
-				});
+			server->Route(key, value);
 		}
 	}
 
@@ -84,10 +73,14 @@ namespace KalaServer
 		return "";
 	}
 
-	void Server::Route(const string& path, RouteHandler handler)
+	void Server::Route(const string& route, const string& fullPath)
 	{
-		routes[path] = handler;
-		cout << "[Route] Registered: " << path << "\n";
+		routes[route] = fullPath;
+#ifdef _DEBUG
+		PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Registered page: " + route);
+#endif
 	}
 
 	void Server::Run() const
@@ -160,11 +153,11 @@ namespace KalaServer
 
 				string body{};
 				string statusLine = "HTTP/1.1 200 OK";
-
+#ifdef _DEBUG
 				server->PrintConsoleMessage(
 					ConsoleMessageType::Type_Message,
 					"Resolved path: '" + path + "'");
-
+#endif
 				bool isAllowedFile =
 					path.find_last_of('.') == string::npos
 					|| path.ends_with(".png")
@@ -181,17 +174,19 @@ namespace KalaServer
 
 				if (!isAllowedFile)
 				{
+#ifdef _DEBUG
 					server->PrintConsoleMessage(
 						ConsoleMessageType::Type_Error,
 						"Error 403 when requesting file or path '" + path + "'!");
-
+#endif
 					string result = server->ServeFile(fullPath + "/errors/403.html");
 					if (result == "")
 					{
+#ifdef _DEBUG
 						server->PrintConsoleMessage(
 							ConsoleMessageType::Type_Error,
 							"File or page for error 403 cannot be accessed!");
-
+#endif
 						body = "<h1>403 Forbidden</h1>";
 					}
 					statusLine = "HTTP/1.1 403 Forbidden";
@@ -203,10 +198,11 @@ namespace KalaServer
 						string result = server->ServeFile(fullPath + "/errors/404.html");
 						if (result == "")
 						{
+#ifdef _DEBUG
 							server->PrintConsoleMessage(
 								ConsoleMessageType::Type_Error,
 								"Page for error 404 cannot be accessed!");
-
+#endif
 							body = "<h1>404 Not Found</h1>";
 						}
 						statusLine = "HTTP/1.1 404 Not Found";
@@ -215,24 +211,26 @@ namespace KalaServer
 					{
 						try
 						{
-							body = routes[path](request);
+							body = server->ServeFile(routes[path]);
 						}
 						catch (const exception& e)
 						{
+#ifdef _DEBUG
 							server->PrintConsoleMessage(
 								ConsoleMessageType::Type_Error,
 								"Error 500 when requesting page ("
 								+ path
 								+ ").\nError:\n"
 								+ e.what());
-
+#endif
 							string result = server->ServeFile(fullPath + "/errors/500.html");
 							if (result == "")
 							{
+#ifdef _DEBUG
 								server->PrintConsoleMessage(
 									ConsoleMessageType::Type_Error,
 									"Page for error 500 cannot be accessed!");
-
+#endif
 								body = "<h1>500 Not Found</h1>";
 							}
 							statusLine = "HTTP/1.1 500 Internal Server Error";
