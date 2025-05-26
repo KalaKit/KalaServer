@@ -1,0 +1,2 @@
+add_executable(miniweb_example main.cpp)
+target_link_libraries(miniweb_example miniweb)
