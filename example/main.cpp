@@ -24,7 +24,6 @@ int main()
 	Server::server = make_unique<Server>(8080);
 
 	static string fullPath = (current_path() / "static").string();
-	cout << "full index path: " << fullPath << "/index.html\n";
 	Server::server->Route("/", [](const string&)
 		{
 			return Server::server->ServeFile(fullPath + "/index.html");

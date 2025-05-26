@@ -149,23 +149,53 @@ namespace KalaServer
 					ConsoleMessageType::Type_Message,
 					"Resolved path: '" + path + "'");
 
-				if (routes.contains(path))
-				{
-					bool isAllowedFile =
-						path.ends_with(".html")
-						|| path.ends_with(".png")
-						|| path.ends_with(".jpg")
-						|| path.ends_with(".jpeg")
-						|| path.ends_with(".gif")
-						|| path.ends_with(".webp")
-						|| path.ends_with(".mp4")
-						|| path.ends_with(".webm")
-						|| path.ends_with(".ogg")
-						|| path.ends_with(".mp3")
-						|| path.ends_with(".wav")
-						|| path.ends_with(".flac");
+				bool isAllowedFile =
+					path.find_last_of('.') == string::npos
+					|| path.ends_with(".png")
+					|| path.ends_with(".jpg")
+					|| path.ends_with(".jpeg")
+					|| path.ends_with(".gif")
+					|| path.ends_with(".webp")
+					|| path.ends_with(".mp4")
+					|| path.ends_with(".webm")
+					|| path.ends_with(".ogg")
+					|| path.ends_with(".mp3")
+					|| path.ends_with(".wav")
+					|| path.ends_with(".flac");
 
-					if (isAllowedFile)
+				if (!isAllowedFile)
+				{
+					server->PrintConsoleMessage(
+						ConsoleMessageType::Type_Error,
+						"Error 403 when requesting file or path '" + path + "'!");
+
+					string result = server->ServeFile(fullPath + "/errors/403.html");
+					if (result == "")
+					{
+						server->PrintConsoleMessage(
+							ConsoleMessageType::Type_Error,
+							"File or page for error 403 cannot be accessed!");
+
+						body = "<h1>403 Forbidden</h1>";
+					}
+					statusLine = "HTTP/1.1 403 Forbidden";
+				}
+				else
+				{
+					if (!routes.contains(path))
+					{
+						string result = server->ServeFile(fullPath + "/errors/404.html");
+						if (result == "")
+						{
+							server->PrintConsoleMessage(
+								ConsoleMessageType::Type_Error,
+								"Page for error 404 cannot be accessed!");
+
+							body = "<h1>404 Not Found</h1>";
+						}
+						statusLine = "HTTP/1.1 404 Not Found";
+					}
+					else
 					{
 						try
 						{
@@ -192,36 +222,6 @@ namespace KalaServer
 							statusLine = "HTTP/1.1 500 Internal Server Error";
 						}
 					}
-					else
-					{
-						server->PrintConsoleMessage(
-							ConsoleMessageType::Type_Error,
-							"Error 403 when requesting file or path '" + path + "'!");
-
-						string result = server->ServeFile(fullPath + "/errors/403.html");
-						if (result == "")
-						{
-							server->PrintConsoleMessage(
-								ConsoleMessageType::Type_Error,
-								"File or page for error 403 cannot be accessed!");
-
-							body = "<h1>403 Forbidden</h1>";
-						}
-						statusLine = "HTTP/1.1 403 Forbidden";
-					}
-				}
-				else
-				{
-					string result = server->ServeFile(fullPath + "/errors/404.html");
-					if (result == "")
-					{
-						server->PrintConsoleMessage(
-							ConsoleMessageType::Type_Error,
-							"Page for error 404 cannot be accessed!");
-
-						body = "<h1>404 Not Found</h1>";
-					}
-					statusLine = "HTTP/1.1 404 Not Found";
 				}
 
 				string response =
