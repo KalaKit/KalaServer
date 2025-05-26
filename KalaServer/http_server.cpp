@@ -17,27 +17,34 @@ using std::stringstream;
 using std::exception;
 using std::filesystem::path;
 using std::filesystem::current_path;
+using std::make_unique;
 
 namespace KalaServer
 {
 	static map<string, RouteHandler> routes;
 	static string fullPath = (current_path() / "static").string();
 
-	Server::Server
-		(int port) 
-		: port(port)
+	void Server::Initialize(
+		const string& routeOrigin,
+		int port)
 	{
-		server->Route("/errors/403.html", [this](const string&)
+		server = make_unique<Server>(routeOrigin, port);
+
+		server->PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Initializing KalaServer...");
+
+		server->Route("/errors/403.html", [](const string&)
 			{
-				return this->ServeFile("/errors/403.html");
+				return server->ServeFile("/errors/403.html");
 			});
-		server->Route("/errors/404.html", [this](const string&)
+		server->Route("/errors/404.html", [](const string&)
 			{
-				return this->ServeFile("/errors/404.html");
+				return server->ServeFile("/errors/404.html");
 			});
-		server->Route("/errors/500.html", [this](const string&)
+		server->Route("/errors/500.html", [](const string&)
 			{
-				return this->ServeFile("/errors/500.html");
+				return server->ServeFile("/errors/500.html");
 			});
 	}
 

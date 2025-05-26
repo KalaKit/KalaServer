@@ -15,13 +15,10 @@ using std::fstream;
 using std::stringstream;
 using std::filesystem::path;
 using std::filesystem::current_path;
-using std::make_unique;
 
 int main()
 {
-	cout << "Initializing KalaServer...\n";
-
-	Server::server = make_unique<Server>(8080);
+	Server::Initialize("static", 8080);
 
 	static string fullPath = (current_path() / "static").string();
 	Server::server->Route("/", [](const string&)

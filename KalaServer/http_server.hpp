@@ -32,7 +32,15 @@ namespace KalaServer
 	public:
 		static inline unique_ptr<Server> server;
 
-		Server(int port = 8080);
+		Server(
+			string routeOrigin,
+			int port) :
+			routeOrigin(routeOrigin),
+			port(port) {}
+
+		static void Initialize(const string& routeOrigin, int port);
+
+
 		string ServeFile(const string& filePath);
 		void Route(const string& path, RouteHandler handler);
 		void Run() const;
@@ -45,7 +53,9 @@ namespace KalaServer
 		void Quit();
 	private:
 		bool running = false;
-		int port = -1;
 		mutable SOCKET serverSocket = INVALID_SOCKET;
+
+		string routeOrigin;
+		int port;
 	};
 }
