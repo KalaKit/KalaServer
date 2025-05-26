@@ -6,7 +6,7 @@
 
 #include "http_server.hpp"
 
-using MiniWeb::Server;
+using KalaServer::Server;
 
 using std::string;
 using std::cout;
@@ -14,6 +14,7 @@ using std::cin;
 using std::fstream;
 using std::stringstream;
 using std::filesystem::path;
+using std::make_unique;
 
 static string ServeFile(const string& fileName)
 {
@@ -27,24 +28,21 @@ static string ServeFile(const string& fileName)
 
 int main()
 {
-	cout << "Initializing MiniWeb...\n";
+	cout << "Initializing KalaServer...\n";
 
-	Server server(8080);
+	Server::server = make_unique<Server>(8080);
 
-	server.Route("/", [](const string&)
+	Server::server->Route("/", [](const string&)
 		{
 			return ServeFile("index.html");
 		});
 
-	server.Route("/about", [](const string&)
+	Server::server->Route("/about", [](const string&)
 		{
 			return ServeFile("about.html");
 		});
 
-	server.Run();
+	Server::server->Run();
 
-	cout << "MiniWeb is open! Press any key to exit...\n";
-	cin.get();
-
-	return 0;
+	Server::server->Quit();
 }

@@ -4,14 +4,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-project(Miniweb)
+project("KalaServer")
 
-set(MINIWEB_ROOT "${CMAKE_SOURCE_DIR}/miniweb")
+set(KALASERVER_ROOT "${CMAKE_SOURCE_DIR}/KalaServer")
 set(EXAMPLE_ROOT "${CMAKE_SOURCE_DIR}/example")
 
-add_library(miniweb STATIC "${MINIWEB_ROOT}/http_server.cpp")
-target_include_directories(miniweb PUBLIC "${MINIWEB_ROOT}")
+add_library(KalaServer STATIC "${KALASERVER_ROOT}/http_server.cpp")
+target_include_directories(KalaServer PUBLIC "${KALASERVER_ROOT}")
 
 add_subdirectory("${EXAMPLE_ROOT}")
-
-include(CPack)
