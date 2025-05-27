@@ -39,48 +39,117 @@ namespace KalaServer
 			ConsoleMessageType::Type_Message,
 			"Initializing KalaServer...");
 
-		server->AddWhitelistedRoute("/errors/403.html", routeOrigin + "/errors/403.html");
-		server->Route("/errors/404.html", routeOrigin + "/errors/404.html");
-		server->Route("/errors/500.html", routeOrigin + "/errors/500.html");
-
-		for (const auto& extension : whitelistedExtensions)
+		for (const auto& extension : extensions)
 		{
-			Server::server->AddWhitelistedExtension(extension);
+			server->AddNewWhitelistedExtension(extension);
 		}
-		AddInitialRoutes(routes);
+		server->AddInitialWhitelistedRoutes(routes);
 	}
-	
-	void Server::AddInitialWhitelistedRoutes(const vector<string> whitelistedRoutes)
+
+	void Server::AddInitialWhitelistedRoutes(const vector<string>& whitelistedRoutes)
 	{
-		string cleanedRoute = route;
-		if (!cleanedRoute.empty())
+		for (const auto& route : whitelistedRoutes)
 		{
-			if (cleanedRoute.front() == '/') cleanedRoute = cleanedRoute.substr(1);
-			if (cleanedRoute.back() == '/')
+			string cleanedRoute = route;
+			if (!cleanedRoute.empty())
 			{
-				cleanedRoute = cleanedRoute.substr(0, cleanedRoute.size() - 1);	
+				if (cleanedRoute.front() == '/') cleanedRoute = cleanedRoute.substr(1);
+				if (cleanedRoute.back() == '/')
+				{
+					cleanedRoute = cleanedRoute.substr(0, cleanedRoute.size() - 1);
+				}
+			}
+
+			path baseDir = current_path() / cleanedRoute;
+
+			if (!exists(baseDir)
+				|| !is_directory(baseDir))
+			{
+				return;
+			}
+
+			for (const auto& file : recursive_directory_iterator(baseDir))
+			{
+				if (!is_regular_file(file.status())) continue;
+
+				path relativePath = relative(file.path(), current_path());
+				string fullRoute = "/" + relativePath.generic_string();
+
+				server->AddNewWhitelistedRoute(fullRoute);
+			}
+
+			server->AddNewWhitelistedRoute(route);
+		}
+	}
+
+	void Server::AddNewWhitelistedRoute(const string& newRoute)
+	{
+		for (const auto& route : server->whitelistedRoutes)
+		{
+			if (route == newRoute)
+			{
+				PrintConsoleMessage(
+					ConsoleMessageType::Type_Warning,
+					"Route '" + route + "' has already been whitelisted!");
+				return;
 			}
 		}
-		
-		path baseDir = current_path() / cleanedRoute;
-		
-		if (!exists(baseDir)
-			|| !is_directory(baseDir))
+
+		server->whitelistedRoutes.push_back(newRoute);
+	}
+	void Server::AddNewWhitelistedExtension(const string& newExtension)
+	{
+		for (const auto& extension : server->whitelistedExtensions)
 		{
-			continue;
+			if (extension == newExtension)
+			{
+				PrintConsoleMessage(
+					ConsoleMessageType::Type_Warning,
+					"Extension '" + extension + "' has already been whitelisted!");
+				return;
+			}
 		}
-		
-		for (const auto& file : recursive_directory_iterator(baseDir))
+
+		server->whitelistedExtensions.push_back(newExtension);
+	}
+
+	void Server::RemoveWhitelistedRoute(const string& thisRoute)
+	{
+		string foundRoute{};
+		for (const auto& route : server->whitelistedRoutes)
 		{
-			if (!is_regular_file(file.status())) continue;
-			
-			path relative = relative(file.path(), current_path());
-			string fullRoute = "/" + relative.generic_string();
-			
-			server->AddWhitelistedRoute(fullRoute);
+			if (route == thisRoute)
+			{
+				foundRoute = route;
+				break;
+			}
 		}
-		
-		server->AddWhitelistedRoute(route);
+
+		if (foundRoute == "")
+		{
+			PrintConsoleMessage(
+				ConsoleMessageType::Type_Warning,
+				"Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!");
+		}
+	}
+	void Server::RemoveWhitelistedExtension(const string& thisExtension)
+	{
+		string foundExtension{};
+		for (const auto& extension : server->whitelistedExtensions)
+		{
+			if (extension == thisExtension)
+			{
+				foundExtension = extension;
+				break;
+			}
+		}
+
+		if (foundExtension == "")
+		{
+			PrintConsoleMessage(
+				ConsoleMessageType::Type_Warning,
+				"Extension '" + thisExtension + "' cannot be removed because it hasn't been whitelisted!");
+		}
 	}
 
 	string Server::ServeFile(const string& filePath)
@@ -168,14 +237,14 @@ namespace KalaServer
 			if (bytesReceived > 0)
 			{
 				string request(buffer);
-				string path = "/";
+				string filePath = "/";
 
 				size_t pathStart = request.find("GET ") + 4;
 				size_t pathEnd = request.find(' ', pathStart);
 				if (pathStart != string::npos
 					&& pathEnd != string::npos)
 				{
-					path = request.substr(pathStart, pathEnd - pathStart);
+					filePath = request.substr(pathStart, pathEnd - pathStart);
 				}
 
 				string body{};
@@ -183,18 +252,18 @@ namespace KalaServer
 #ifdef _DEBUG
 				server->PrintConsoleMessage(
 					ConsoleMessageType::Type_Message,
-					"Resolved path: '" + path + "'");
+					"Resolved path: '" + filePath + "'");
 #endif
 				bool isAllowedFile =
-					path.find_last_of('.') == string::npos
-					|| server->ExtensionExists(path.extension().string());
+					filePath.find_last_of('.') == string::npos
+					|| server->ExtensionExists(path(filePath).extension().string());
 
 				if (!isAllowedFile)
 				{
 #ifdef _DEBUG
 					server->PrintConsoleMessage(
 						ConsoleMessageType::Type_Error,
-						"Error 403 when requesting file or path '" + path + "'!");
+						"Error 403 when requesting file or path '" + filePath + "'!");
 #endif
 					string result = server->ServeFile(path(current_path() / "pages/errors/403.html").string());
 					if (result == "")
@@ -210,7 +279,7 @@ namespace KalaServer
 				}
 				else
 				{
-					if (!RouteExists(path))
+					if (!server->RouteExists(filePath))
 					{
 						string result = server->ServeFile(path(current_path() / "pages/errors/404.html").string());
 						if (result == "")
@@ -228,7 +297,7 @@ namespace KalaServer
 					{
 						try
 						{
-							body = server->ServeFile(server->routes[path]);
+							body = server->ServeFile(server->routes[filePath]);
 						}
 						catch (const exception& e)
 						{
@@ -236,7 +305,7 @@ namespace KalaServer
 							server->PrintConsoleMessage(
 								ConsoleMessageType::Type_Error,
 								"Error 500 when requesting page ("
-								+ path
+								+ filePath
 								+ ").\nError:\n"
 								+ e.what());
 #endif

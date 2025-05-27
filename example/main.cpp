@@ -29,7 +29,7 @@ int main()
 	};
 	
 	Server::Initialize(
-		8080
+		8080,
 		whitelistedExtensions,
 		whitelistedRoutes);
 		

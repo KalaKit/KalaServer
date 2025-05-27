@@ -45,75 +45,11 @@ namespace KalaServer
 			const vector<string>& routes, 
 			const vector<string>& extensions);
 			
-		void AddNewWhitelistedRoute(const string& newRoute)
-		{
-			for (const auto& route : whitelistedRoutes)
-			{
-				if (route == newRoute)
-				{
-					PrintConsoleMessage(
-						ConsoleMessageType::Type_Warning,
-						"Route '" + route + "' has already been whitelisted!");
-					return;
-				}
-			}
-			
-			whitelistedRoutes.push_back(newRoute);
-		}
-		void AddNewWhitelistedExtension(const string& newExtension)
-		{
-			for (const auto& extension : whitelistedExtensions)
-			{
-				if (extension == newExtension)
-				{
-					PrintConsoleMessage(
-						ConsoleMessageType::Type_Warning,
-						"Extension '" + extension + "' has already been whitelisted!");
-					return;
-				}
-			}
-			
-			whitelistedExtensions.push_back(newExtension);
-		}
+		void AddNewWhitelistedRoute(const string& newRoute);
+		void AddNewWhitelistedExtension(const string& newExtension);
 		
-		void RemoveWhitelistedRoute(const string& thisRoute)
-		{
-			string foundRoute{};
-			for (const auto& route : whitelistedRoutes)
-			{
-				if (route == thisRoute)
-				{
-					foundRoute = route;
-					break;
-				}
-			}
-			
-			if (foundRoute == "")
-			{
-				PrintConsoleMessage(
-					ConsoleMessageType::Type_Warning,
-					"Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!");
-			}
-		}
-		void RemoveWhitelistedExtension(const string& thisExtension)
-		{
-			string foundExtension{};
-			for (const auto& extension : whitelistedExtensions)
-			{
-				if (extension == thisExtension)
-				{
-					foundExtension = extension;
-					break;
-				}
-			}
-			
-			if (foundExtension == "")
-			{
-				PrintConsoleMessage(
-					ConsoleMessageType::Type_Warning,
-					"Extension '" + thisExtension + "' cannot be removed because it hasn't been whitelisted!");
-			}
-		}
+		void RemoveWhitelistedRoute(const string& thisRoute);
+		void RemoveWhitelistedExtension(const string& thisExtension);
 		
 		bool RouteExists(const string& thisRoute)
 		{
