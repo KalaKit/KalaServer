@@ -53,11 +53,7 @@ namespace KalaServer
 		
 		bool RouteExists(const string& thisRoute)
 		{
-			for (const auto& route : whitelistedRoutes)
-			{
-				if (route == thisRoute) return true;
-			}
-			return false;
+			return whitelistedRoutes.contains(thisRoute);
 		}
 		bool ExtensionExists(const string& thisExtension)
 		{
@@ -68,7 +64,7 @@ namespace KalaServer
 			return false;
 		}
 			
-		vector<string> GetWhitelistedRoutes() { return whitelistedRoutes; }
+		map<string, string> GetWhitelistedRoutes() { return whitelistedRoutes; }
 		vector<string> GetWhitelistedExtensions() { return whitelistedExtensions; }
 
 		string ServeFile(const string& route);
@@ -86,9 +82,8 @@ namespace KalaServer
 	
 		bool running = false;
 		mutable SOCKET serverSocket = INVALID_SOCKET;
-		vector<string> whitelistedRoutes{};
 		vector<string> whitelistedExtensions{};
-		map<string, string> routes;
+		map<string, string> whitelistedRoutes{};
 
 		int port;
 	};

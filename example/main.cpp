@@ -30,8 +30,8 @@ int main()
 	
 	Server::Initialize(
 		8080,
-		whitelistedExtensions,
-		whitelistedRoutes);
+		whitelistedRoutes,
+		whitelistedExtensions);
 		
 	Server::server->Run();
 }

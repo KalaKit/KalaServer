@@ -37,13 +37,41 @@ namespace KalaServer
 
 		server->PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"Initializing KalaServer...");
+			"Initializing KalaServer..."
+			"\n\n"
+			"=============================="
+			"\n"
+			"Adding core extensions..."
+			"\n"
+			"=============================="
+			"\n");
 
 		for (const auto& extension : extensions)
 		{
 			server->AddNewWhitelistedExtension(extension);
 		}
+
+		server->PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"\n"
+			"=============================="
+			"\n"
+			"Adding core routes..."
+			"\n"
+			"=============================="
+			"\n");
+
 		server->AddInitialWhitelistedRoutes(routes);
+
+		server->PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"\n"
+			"=============================="
+			"\n"
+			"Initialization finished!"
+			"\n"
+			"=============================="
+			"\n");
 	}
 
 	void Server::AddInitialWhitelistedRoutes(const vector<string>& whitelistedRoutes)
@@ -84,18 +112,27 @@ namespace KalaServer
 
 	void Server::AddNewWhitelistedRoute(const string& newRoute)
 	{
-		for (const auto& route : server->whitelistedRoutes)
+		if (server->whitelistedRoutes.contains(newRoute))
 		{
-			if (route == newRoute)
-			{
-				PrintConsoleMessage(
-					ConsoleMessageType::Type_Warning,
-					"Route '" + route + "' has already been whitelisted!");
-				return;
-			}
+			PrintConsoleMessage(
+				ConsoleMessageType::Type_Warning,
+				"Route '" + newRoute + "' has already been whitelisted!");
+			return;
 		}
 
-		server->whitelistedRoutes.push_back(newRoute);
+		path fullPath = current_path() / path(newRoute).relative_path();
+		if (!exists(fullPath))
+		{
+			PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Failed to create full path for route '" + newRoute + "'! Attempted full path was '" + fullPath.string() + "'.");
+		}
+
+		server->whitelistedRoutes[newRoute] = fullPath.string();
+
+		PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Added new route '" + newRoute + "'");
 	}
 	void Server::AddNewWhitelistedExtension(const string& newExtension)
 	{
@@ -111,18 +148,17 @@ namespace KalaServer
 		}
 
 		server->whitelistedExtensions.push_back(newExtension);
+		PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Added new extension '" + newExtension + "'");
 	}
 
 	void Server::RemoveWhitelistedRoute(const string& thisRoute)
 	{
 		string foundRoute{};
-		for (const auto& route : server->whitelistedRoutes)
+		if (server->whitelistedRoutes.contains(thisRoute))
 		{
-			if (route == thisRoute)
-			{
-				foundRoute = route;
-				break;
-			}
+			foundRoute = thisRoute;
 		}
 
 		if (foundRoute == "")
@@ -252,7 +288,7 @@ namespace KalaServer
 #ifdef _DEBUG
 				server->PrintConsoleMessage(
 					ConsoleMessageType::Type_Message,
-					"Resolved path: '" + filePath + "'");
+					"Loading path: '" + filePath + "'");
 #endif
 				bool isAllowedFile =
 					filePath.find_last_of('.') == string::npos
@@ -265,60 +301,53 @@ namespace KalaServer
 						ConsoleMessageType::Type_Error,
 						"Error 403 when requesting file or path '" + filePath + "'!");
 #endif
-					string result = server->ServeFile(path(current_path() / "pages/errors/403.html").string());
-					if (result == "")
-					{
-#ifdef _DEBUG
-						server->PrintConsoleMessage(
-							ConsoleMessageType::Type_Error,
-							"File or page for error 403 cannot be accessed!");
-#endif
-						body = "<h1>403 Forbidden</h1>";
-					}
+					server->ServeFile(path(current_path() / "pages/errors/403.html").string());
 					statusLine = "HTTP/1.1 403 Forbidden";
 				}
 				else
 				{
 					if (!server->RouteExists(filePath))
 					{
-						string result = server->ServeFile(path(current_path() / "pages/errors/404.html").string());
-						if (result == "")
-						{
 #ifdef _DEBUG
-							server->PrintConsoleMessage(
-								ConsoleMessageType::Type_Error,
-								"Page for error 404 cannot be accessed!");
+						server->PrintConsoleMessage(
+							ConsoleMessageType::Type_Error,
+							"Error 404 when requesting file or path '" + filePath + "'!");
 #endif
-							body = "<h1>404 Not Found</h1>";
-						}
+						server->ServeFile(path(current_path() / "pages/errors/404.html").string());
 						statusLine = "HTTP/1.1 404 Not Found";
 					}
 					else
 					{
 						try
 						{
-							body = server->ServeFile(server->routes[filePath]);
+							auto it = server->whitelistedRoutes.find(filePath);
+							if (it == server->whitelistedRoutes.end())
+							{
+								server->PrintConsoleMessage(
+									ConsoleMessageType::Type_Error,
+									"Route '" + filePath + "' is allowed but not mapped to any file!");
+
+								server->ServeFile(path(current_path() / "pages/errors/500.html").string());
+								statusLine = "HTTP/1.1 500 Internal Server Error";
+							}
+							else
+							{
+								server->PrintConsoleMessage(
+									ConsoleMessageType::Type_Message,
+									"Serving route '" + it->second + "'.");
+								body = server->ServeFile(it->second);
+							}
 						}
 						catch (const exception& e)
 						{
-#ifdef _DEBUG
 							server->PrintConsoleMessage(
 								ConsoleMessageType::Type_Error,
 								"Error 500 when requesting page ("
 								+ filePath
 								+ ").\nError:\n"
 								+ e.what());
-#endif
-							string result = server->ServeFile(path(current_path() / "pages/errors/403.html").string());
-							if (result == "")
-							{
-#ifdef _DEBUG
-								server->PrintConsoleMessage(
-									ConsoleMessageType::Type_Error,
-									"Page for error 500 cannot be accessed!");
-#endif
-								body = "<h1>500 Not Found</h1>";
-							}
+
+							server->ServeFile(path(current_path() / "pages/errors/500.html").string());
 							statusLine = "HTTP/1.1 500 Internal Server Error";
 						}
 					}
