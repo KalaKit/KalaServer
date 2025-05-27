@@ -14,10 +14,11 @@ KalaServer is a lightweight C++ 20 library for Windows that allows you to make a
 
 ## General
 
+- file download/upload/playback (can play back audio and video files)
 - MIME Types
 - Threading (new thread per user)
 - Range Requests and persistent connections (for large media or when serving multiple assets)
-- GUI for server (useful server info and interactions)
+- GUI for server (useful server info and interactions, file download and upload)
 
 ## For global access
 
