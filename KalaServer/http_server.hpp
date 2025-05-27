@@ -20,6 +20,13 @@ namespace KalaServer
 	using std::map;
 	using std::vector;
 
+	struct ErrorMessage
+	{
+		string error403;
+		string error404;
+		string error500;
+	};
+
 	enum class PopupReason
 	{
 		Reason_Error,
@@ -40,14 +47,17 @@ namespace KalaServer
 
 		Server(
 			int port,
+			ErrorMessage errorMessage,
 			string whitelistedRoutesFolder,
-			vector<string> whitelistedExtensions)
-			: port(port),
+			vector<string> whitelistedExtensions) :
+			port(port),
+			errorMessage(errorMessage),
 			whitelistedRoutesFolder(whitelistedRoutesFolder),
 			whitelistedExtensions(whitelistedExtensions) {}
 
 		static void Initialize(
 			int port,
+			const ErrorMessage& errorMessage,
 			const string& whitelistedRoutesFolder,
 			const vector<string>& extensions);
 			
@@ -91,6 +101,7 @@ namespace KalaServer
 		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
 
 		int port; //Local server port
+		ErrorMessage errorMessage; //File paths for server admin provided error pages, loads browser defaults otherwise.
 		string whitelistedRoutesFolder; //The folder path relative to the server where all pages are inside of.
 		vector<string> whitelistedExtensions; //All extensions that are allowed to be accessed
 	};

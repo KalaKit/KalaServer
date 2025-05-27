@@ -9,6 +9,7 @@
 #include "http_server.hpp"
 
 using KalaServer::Server;
+using KalaServer::ErrorMessage;
 
 using std::string;
 using std::vector;
@@ -24,8 +25,14 @@ int main()
 	
 	static const string whitelistedRoutesFolder = "content/pages";
 
+	ErrorMessage msg{};
+	msg.error403 = "/errors/403";
+	msg.error404 = "/errors/404";
+	msg.error500 = "/errors/500";
+
 	Server::Initialize(
 		8080,
+		msg,
 		whitelistedRoutesFolder,
 		whitelistedExtensions);
 		

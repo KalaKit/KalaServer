@@ -30,11 +30,13 @@ namespace KalaServer
 {
 	void Server::Initialize(
 		int port,
+		const ErrorMessage& errorMessage,
 		const string& whitelistedRoutesFolder,
 		const vector<string>& extensions)
 	{
 		server = make_unique<Server>(
 			port,
+			errorMessage,
 			whitelistedRoutesFolder,
 			extensions);
 
@@ -275,14 +277,12 @@ namespace KalaServer
 						ConsoleMessageType::Type_Message,
 						"User tried to access non-existing route '" + filePath + "'!");
 #endif
-					string result = server->ServeFile("/errors/404");
+					string result = server->ServeFile(server->errorMessage.error404);
 					if (result == "")
 					{
 						server->PrintConsoleMessage(
 							ConsoleMessageType::Type_Error,
 							"Failed to load 404 error page!");
-
-						body = "<h1>404 Not Found</h1>";
 					}
 					else body = result;
 
@@ -301,14 +301,12 @@ namespace KalaServer
 							ConsoleMessageType::Type_Warning,
 							"User tried to access forbidden route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
 #endif
-						string result = server->ServeFile("/errors/403");
+						string result = server->ServeFile(server->errorMessage.error403);
 						if (result == "")
 						{
 							server->PrintConsoleMessage(
 								ConsoleMessageType::Type_Error,
 								"Failed to load 403 error page!");
-
-							body = "<h1>403 Forbidden</h1>";
 						}
 						else body = result;
 
@@ -327,14 +325,12 @@ namespace KalaServer
 							string result = server->ServeFile(filePath);
 							if (result == "")
 							{
-								string errorResult = server->ServeFile("/errors/500");
+								string errorResult = server->ServeFile(server->errorMessage.error500);
 								if (errorResult == "")
 								{
 									server->PrintConsoleMessage(
 										ConsoleMessageType::Type_Error,
 										"Failed to load 500 error page!");
-
-									body = "<h1>500 Internal Server Error</h1>";
 								}
 								else body = errorResult;
 							}
@@ -349,14 +345,12 @@ namespace KalaServer
 								+ ").\nError:\n"
 								+ e.what());
 
-							string result = server->ServeFile("/errors/500");
+							string result = server->ServeFile(server->errorMessage.error500);
 							if (result == "")
 							{
 								server->PrintConsoleMessage(
 									ConsoleMessageType::Type_Error,
 									"Failed to load 500 error page!");
-
-								body = "<h1>500 Internal Server Error</h1>";
 							}
 							else body = result;
 
