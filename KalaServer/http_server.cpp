@@ -22,20 +22,18 @@ using std::stringstream;
 using std::exception;
 using std::filesystem::path;
 using std::filesystem::current_path;
+using std::filesystem::exists;
+using std::filesystem::recursive_directory_iterator;
 using std::make_unique;
 
 namespace KalaServer
 {
-	static map<string, string> routes;
-	static string fullPath{};
-
 	void Server::Initialize(
-		const string& routeOrigin,
-		int port,
-		map<string, string> initialRoutes)
+		int port, 
+		const vector<string>& routes, 
+		const vector<string>& extensions)
 	{
-		server = make_unique<Server>(routeOrigin, port);
-		fullPath = (current_path() / routeOrigin).string();
+		server = make_unique<Server>(port);
 
 		server->PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
@@ -45,10 +43,44 @@ namespace KalaServer
 		server->Route("/errors/404.html", routeOrigin + "/errors/404.html");
 		server->Route("/errors/500.html", routeOrigin + "/errors/500.html");
 
-		for (const auto& [key, value] : initialRoutes)
+		for (const auto& extension : whitelistedExtensions)
 		{
-			server->Route(key, value);
+			Server::server->AddWhitelistedExtension(extension);
 		}
+		AddInitialRoutes(routes);
+	}
+	
+	void Server::AddInitialWhitelistedRoutes(const vector<string> whitelistedRoutes)
+	{
+		string cleanedRoute = route;
+		if (!cleanedRoute.empty())
+		{
+			if (cleanedRoute.front() == '/') cleanedRoute = cleanedRoute.substr(1);
+			if (cleanedRoute.back() == '/')
+			{
+				cleanedRoute = cleanedRoute.substr(0, cleanedRoute.size() - 1);	
+			}
+		}
+		
+		path baseDir = current_path() / cleanedRoute;
+		
+		if (!exists(baseDir)
+			|| !is_directory(baseDir))
+		{
+			continue;
+		}
+		
+		for (const auto& file : recursive_directory_iterator(baseDir))
+		{
+			if (!is_regular_file(file.status())) continue;
+			
+			path relative = relative(file.path(), current_path());
+			string fullRoute = "/" + relative.generic_string();
+			
+			server->AddWhitelistedRoute(fullRoute);
+		}
+		
+		server->AddWhitelistedRoute(route);
 	}
 
 	string Server::ServeFile(const string& filePath)
@@ -76,16 +108,6 @@ namespace KalaServer
 			}
 		}
 		return "";
-	}
-
-	void Server::Route(const string& route, const string& fullPath)
-	{
-		routes[route] = fullPath;
-#ifdef _DEBUG
-		PrintConsoleMessage(
-			ConsoleMessageType::Type_Message,
-			"Registered page: " + route);
-#endif
 	}
 
 	void Server::Run() const
@@ -165,17 +187,7 @@ namespace KalaServer
 #endif
 				bool isAllowedFile =
 					path.find_last_of('.') == string::npos
-					|| path.ends_with(".png")
-					|| path.ends_with(".jpg")
-					|| path.ends_with(".jpeg")
-					|| path.ends_with(".gif")
-					|| path.ends_with(".webp")
-					|| path.ends_with(".mp4")
-					|| path.ends_with(".webm")
-					|| path.ends_with(".ogg")
-					|| path.ends_with(".mp3")
-					|| path.ends_with(".wav")
-					|| path.ends_with(".flac");
+					|| server->ExtensionExists(path.extension().string());
 
 				if (!isAllowedFile)
 				{
@@ -184,7 +196,7 @@ namespace KalaServer
 						ConsoleMessageType::Type_Error,
 						"Error 403 when requesting file or path '" + path + "'!");
 #endif
-					string result = server->ServeFile(fullPath + "/errors/403.html");
+					string result = server->ServeFile(path(current_path() / "pages/errors/403.html").string());
 					if (result == "")
 					{
 #ifdef _DEBUG
@@ -198,9 +210,9 @@ namespace KalaServer
 				}
 				else
 				{
-					if (!routes.contains(path))
+					if (!RouteExists(path))
 					{
-						string result = server->ServeFile(fullPath + "/errors/404.html");
+						string result = server->ServeFile(path(current_path() / "pages/errors/404.html").string());
 						if (result == "")
 						{
 #ifdef _DEBUG
@@ -216,7 +228,7 @@ namespace KalaServer
 					{
 						try
 						{
-							body = server->ServeFile(routes[path]);
+							body = server->ServeFile(server->routes[path]);
 						}
 						catch (const exception& e)
 						{
@@ -228,7 +240,7 @@ namespace KalaServer
 								+ ").\nError:\n"
 								+ e.what());
 #endif
-							string result = server->ServeFile(fullPath + "/errors/500.html");
+							string result = server->ServeFile(path(current_path() / "pages/errors/403.html").string());
 							if (result == "")
 							{
 #ifdef _DEBUG

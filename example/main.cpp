@@ -4,28 +4,34 @@
 //Read LICENSE.md for more information.
 
 #include <string>
-#include <filesystem>
+#include <vector>
 
 #include "http_server.hpp"
 
 using KalaServer::Server;
 
 using std::string;
-using std::filesystem::current_path;
-using std::map;
+using std::vector;
 
 int main()
 {
-	static string fullPath = (current_path() / "static").string();
-
-	map<string, string> initialRoutes{};
-	initialRoutes["/"] = fullPath + "/index.html";
-	initialRoutes["/about"] = fullPath + "/about.html";
-
+	static const vector<string> whitelistedExtensions = 
+	{
+		".png", ".jpg", ".jpeg", ".gif",
+		".mp3", ".wav", ".flac", ".ogg",
+		".webp", ".mp4", ".webm"
+	};	
+	static const vector<string> whitelistedRoutes = 
+	{
+		"/images/",
+		"/videos/",
+		"/pages/"
+	};
+	
 	Server::Initialize(
-		"static", 
-		8080,
-		initialRoutes);
-
+		8080
+		whitelistedExtensions,
+		whitelistedRoutes);
+		
 	Server::server->Run();
 }
