@@ -3,17 +3,9 @@
 set "PROJECT_ROOT=%~dp0"
 cd "%PROJECT_ROOT%"
 
-set "PAGES_ORIGIN=%PROJECT_ROOT%\example\pages"
-set "IMAGES_ORIGIN=%PROJECT_ROOT%\example\images"
-set "VIDEOS_ORIGIN=%PROJECT_ROOT%\example\videos"
-
-set "PAGES_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\pages"
-set "IMAGES_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\images"
-set "VIDEOS_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\videos"
-
-set "PAGES_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\pages"
-set "IMAGES_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\images"
-set "VIDEOS_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\videos"
+set "CONTENT_ORIGIN=%PROJECT_ROOT%\example\content"
+set "CONTENT_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\content"
+set "CONTENT_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\content"
 
 set "BUILD_DEBUG=%PROJECT_ROOT%build-debug"
 if exist "%BUILD_DEBUG%" (
@@ -74,27 +66,10 @@ if exist "%PAGES_RELEASE_TARGET%" rmdir /s /q "%PAGES_RELEASE_TARGET%"
 if exist "%IMAGES_RELEASE_TARGET%" rmdir /s /q "%IMAGES_RELEASE_TARGET%"
 if exist "%VIDEOS_RELEASE_TARGET%" rmdir /s /q "%VIDEOS_RELEASE_TARGET%"
 
-mkdir "%PAGES_DEBUG_TARGET%"
-mkdir "%IMAGES_DEBUG_TARGET%"
-mkdir "%VIDEOS_DEBUG_TARGET%"
-
-mkdir "%PAGES_RELEASE_TARGET%"
-mkdir "%IMAGES_RELEASE_TARGET%"
-mkdir "%VIDEOS_RELEASE_TARGET%"
-
-xcopy "%PAGES_ORIGIN%" "%PAGES_DEBUG_TARGET%\" /E /I /Y >nul
-echo Copied files to pages debug target.
-xcopy "%IMAGES_ORIGIN%" "%IMAGES_DEBUG_TARGET%\" /E /I /Y >nul
-echo Copied files to images debug target.
-xcopy "%VIDEOS_ORIGIN%" "%VIDEOS_DEBUG_TARGET%\" /E /I /Y >nul
-echo Copied files to videos debug target.
-
-xcopy "%PAGES_ORIGIN%" "%PAGES_RELEASE_TARGET%\" /E /I /Y >nul
-echo Copied files to pages release target.
-xcopy "%IMAGES_ORIGIN%" "%IMAGES_RELEASE_TARGET%\" /E /I /Y >nul
-echo Copied files to images release target.
-xcopy "%VIDEOS_ORIGIN%" "%VIDEOS_RELEASE_TARGET%\" /E /I /Y >nul
-echo Copied files to videos release target.
+xcopy "%CONTENT_ORIGIN%" "%CONTENT_DEBUG_TARGET%\" /E /I /Y >nul
+echo Copied server content files to debug target.
+xcopy "%CONTENT_ORIGIN%" "%CONTENT_RELEASE_TARGET%\" /E /I /Y >nul
+echo Copied server content files to release target.
 
 echo.
 echo ========================================

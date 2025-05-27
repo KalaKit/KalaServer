@@ -38,14 +38,20 @@ namespace KalaServer
 	public:
 		static inline unique_ptr<Server> server;
 
-		Server(int port) : port(port) {}
+		Server(
+			int port,
+			string whitelistedRoutesFolder,
+			vector<string> whitelistedExtensions)
+			: port(port),
+			whitelistedRoutesFolder(whitelistedRoutesFolder),
+			whitelistedExtensions(whitelistedExtensions) {}
 
 		static void Initialize(
-			int port, 
-			const vector<string>& routes, 
+			int port,
+			const string& whitelistedRoutesFolder,
 			const vector<string>& extensions);
 			
-		void AddNewWhitelistedRoute(const string& newRoute);
+		void AddNewWhitelistedRoute(const string& rootPath, const string& filePath);
 		void AddNewWhitelistedExtension(const string& newExtension);
 		
 		void RemoveWhitelistedRoute(const string& thisRoute);
@@ -78,13 +84,14 @@ namespace KalaServer
 			const string& message);
 		void Quit();
 	private:
-		void AddInitialWhitelistedRoutes(const vector<string>& routes);
+		void AddInitialWhitelistedRoutes();
 	
-		bool running = false;
-		mutable SOCKET serverSocket = INVALID_SOCKET;
-		vector<string> whitelistedExtensions{};
-		map<string, string> whitelistedRoutes{};
+		bool running = false; //Is the server currently running
+		mutable SOCKET serverSocket = INVALID_SOCKET; //Current active socket
+		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
 
-		int port;
+		int port; //Local server port
+		string whitelistedRoutesFolder; //The folder path relative to the server where all pages are inside of.
+		vector<string> whitelistedExtensions; //All extensions that are allowed to be accessed
 	};
 }

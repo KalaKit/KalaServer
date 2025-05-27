@@ -17,20 +17,16 @@ int main()
 {
 	static const vector<string> whitelistedExtensions = 
 	{
-		".png", ".jpg", ".jpeg", ".gif",
+		".png", ".jpg", ".jpeg", ".ico",
 		".mp3", ".wav", ".flac", ".ogg",
-		".webp", ".mp4", ".webm"
+		".webp", ".webm", ".mp4", ".gif"
 	};	
-	static const vector<string> whitelistedRoutes = 
-	{
-		"/images/",
-		"/videos/",
-		"/pages/"
-	};
 	
+	static const string whitelistedRoutesFolder = "content/pages";
+
 	Server::Initialize(
 		8080,
-		whitelistedRoutes,
+		whitelistedRoutesFolder,
 		whitelistedExtensions);
 		
 	Server::server->Run();
