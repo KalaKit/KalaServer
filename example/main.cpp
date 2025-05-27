@@ -31,7 +31,7 @@ int main()
 	msg.error500 = "/errors/500";
 
 	Server::Initialize(
-		8080,
+		80,
 		msg,
 		whitelistedRoutesFolder,
 		whitelistedExtensions);

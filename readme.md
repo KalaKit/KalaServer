@@ -25,7 +25,68 @@ To compile from source code simply run 'build_all.bat' or 'build_debug.bat' or '
 
 Compile the project from source using the existing CMakeLists.txt at root by running 'build_all.bat' and then open 'KalaServer_example.exe' inside 'build-release/example' or 'build-debug/example' to start the example server made with KalaServer.
 
-how to get access locally:
-- local port: 8080
-- local website: http://localhost:8080/
-- firewall: enable private, disable public
+## How to get access locally
+
+- allow port '8080' through firewall
+	- add inbound rule
+	- choose port
+	- choose tcp
+	- set specific local port to 8080
+	- allow connection
+	- profile: private
+	- name: KalaServer
+- run the server (which listens on port 8080)
+- open your browser and go to 'http://localhost:8080'
+
+## How to get access locally with a custom domain
+
+- open 'C:\Windows\System32\drivers\etc\hosts'
+- add '127.0.0.1    yourdomain.com' at the bottom
+- allow port '8080' through firewall
+	- add inbound rule
+	- choose port
+	- choose tcp
+	- set specific local port to 8080
+	- allow connection
+	- profile: All
+	- name: KalaServer
+- run the server (which listens on port 8080)
+- open your browser and go to 'http://yourdomain.com:8080'
+
+## How to get access globally
+
+- allow port '80' through firewall
+	- add inbound rule
+	- choose port
+	- choose tcp
+	- set specific local port to 80
+	- allow connection
+	- profile: All
+	- name: KalaServer
+- log in to your router admin page (usually 192.168.1.1)
+- go to the port forwarding section 
+	- port: 80
+	- protocol: tcp
+	- internal ip: your ipv4
+	- internal port: 80
+	- name: KalaServer
+- add a root domain record to cloudflare (or other domain provider)
+	- go to your cloudflare domain
+	- go to dns
+	- click add record
+	- Type: A
+	- Name: @
+	- IPv4 address: your public ipv4 (not the same from cmd ipconfig command)
+	- Proxy status: off
+- add a cname record to cloudflare (or other domain provider)
+	- go to your cloudflare domain
+	- go to dns
+	- click add record
+	- Type: CNAME
+	- Name: www
+	- Target: your domain + extension (example - thekalakit.com)
+	- Proxy status: off
+- run the server as admin (which listens on port 80)
+- open your browser and go to 'http://yourdomain.com'
+
+https://accounts.hetzner.com/login

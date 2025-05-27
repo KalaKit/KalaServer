@@ -239,7 +239,7 @@ namespace KalaServer
 				"Listen failed!");
 		}
 
-		cout << "Server is running on http://localhost:" << server->port << "\n";
+		cout << "Server is running on port '" << server->port << "'.\n";
 
 		server->running = true;
 		while (running)
@@ -259,12 +259,18 @@ namespace KalaServer
 				string request(buffer);
 				string filePath = "/";
 
-				size_t pathStart = request.find("GET ") + 4;
-				size_t pathEnd = request.find(' ', pathStart);
-				if (pathStart != string::npos
-					&& pathEnd != string::npos)
+				server->PrintConsoleMessage(
+					ConsoleMessageType::Type_Message,
+					"Raw HTTP request:\n" + request);
+
+				if (request.starts_with("GET "))
 				{
-					filePath = request.substr(pathStart, pathEnd - pathStart);
+					size_t pathStart = 4;
+					size_t pathEnd = request.find(' ', pathStart);
+					if (pathEnd != string::npos)
+					{
+						filePath = request.substr(pathStart, pathEnd - pathStart);
+					}
 				}
 
 				string body{};
@@ -272,11 +278,10 @@ namespace KalaServer
 
 				if (!server->RouteExists(filePath))
 				{
-#ifdef _DEBUG
 					server->PrintConsoleMessage(
 						ConsoleMessageType::Type_Message,
 						"User tried to access non-existing route '" + filePath + "'!");
-#endif
+
 					string result = server->ServeFile(server->errorMessage.error404);
 					if (result == "")
 					{
@@ -296,11 +301,10 @@ namespace KalaServer
 
 					if (!isAllowedFile)
 					{
-#ifdef _DEBUG
 						server->PrintConsoleMessage(
 							ConsoleMessageType::Type_Warning,
 							"User tried to access forbidden route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
-#endif
+
 						string result = server->ServeFile(server->errorMessage.error403);
 						if (result == "")
 						{
@@ -314,11 +318,9 @@ namespace KalaServer
 					}
 					else
 					{
-#ifdef _DEBUG
 						server->PrintConsoleMessage(
 							ConsoleMessageType::Type_Message,
 							"Loading route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
-#endif
 
 						try
 						{
