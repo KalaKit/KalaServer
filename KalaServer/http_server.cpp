@@ -39,7 +39,7 @@ namespace KalaServer
 			ConsoleMessageType::Type_Message,
 			"Initializing KalaServer...");
 
-		server->Route("/errors/403.html", routeOrigin + "/errors/403.html");
+		server->AddWhitelistedRoute("/errors/403.html", routeOrigin + "/errors/403.html");
 		server->Route("/errors/404.html", routeOrigin + "/errors/404.html");
 		server->Route("/errors/500.html", routeOrigin + "/errors/500.html");
 
