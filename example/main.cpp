@@ -28,6 +28,4 @@ int main()
 		initialRoutes);
 
 	Server::server->Run();
-
-	Server::server->Quit();
 }

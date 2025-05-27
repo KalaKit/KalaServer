@@ -10,13 +10,28 @@ KalaServer is a lightweight C++ 20 library for Windows that allows you to make a
 
 # Future plans
 
+## General
+
 - MIME Types
 - Threading (new thread per user)
 - Range Requests and persistent connections (for large media or when serving multiple assets)
 - GUI for server (useful server info and interactions)
-- Global connection (not just local access to website)
+
+## For global access
+
 - limit brute-force attempts by throttling per-second and per-minute requests for current ip
-- authorization with session tokens, password hashes, HTTPS, account data stored on disk
+- additional security with openssl:
+	- https encryption
+	- tls handshake
+	- certificate handling + client sertificate verification
+	- cypher suite selection
+	- protocol version restrictions
+	- perfect forward secrecy
+	- secure session reuse
+- authorization:
+	- session tokens
+	- password hashes
+	- account data stored on disk
 - each route as struct with auth-level as enum, route as string and mimeType as string
 
 # Prerequisites (when compiling from source code)
