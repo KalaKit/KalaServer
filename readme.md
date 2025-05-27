@@ -36,5 +36,5 @@ how to get access locally:
 
 KalaServer correctly displays errors on your browser and sends 500, 403 or 404 when either of those are errors are encountered on the server.
 
-![error_403](error_examples/error_403.png)
-![error_404](error_examples/error_404.png)
+![error_403](example/content/images/error_403.png)
+![error_404](example/content/images/error_404.png)
