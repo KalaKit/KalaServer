@@ -8,6 +8,8 @@
 
 KalaServer is a lightweight C++ 20 library for Windows that allows you to make an HTTP server locally for websites using Windows sockets.
 
+Future plans include support for file hosting, file download/upload, media playback, secure account systems with authorization and easy game server creation.
+
 ---
 
 # Future plans
