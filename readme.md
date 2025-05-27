@@ -31,3 +31,10 @@ how to get access locally:
 - local port: 8080
 - local website: http://localhost:8080/
 - firewall: enable private, disable public
+
+# Displayed errors
+
+KalaServer correctly displays errors on your browser and sends 500, 403 or 404 when either of those are errors are encountered on the server.
+
+![error_403](error_examples/error_403.png)
+![error_404](error_examples/error_404.png)
