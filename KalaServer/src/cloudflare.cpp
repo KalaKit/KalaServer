@@ -198,8 +198,11 @@ namespace KalaServer
 		ZeroMemory(&pi, sizeof(pi));
 		si.cb = sizeof(si);
 
-		//create the new process
 		string command = "tunnel login";
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [Cloudflared command] " + command);
+
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
 		(
@@ -264,8 +267,11 @@ namespace KalaServer
 		ZeroMemory(&pi, sizeof(pi));
 		si.cb = sizeof(si);
 
-		//create the new process
-		string command = "tunnel create";
+		string command = "tunnel create " + serverName;
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [Cloudflared command] " + command);
+
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
 		(
@@ -366,6 +372,10 @@ namespace KalaServer
 			"  \"credentials-file\": \"" + cleanedCredentialsPath + "\"\n"
 			"}\n";
 
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Attempting to create tunnel config file at: " + tunnelConfigPath);
+
 		ofstream configFile(tunnelConfigPath);
 		if (!configFile)
 		{
@@ -418,12 +428,15 @@ namespace KalaServer
 		ZeroMemory(&pi, sizeof(pi));
 		si.cb = sizeof(si);
 
-		//create the new process
 		string command =
 			"tunnel route dns "
-			+ domainName
+			+ serverName
 			+ " "
-			+ serverName;
+			+ domainName;
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [Cloudflared command] " + command);
+
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
 		(
@@ -464,6 +477,8 @@ namespace KalaServer
 
 	void CloudFlare::RunTunnel()
 	{
+		string serverName = Server::server->GetServerName();
+
 		wstring wParentFolderPath(cloudFlaredParentPath.begin(), cloudFlaredParentPath.end());
 		wstring wExePath(cloudflaredPath.begin(), cloudflaredPath.end());
 		string commands{};
@@ -477,7 +492,7 @@ namespace KalaServer
 		si.cb = sizeof(si);
 
 		//create the new process
-		string command = "tunnel run " + Server::server->GetServerName();
+		string command = "tunnel run " + serverName;
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
 		(
