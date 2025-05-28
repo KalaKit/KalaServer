@@ -60,7 +60,7 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 - download [the latest cloudflared-windows-amd64.exe](https://github.com/cloudflare/cloudflared/releases/latest)
 - copy to location where your server exe is
 - rename to 'cloudflared.exe'
-- call 'server->EnableCloudflared();' in your server code before initializing the server
+- call 'Server::server->EnableCloudflared();' in your server code right after initializing the server
 - compile the server and run with any port
 - open your browser and go to 'http://yourdomain.com'
 
