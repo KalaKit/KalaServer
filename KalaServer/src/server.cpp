@@ -3,6 +3,7 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <iostream>
 #include <map>
@@ -11,7 +12,10 @@
 #include <sstream>
 #include <filesystem>
 
+#include "core.hpp"
 #include "server.hpp"
+#include "cloudflare.hpp"
+#include "dns.hpp"
 
 using std::cout;
 using std::map;
@@ -30,19 +34,23 @@ namespace KalaServer
 {
 	void Server::Initialize(
 		int port,
+		const string& serverName,
+		const string& domainName,
 		const ErrorMessage& errorMessage,
 		const string& whitelistedRoutesFolder,
 		const vector<string>& extensions)
 	{
 		server = make_unique<Server>(
 			port,
+			serverName,
+			domainName,
 			errorMessage,
 			whitelistedRoutesFolder,
 			extensions);
 
-		server->PrintConsoleMessage(
+		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"Initializing KalaServer..."
+			"Initializing " + Server::server->GetServerName() + " ..."
 			"\n\n"
 			"=============================="
 			"\n"
@@ -53,7 +61,7 @@ namespace KalaServer
 
 		server->AddInitialWhitelistedRoutes();
 		
-		server->PrintConsoleMessage(
+		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"\n"
 			"=============================="
@@ -66,15 +74,17 @@ namespace KalaServer
 		WSADATA wsaData{};
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		{
-			server->CreatePopup(
+			Core::CreatePopup(
 				PopupReason::Reason_Error,
 				"WSAStartup failed!");
 		}
 
-		server->serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (serverSocket == INVALID_SOCKET)
+		SOCKET thisSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		server->serverSocket = static_cast<uintptr_t>(thisSocket);
+
+		if (thisSocket == INVALID_SOCKET)
 		{
-			server->CreatePopup(
+			Core::CreatePopup(
 				PopupReason::Reason_Error,
 				"Socket creation failed!");
 		}
@@ -85,27 +95,27 @@ namespace KalaServer
 		serverAddr.sin_port = htons(port);
 
 		if (bind(
-			server->serverSocket,
+			thisSocket,
 			(sockaddr*)&serverAddr,
 			sizeof(serverAddr)) == SOCKET_ERROR)
 		{
-			server->CreatePopup(
+			Core::CreatePopup(
 				PopupReason::Reason_Error,
 				"Bind failed!");
 		}
 
-		if (listen(server->serverSocket, SOMAXCONN) == SOCKET_ERROR)
+		if (listen(thisSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
-			server->CreatePopup(
+			Core::CreatePopup(
 				PopupReason::Reason_Error,
 				"Listen failed!");
 		}
 
 		cout << "Server is running on port '" << server->port << "'.\n";
 
-		server->running = true;
+		Core::isRunning = true;
 
-		server->PrintConsoleMessage(
+		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"\n"
 			"=============================="
@@ -121,7 +131,7 @@ namespace KalaServer
 		if (server->whitelistedRoutesFolder == ""
 			|| !exists(current_path() / server->whitelistedRoutesFolder))
 		{
-			CreatePopup(
+			Core::CreatePopup(
 				PopupReason::Reason_Error,
 				"Whitelisted routes root folder '" + server->whitelistedRoutesFolder + "' is empty or does not exist!");
 			return;
@@ -157,7 +167,7 @@ namespace KalaServer
 	{
 		if (server->whitelistedRoutes.contains(rootPath))
 		{
-			PrintConsoleMessage(
+			Core::PrintConsoleMessage(
 				ConsoleMessageType::Type_Warning,
 				"Route '" + rootPath + "' has already been whitelisted!");
 			return;
@@ -166,7 +176,7 @@ namespace KalaServer
 		path fullPath = path(filePath);
 		if (!exists(fullPath))
 		{
-			PrintConsoleMessage(
+			Core::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Page path '" + filePath + "' does not exist!.");
 
@@ -175,7 +185,7 @@ namespace KalaServer
 
 		server->whitelistedRoutes[rootPath] = filePath;
 
-		PrintConsoleMessage(
+		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Added new route '" + rootPath + "'");
 	}
@@ -185,7 +195,7 @@ namespace KalaServer
 		{
 			if (extension == newExtension)
 			{
-				PrintConsoleMessage(
+				Core::PrintConsoleMessage(
 					ConsoleMessageType::Type_Warning,
 					"Extension '" + extension + "' has already been whitelisted!");
 				return;
@@ -193,7 +203,7 @@ namespace KalaServer
 		}
 
 		server->whitelistedExtensions.push_back(newExtension);
-		PrintConsoleMessage(
+		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Added new extension '" + newExtension + "'");
 	}
@@ -208,7 +218,7 @@ namespace KalaServer
 
 		if (foundRoute == "")
 		{
-			PrintConsoleMessage(
+			Core::PrintConsoleMessage(
 				ConsoleMessageType::Type_Warning,
 				"Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!");
 		}
@@ -227,7 +237,7 @@ namespace KalaServer
 
 		if (foundExtension == "")
 		{
-			PrintConsoleMessage(
+			Core::PrintConsoleMessage(
 				ConsoleMessageType::Type_Warning,
 				"Extension '" + thisExtension + "' cannot be removed because it hasn't been whitelisted!");
 		}
@@ -251,208 +261,162 @@ namespace KalaServer
 		return "";
 	}
 
-	void Server::Run() const
+	bool Server::Run() const
 	{
-		while (running)
+		if (!CloudFlare::IsRunning()
+			&& !DNS::IsRunning())
 		{
-			SOCKET clientSocket = accept(server->serverSocket, nullptr, nullptr);
-			if (clientSocket == INVALID_SOCKET)
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Neither cloudflared or dns was started! Please run atleast one of them.");
+			return false;
+		}
+
+		SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
+		SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
+		if (clientSocket == INVALID_SOCKET)
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Accept failed!");
+			return false;
+		}
+
+		char buffer[2048] = {};
+		int bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+		if (bytesReceived > 0)
+		{
+			string request(buffer);
+			string filePath = "/";
+
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"Raw HTTP request:\n" + request);
+
+			if (request.starts_with("GET "))
 			{
-				server->CreatePopup(
-					PopupReason::Reason_Error,
-					"Accept failed!");
+				size_t pathStart = 4;
+				size_t pathEnd = request.find(' ', pathStart);
+				if (pathEnd != string::npos)
+				{
+					filePath = request.substr(pathStart, pathEnd - pathStart);
+				}
 			}
 
-			char buffer[2048] = {};
-			int bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-			if (bytesReceived > 0)
+			string body{};
+			string statusLine = "HTTP/1.1 200 OK";
+
+			if (!server->RouteExists(filePath))
 			{
-				string request(buffer);
-				string filePath = "/";
-
-				server->PrintConsoleMessage(
+				Core::PrintConsoleMessage(
 					ConsoleMessageType::Type_Message,
-					"Raw HTTP request:\n" + request);
+					"User tried to access non-existing route '" + filePath + "'!");
 
-				if (request.starts_with("GET "))
+				string result = server->ServeFile(server->errorMessage.error404);
+				if (result == "")
 				{
-					size_t pathStart = 4;
-					size_t pathEnd = request.find(' ', pathStart);
-					if (pathEnd != string::npos)
-					{
-						filePath = request.substr(pathStart, pathEnd - pathStart);
-					}
+					Core::PrintConsoleMessage(
+						ConsoleMessageType::Type_Error,
+						"Failed to load 404 error page!");
 				}
+				else body = result;
 
-				string body{};
-				string statusLine = "HTTP/1.1 200 OK";
+				statusLine = "HTTP/1.1 404 Not Found";
+			}
+			else
+			{
+				bool isAllowedFile =
+					filePath.find_last_of('.') == string::npos
+					|| server->ExtensionExists(path(filePath).extension().generic_string());
 
-				if (!server->RouteExists(filePath))
+				if (!isAllowedFile)
 				{
-					server->PrintConsoleMessage(
-						ConsoleMessageType::Type_Message,
-						"User tried to access non-existing route '" + filePath + "'!");
+					Core::PrintConsoleMessage(
+						ConsoleMessageType::Type_Warning,
+						"User tried to access forbidden route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
 
-					string result = server->ServeFile(server->errorMessage.error404);
+					string result = server->ServeFile(server->errorMessage.error403);
 					if (result == "")
 					{
-						server->PrintConsoleMessage(
+						Core::PrintConsoleMessage(
 							ConsoleMessageType::Type_Error,
-							"Failed to load 404 error page!");
+							"Failed to load 403 error page!");
 					}
 					else body = result;
 
-					statusLine = "HTTP/1.1 404 Not Found";
+					statusLine = "HTTP/1.1 403 Forbidden";
 				}
 				else
 				{
-					bool isAllowedFile =
-						filePath.find_last_of('.') == string::npos
-						|| server->ExtensionExists(path(filePath).extension().generic_string());
+					Core::PrintConsoleMessage(
+						ConsoleMessageType::Type_Message,
+						"Loading route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
 
-					if (!isAllowedFile)
+					try
 					{
-						server->PrintConsoleMessage(
-							ConsoleMessageType::Type_Warning,
-							"User tried to access forbidden route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
-
-						string result = server->ServeFile(server->errorMessage.error403);
+						string result = server->ServeFile(filePath);
 						if (result == "")
 						{
-							server->PrintConsoleMessage(
-								ConsoleMessageType::Type_Error,
-								"Failed to load 403 error page!");
-						}
-						else body = result;
-
-						statusLine = "HTTP/1.1 403 Forbidden";
-					}
-					else
-					{
-						server->PrintConsoleMessage(
-							ConsoleMessageType::Type_Message,
-							"Loading route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
-
-						try
-						{
-							string result = server->ServeFile(filePath);
-							if (result == "")
+							string errorResult = server->ServeFile(server->errorMessage.error500);
+							if (errorResult == "")
 							{
-								string errorResult = server->ServeFile(server->errorMessage.error500);
-								if (errorResult == "")
-								{
-									server->PrintConsoleMessage(
-										ConsoleMessageType::Type_Error,
-										"Failed to load 500 error page!");
-								}
-								else body = errorResult;
-							}
-							else body = result;
-						}
-						catch (const exception& e)
-						{
-							server->PrintConsoleMessage(
-								ConsoleMessageType::Type_Error,
-								"Error 500 when requesting page ("
-								+ filePath
-								+ ").\nError:\n"
-								+ e.what());
-
-							string result = server->ServeFile(server->errorMessage.error500);
-							if (result == "")
-							{
-								server->PrintConsoleMessage(
+								Core::PrintConsoleMessage(
 									ConsoleMessageType::Type_Error,
 									"Failed to load 500 error page!");
 							}
-							else body = result;
-
-							statusLine = "HTTP/1.1 500 Internal Server Error";
+							else body = errorResult;
 						}
+						else body = result;
+					}
+					catch (const exception& e)
+					{
+						Core::PrintConsoleMessage(
+							ConsoleMessageType::Type_Error,
+							"Error 500 when requesting page ("
+							+ filePath
+							+ ").\nError:\n"
+							+ e.what());
+
+						string result = server->ServeFile(server->errorMessage.error500);
+						if (result == "")
+						{
+							Core::PrintConsoleMessage(
+								ConsoleMessageType::Type_Error,
+								"Failed to load 500 error page!");
+						}
+						else body = result;
+
+						statusLine = "HTTP/1.1 500 Internal Server Error";
 					}
 				}
-
-				string response =
-					statusLine + "\r\n"
-					"Content-Type: text/html\r\n"
-					"Content-Length: " + to_string(body.size()) + "\r\n"
-					"Connection: close\r\n\r\n" + body;
-
-				send(
-					clientSocket,
-					response.c_str(),
-					static_cast<int>(response.size()),
-					0);
 			}
 
-			closesocket(clientSocket);
+			string response =
+				statusLine + "\r\n"
+				"Content-Type: text/html\r\n"
+				"Content-Length: " + to_string(body.size()) + "\r\n"
+				"Connection: close\r\n\r\n" + body;
+
+			send(
+				clientSocket,
+				response.c_str(),
+				static_cast<int>(response.size()),
+				0);
 		}
 
-		closesocket(server->serverSocket);
-		WSACleanup();
-	}
+		closesocket(clientSocket);
 
-	void Server::PrintConsoleMessage(
-		ConsoleMessageType type,
-		const string& message)
-	{
-		string targetType{};
-
-		switch (type)
-		{
-		case ConsoleMessageType::Type_Error:
-			targetType = "[ERROR] ";
-			break;
-		case ConsoleMessageType::Type_Warning:
-			targetType = "[WARNING] ";
-			break;
-		case ConsoleMessageType::Type_Message:
-			targetType = "";
-			break;
-		}
-
-		string result = targetType + message;
-		cout << result + "\n";
-	}
-
-	void Server::CreatePopup(
-		PopupReason reason,
-		const string& message)
-	{
-		string popupTitle{};
-
-		if (reason == PopupReason::Reason_Error)
-		{
-			popupTitle = "KalaServer error";
-
-			MessageBoxA(
-				nullptr,
-				message.c_str(),
-				popupTitle.c_str(),
-				MB_ICONERROR
-				| MB_OK);
-
-			Quit();
-		}
-		else if (reason == PopupReason::Reason_Warning)
-		{
-			popupTitle = "KalaServer warning";
-
-			MessageBoxA(
-				nullptr,
-				message.c_str(),
-				popupTitle.c_str(),
-				MB_ICONWARNING
-				| MB_OK);
-		}
+		return true;
 	}
 
 	void Server::Quit()
 	{
-		if (serverSocket != INVALID_SOCKET)
+		SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
+		if (thisSocket != INVALID_SOCKET)
 		{
-			closesocket(serverSocket);
-			serverSocket = INVALID_SOCKET;
+			closesocket(thisSocket);
+			thisSocket = INVALID_SOCKET;
+			server->serverSocket = 0;
 		}
 
 		WSACleanup();

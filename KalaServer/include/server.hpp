@@ -5,13 +5,12 @@
 
 #pragma once
 
-#include <WinSock2.h>
 #include <string>
 #include <memory>
 #include <map>
 #include <vector>
 
-#pragma comment(lib, "ws2_32.lib")
+
 
 namespace KalaServer
 {
@@ -26,47 +25,57 @@ namespace KalaServer
 		string error404;
 		string error500;
 	};
-
-	enum class PopupReason
-	{
-		Reason_Error,
-		Reason_Warning
-	};
-
-	enum class ConsoleMessageType
-	{
-		Type_Error,
-		Type_Warning,
-		Type_Message
-	};
 	
-	class Server()
+	class Server
 	{
 	public:
 		static inline unique_ptr<Server> server;
 
 		Server(
 			int port,
-			ErrorMessage errorMessage,
+			string serverName,
+			string domainName,
+			ErrorMessage errorMessages,
 			string whitelistedRoutesFolder,
 			vector<string> whitelistedExtensions) :
 			port(port),
+			serverName(serverName),
+			domainName(domainName),
 			errorMessage(errorMessage),
 			whitelistedRoutesFolder(whitelistedRoutesFolder),
-			whitelistedExtensions(whitelistedExtensions) {}
+			whitelistedExtensions(whitelistedExtensions) {
+		}
 
+		/// <summary>
+		/// Initializes the server. Must be ran first before any other components.
+		/// </summary>
 		static void Initialize(
 			int port,
+			const string& serverName,
+			const string& domainName,
 			const ErrorMessage& errorMessage,
 			const string& whitelistedRoutesFolder,
 			const vector<string>& extensions);
-			
+
+		/// <summary>
+		/// Runs the server loop. Use Core::Run instead of this.
+		/// </summary>
+		bool Run() const;
+
+		/// <summary>
+		/// Closes the server. Use Core::Quit instead of this.
+		/// </summary>
+		void Quit();
+
+		void SetServerName(const string& newServerName) { serverName = newServerName; }
+		void SetDomainName(const string& newDomainName) { domainName = newDomainName; }
+
 		void AddNewWhitelistedRoute(const string& rootPath, const string& filePath);
 		void AddNewWhitelistedExtension(const string& newExtension);
-		
+
 		void RemoveWhitelistedRoute(const string& thisRoute);
 		void RemoveWhitelistedExtension(const string& thisExtension);
-		
+
 		bool RouteExists(const string& thisRoute)
 		{
 			return whitelistedRoutes.contains(thisRoute);
@@ -79,21 +88,25 @@ namespace KalaServer
 			}
 			return false;
 		}
-			
+
+		string GetServerName() { return serverName; }
+		string GetDomainName() { return domainName; }
+
 		map<string, string> GetWhitelistedRoutes() { return whitelistedRoutes; }
 		vector<string> GetWhitelistedExtensions() { return whitelistedExtensions; }
 
 		string ServeFile(const string& route);
 	private:
 		void AddInitialWhitelistedRoutes();
-	
-		bool running = false; //Is the server currently running
-		mutable SOCKET serverSocket = INVALID_SOCKET; //Current active socket
+
+		mutable uintptr_t serverSocket{}; //Current active socket
 		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
 
 		int port; //Local server port
+		string serverName; //The server name used for cloudflare/dns calls
+		string domainName; //The domain name that is launched
 		ErrorMessage errorMessage; //File paths for server admin provided error pages, loads browser defaults otherwise.
 		string whitelistedRoutesFolder; //The folder path relative to the server where all pages are inside of.
 		vector<string> whitelistedExtensions; //All extensions that are allowed to be accessed
-	}
+	};
 }

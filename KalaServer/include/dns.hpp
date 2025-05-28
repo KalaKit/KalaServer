@@ -1,0 +1,30 @@
+//Copyright(C) 2025 Lost Empire Entertainment
+//This program comes with ABSOLUTELY NO WARRANTY.
+//This is free software, and you are welcome to redistribute it under certain conditions.
+//Read LICENSE.md for more information.
+
+#pragma once
+
+namespace KalaServer
+{
+	class DNS
+	{
+	public:
+		/// <summary>
+		/// Start up dns. Must not be running cloudflared with this.
+		/// Returns true if initialized successfully.
+		/// </summary>
+		static bool RunDNS();
+
+		static bool IsInitializing() { return isInitializing; }
+		static bool IsRunning() { return isRunning; }
+
+		/// <summary>
+		/// Shut down dns.
+		/// </summary>
+		static void Quit();
+	private:
+		static inline bool isInitializing = true;
+		static inline bool isRunning = false;
+	};
+}

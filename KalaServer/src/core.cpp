@@ -3,18 +3,28 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include <Windows.h>
+#include <iostream>
+
 #include "core.hpp"
 #include "server.hpp"
 #include "cloudflare.hpp"
+#include "dns.hpp"
+
+using std::cout;
 
 namespace KalaServer
 {
-	bool Core::Run() const
+	bool Core::Run()
 	{
-		return Server::server->Run() const;
+		bool result{};
+
+		result = Server::server->Run();
+
+		return result;
 	}
 
-	void Server::PrintConsoleMessage(
+	void Core::PrintConsoleMessage(
 		ConsoleMessageType type,
 		const string& message)
 	{
@@ -37,7 +47,7 @@ namespace KalaServer
 		cout << result + "\n";
 	}
 
-	void Server::CreatePopup(
+	void Core::CreatePopup(
 		PopupReason reason,
 		const string& message)
 	{
@@ -45,7 +55,7 @@ namespace KalaServer
 
 		if (reason == PopupReason::Reason_Error)
 		{
-			popupTitle = "KalaServer error";
+			popupTitle = Server::server->GetServerName() + " error";
 
 			MessageBoxA(
 				nullptr,
@@ -54,11 +64,11 @@ namespace KalaServer
 				MB_ICONERROR
 				| MB_OK);
 
-			Quit();
+			isRunning = false;
 		}
 		else if (reason == PopupReason::Reason_Warning)
 		{
-			popupTitle = "KalaServer warning";
+			popupTitle = Server::server->GetServerName() + "  warning";
 
 			MessageBoxA(
 				nullptr,
@@ -72,6 +82,9 @@ namespace KalaServer
 	void Core::Quit()
 	{
 		Server::server->Quit();
+
+		if (CloudFlare::IsRunning()) CloudFlare::Quit();
+		if (DNS::IsRunning()) DNS::Quit();
 		
 		exit(0);
 	}

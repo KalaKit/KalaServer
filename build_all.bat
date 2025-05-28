@@ -7,6 +7,16 @@ set "CONTENT_ORIGIN=%PROJECT_ROOT%\example\content"
 set "CONTENT_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\content"
 set "CONTENT_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\content"
 
+set "CLOUDFLARED_ORIGIN=%PROJECT_ROOT%\example\cloudflared.exe"
+set "CLOUDFLARED_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\cloudflared.exe"
+set "CLOUDFLARED_RELEASE_TARGET=%PROJECT_ROOT%\\build-release\example\cloudflared.exe"
+
+if not exist "%CLOUDFLARED_ORIGIN%" (
+	echo Failed to find cloudflared.exe! Please place it to "%PROJECT_ROOT%example\cloudflared.exe".
+	pause
+	exit /b 1
+)
+
 set "BUILD_DEBUG=%PROJECT_ROOT%build-debug"
 if exist "%BUILD_DEBUG%" (
 	rmdir /s /q "%BUILD_DEBUG%"
@@ -70,6 +80,11 @@ xcopy "%CONTENT_ORIGIN%" "%CONTENT_DEBUG_TARGET%\" /E /I /Y >nul
 echo Copied server content files to debug target.
 xcopy "%CONTENT_ORIGIN%" "%CONTENT_RELEASE_TARGET%\" /E /I /Y >nul
 echo Copied server content files to release target.
+
+copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_DEBUG_TARGET%"
+echo Copied cloudflared to debug target.
+copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_RELEASE_TARGET%"
+echo Copied cloudflared to release target.
 
 echo.
 echo ========================================

@@ -5,12 +5,34 @@
 
 #pragma once
 
+#include <string>
+
 namespace KalaServer
 {
+	using std::string;
+
+	enum class ConsoleMessageType
+	{
+		Type_Error,
+		Type_Warning,
+		Type_Message
+	};
+
+	enum class PopupReason
+	{
+		Reason_Error,
+		Reason_Warning
+	};
+
 	class Core
 	{
 	public:
-		static void Run() const;
+		//Is the server currently running
+		static inline bool isRunning = false;
+
+		static bool Run();
+
+		static bool IsRunning() { return isRunning; }
 
 		static void PrintConsoleMessage(
 			ConsoleMessageType type, 

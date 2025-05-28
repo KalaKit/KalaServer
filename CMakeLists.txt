@@ -14,7 +14,9 @@ set(INCLUDE_DIR "${KALASERVER_ROOT}/include")
 
 add_library(KalaServer STATIC 
 	"${SRC_DIR}/core.cpp"
+	"${SRC_DIR}/server.cpp"
 	"${SRC_DIR}/cloudflare.cpp"
+	"${SRC_DIR}/dns.cpp"
 )
 
 target_include_directories(KalaServer PUBLIC 

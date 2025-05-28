@@ -6,35 +6,63 @@
 #include <string>
 #include <vector>
 
-#include "http_server.hpp"
+#include "core.hpp"
+#include "server.hpp"
+#include "cloudflare.hpp"
+#include "dns.hpp"
 
+using KalaServer::Core;
 using KalaServer::Server;
 using KalaServer::ErrorMessage;
+using KalaServer::ConsoleMessageType;
+using KalaServer::CloudFlare;
+using KalaServer::DNS;
 
 using std::string;
 using std::vector;
 
 int main()
 {
-	static const vector<string> whitelistedExtensions = 
-	{
-		".png", ".jpg", ".jpeg", ".ico",
-		".mp3", ".wav", ".flac", ".ogg",
-		".webp", ".webm", ".mp4", ".gif"
-	};	
-	
-	static const string whitelistedRoutesFolder = "content/pages";
+	int port = 80;
+
+	string serverName = "KalaServer";
+	string domainName = "thekalakit.com";
 
 	ErrorMessage msg{};
 	msg.error403 = "/errors/403";
 	msg.error404 = "/errors/404";
 	msg.error500 = "/errors/500";
+	
+	static const string whitelistedRoutesFolder = "content/pages";
+
+	static const vector<string> whitelistedExtensions =
+	{
+		".png", ".jpg", ".jpeg", ".ico",
+		".mp3", ".wav", ".flac", ".ogg",
+		".webp", ".webm", ".mp4", ".gif"
+	};
 
 	Server::Initialize(
-		80,
+		port,
+		serverName,
+		domainName,
 		msg,
 		whitelistedRoutesFolder,
 		whitelistedExtensions);
+
+	CloudFlare::RunCloudflared();
+	
+	//do not run dns and cloudflared together
+	//DNS::RunDNS();
 		
-	Server::server->Run();
+	Core::PrintConsoleMessage(
+		ConsoleMessageType::Type_Message,
+		"Reached render loop successfully!");
+
+	while (Core::isRunning)
+	{
+		Core::Run();
+	}
+
+	Core::Quit();
 }
