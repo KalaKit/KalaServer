@@ -88,5 +88,3 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 	- Proxy status: off
 - run the server as admin (which listens on port 80)
 - open your browser and go to 'http://yourdomain.com'
-
-https://accounts.hetzner.com/login
