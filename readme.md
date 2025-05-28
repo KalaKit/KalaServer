@@ -77,7 +77,7 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 	- Type: A
 	- Name: @
 	- IPv4 address: your public ipv4 (not the same from cmd ipconfig command)
-	- Proxy status: off
+	- Proxy status: on
 - add a cname record to cloudflare (or other domain provider)
 	- go to your cloudflare domain
 	- go to dns
@@ -85,6 +85,6 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 	- Type: CNAME
 	- Name: www
 	- Target: your domain + extension (example - thekalakit.com)
-	- Proxy status: off
+	- Proxy status: on
 - run the server as admin (which listens on port 80)
 - open your browser and go to 'http://yourdomain.com'
