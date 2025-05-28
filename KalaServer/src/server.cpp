@@ -11,7 +11,7 @@
 #include <sstream>
 #include <filesystem>
 
-#include "http_server.hpp"
+#include "server.hpp"
 
 using std::cout;
 using std::map;
@@ -52,6 +52,58 @@ namespace KalaServer
 			"\n");
 
 		server->AddInitialWhitelistedRoutes();
+		
+		server->PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"\n"
+			"=============================="
+			"\n"
+			"Connecting to network..."
+			"\n"
+			"=============================="
+			"\n");
+		
+		WSADATA wsaData{};
+		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+		{
+			server->CreatePopup(
+				PopupReason::Reason_Error,
+				"WSAStartup failed!");
+		}
+
+		server->serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (serverSocket == INVALID_SOCKET)
+		{
+			server->CreatePopup(
+				PopupReason::Reason_Error,
+				"Socket creation failed!");
+		}
+
+		sockaddr_in serverAddr{};
+		serverAddr.sin_family = AF_INET;
+		serverAddr.sin_addr.s_addr = INADDR_ANY;
+		serverAddr.sin_port = htons(port);
+
+		if (bind(
+			server->serverSocket,
+			(sockaddr*)&serverAddr,
+			sizeof(serverAddr)) == SOCKET_ERROR)
+		{
+			server->CreatePopup(
+				PopupReason::Reason_Error,
+				"Bind failed!");
+		}
+
+		if (listen(server->serverSocket, SOMAXCONN) == SOCKET_ERROR)
+		{
+			server->CreatePopup(
+				PopupReason::Reason_Error,
+				"Listen failed!");
+		}
+
+		cout << "Server is running on port '" << server->port << "'.\n";
+
+		server->running = true;
 
 		server->PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
@@ -201,47 +253,6 @@ namespace KalaServer
 
 	void Server::Run() const
 	{
-		WSADATA wsaData{};
-		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-		{
-			server->CreatePopup(
-				PopupReason::Reason_Error,
-				"WSAStartup failed!");
-		}
-
-		server->serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (serverSocket == INVALID_SOCKET)
-		{
-			server->CreatePopup(
-				PopupReason::Reason_Error,
-				"Socket creation failed!");
-		}
-
-		sockaddr_in serverAddr{};
-		serverAddr.sin_family = AF_INET;
-		serverAddr.sin_addr.s_addr = INADDR_ANY;
-		serverAddr.sin_port = htons(port);
-
-		if (bind(
-			server->serverSocket,
-			(sockaddr*)&serverAddr,
-			sizeof(serverAddr)) == SOCKET_ERROR)
-		{
-			server->CreatePopup(
-				PopupReason::Reason_Error,
-				"Bind failed!");
-		}
-
-		if (listen(server->serverSocket, SOMAXCONN) == SOCKET_ERROR)
-		{
-			server->CreatePopup(
-				PopupReason::Reason_Error,
-				"Listen failed!");
-		}
-
-		cout << "Server is running on port '" << server->port << "'.\n";
-
-		server->running = true;
 		while (running)
 		{
 			SOCKET clientSocket = accept(server->serverSocket, nullptr, nullptr);
@@ -445,6 +456,5 @@ namespace KalaServer
 		}
 
 		WSACleanup();
-		exit(0);
 	}
 }

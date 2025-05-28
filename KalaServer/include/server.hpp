@@ -39,8 +39,8 @@ namespace KalaServer
 		Type_Warning,
 		Type_Message
 	};
-
-	class Server
+	
+	class Server()
 	{
 	public:
 		static inline unique_ptr<Server> server;
@@ -84,15 +84,6 @@ namespace KalaServer
 		vector<string> GetWhitelistedExtensions() { return whitelistedExtensions; }
 
 		string ServeFile(const string& route);
-
-		void Run() const;
-
-		void PrintConsoleMessage(ConsoleMessageType type, const string& message);
-
-		void CreatePopup(
-			PopupReason reason,
-			const string& message);
-		void Quit();
 	private:
 		void AddInitialWhitelistedRoutes();
 	
@@ -104,5 +95,5 @@ namespace KalaServer
 		ErrorMessage errorMessage; //File paths for server admin provided error pages, loads browser defaults otherwise.
 		string whitelistedRoutesFolder; //The folder path relative to the server where all pages are inside of.
 		vector<string> whitelistedExtensions; //All extensions that are allowed to be accessed
-	};
+	}
 }

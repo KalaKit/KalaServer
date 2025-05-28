@@ -9,7 +9,16 @@ project("KalaServer")
 set(KALASERVER_ROOT "${CMAKE_SOURCE_DIR}/KalaServer")
 set(EXAMPLE_ROOT "${CMAKE_SOURCE_DIR}/example")
 
-add_library(KalaServer STATIC "${KALASERVER_ROOT}/http_server.cpp")
-target_include_directories(KalaServer PUBLIC "${KALASERVER_ROOT}")
+set(SRC_DIR "${KALASERVER_ROOT}/src")
+set(INCLUDE_DIR "${KALASERVER_ROOT}/include")
+
+add_library(KalaServer STATIC 
+	"${SRC_DIR}/core.cpp"
+	"${SRC_DIR}/cloudflare.cpp"
+)
+
+target_include_directories(KalaServer PUBLIC 
+	"${INCLUDE_DIR}"
+)
 
 add_subdirectory("${EXAMPLE_ROOT}")
