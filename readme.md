@@ -6,9 +6,9 @@
 
 ![Logo](logo.png)
 
-KalaServer is a lightweight C++ 20 library for Windows that allows you to make an HTTP server locally for websites using Windows sockets.
+KalaServer is a lightweight C++ 20 library for Windows that allows you to make web, media or any other kind of a server with very few dependencies. The library is currently in early alpha development, so a lot of changes will come, but the core goals will stay the same. Track development and future plans on the public [trello board](https://trello.com/b/Xrf2qRDD/kalaserver) board.
 
-Future plans include support for file hosting, file download/upload, media playback, secure account systems with authorization and easy game server creation. Track progress on the [trello board](https://trello.com/b/Xrf2qRDD/kalaserver).
+An example project using KalaServer has been added to the example folder, at the current stage it is compiled alongside KalaServer but can be easily excluded by removing the line 'add_subdirectory("${EXAMPLE_ROOT}")' from the bottom of the CMakeLists.txt file at the root repository folder.
 
 ---
 
