@@ -55,6 +55,17 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 
 ## How to get access globally
 
+### With 'cloudflared' and Cloudflare
+
+- download [the latest cloudflared-windows-amd64.exe](https://github.com/cloudflare/cloudflared/releases/latest)
+- copy to location where your server exe is
+- rename to 'cloudflared.exe'
+- call 'server->EnableCloudflared();' in your server code before initializing the server
+- compile the server and run with any port
+- open your browser and go to 'http://yourdomain.com'
+
+### With port forwarding (and via self-hosted dns in the future)
+
 - allow port '80' through firewall
 	- add inbound rule
 	- choose port
