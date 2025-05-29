@@ -80,6 +80,8 @@ namespace KalaServer
 			return false;
 		}
 
+		cloudFlaredName = "cloudflared.exe";
+		cloudflaredPath = path(current_path() / cloudFlaredName).string();
 		if (!exists(cloudflaredPath))
 		{
 			Core::CreatePopup(
@@ -95,11 +97,9 @@ namespace KalaServer
 
 		SetReusedParameters();
 
-		if (!CreateHeadlessWindow())
-		{
-			isInitializing = false;
-			return false;
-		}
+		if (!exists(certPath)) CreateCert();
+		else if (!TunnelExists()) CreateTunnel();
+		else RunTunnel();
 
 		isInitializing = false;
 		isRunning = true;
@@ -156,114 +156,12 @@ namespace KalaServer
 
 	void CloudFlare::SetReusedParameters()
 	{
-		cloudFlaredName = "cloudflared.exe";
-		cloudflaredPath = path(current_path() / cloudFlaredName).string();
 		cloudFlaredParentPath = current_path().string();
 
 		cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
 		certPath = path(path(cloudFlareFolder) / "cert.pem").string();
 		string tunnelConfigName = Server::server->GetServerName() + ".json";
 		tunnelConfigPath = path(path(cloudFlareFolder) / tunnelConfigName).string();
-	}
-
-	bool CloudFlare::CreateHeadlessWindow()
-	{
-		wstring wParentFolderPath(cloudFlaredParentPath.begin(), cloudFlaredParentPath.end());
-		wstring wExePath(cloudflaredPath.begin(), cloudflaredPath.end());
-		string commands{};
-		wstring wCommands(commands.begin(), commands.end());
-
-		//initialize structures for process creation
-		STARTUPINFOW si;
-		PROCESS_INFORMATION pi;
-		ZeroMemory(&si, sizeof(si));
-		ZeroMemory(&pi, sizeof(pi));
-		si.cb = sizeof(si);
-
-		//create the new process
-		if (!CreateProcessW
-		(
-			wExePath.c_str(),          //path to the executable
-			const_cast<LPWSTR>(wCommands.c_str()), //command line arguments
-			nullptr,                   //process handle not inheritable
-			nullptr,                   //thread handle not inheritable
-			FALSE,                     //handle inheritance
-			0,                         //creation flags
-			nullptr,                   //use parent's environment block
-			wParentFolderPath.c_str(), //use parent's starting directory
-			&si,                       //pointer to STARTUPINFO structure
-			&pi                        //pointer to PROCESS_INFORMATION structure
-		))
-		{
-			//retrieve the error code and print a descriptive error message
-			LPVOID lpMsgBuf = nullptr;
-			DWORD dw = GetLastError();
-			FormatMessageW(
-				FORMAT_MESSAGE_ALLOCATE_BUFFER
-				| FORMAT_MESSAGE_FROM_SYSTEM
-				| FORMAT_MESSAGE_IGNORE_INSERTS,
-				nullptr,
-				dw,
-				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-				(LPWSTR)&lpMsgBuf, 0, nullptr);
-
-			if (lpMsgBuf)
-			{
-				wstring wideMessage(reinterpret_cast<wchar_t*>(lpMsgBuf));
-
-				int sizeNeeded = WideCharToMultiByte(
-					CP_UTF8,
-					0,
-					wideMessage.c_str(),
-					-1,
-					nullptr,
-					0,
-					nullptr,
-					nullptr);
-
-				if (sizeNeeded > 0)
-				{
-					string message(sizeNeeded, 0);
-
-					WideCharToMultiByte(
-						CP_UTF8,
-						0,
-						wideMessage.c_str(),
-						-1,
-						&message[0],
-						sizeNeeded,
-						nullptr,
-						nullptr);
-
-					Core::PrintConsoleMessage(
-						ConsoleMessageType::Type_Error,
-						message);
-				}
-				LocalFree(lpMsgBuf);
-			}
-
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create cloudflared process!");
-			return false;
-		}
-
-		//close thread handle and process
-		CloseHandle(pi.hThread);
-		CloseHandle(pi.hProcess);
-
-		Core::PrintConsoleMessage(
-			ConsoleMessageType::Type_Message,
-			"Created cloudflared process successfully. PID: " + to_string(pi.dwProcessId));
-
-		if (!TunnelExists()) CreateCert();
-		else RunTunnel();
-
-		return true;
 	}
 	
 	bool CloudFlare::TunnelExists()
@@ -429,6 +327,8 @@ namespace KalaServer
 
 	void CloudFlare::CreateTunnel()
 	{
+		if (TunnelExists()) RunTunnel();
+
 		string serverName = Server::server->GetServerName();
 
 		wstring wParentFolderPath(cloudFlaredParentPath.begin(), cloudFlaredParentPath.end());

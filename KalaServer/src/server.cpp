@@ -163,7 +163,6 @@ namespace KalaServer
 			}
 
 			//get clean route
-
 			path relativePath = relative(route.path(), server->whitelistedRoutesFolder);
 			relativePath.replace_extension("");
 			string correctRootPath = "/" + relativePath.generic_string();

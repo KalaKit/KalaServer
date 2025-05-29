@@ -10,8 +10,6 @@
 #include <map>
 #include <vector>
 
-
-
 namespace KalaServer
 {
 	using std::string;

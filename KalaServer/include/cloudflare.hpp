@@ -25,7 +25,7 @@ namespace KalaServer
 		/// </summary>
 		static void Quit();
 	private:
-		static inline bool isInitializing = true;
+		static inline bool isInitializing = false;
 		static inline bool isRunning = false;
 		
 		static inline string tunnelName;
@@ -34,11 +34,6 @@ namespace KalaServer
 		static string GetTunnelCommandFile();
 
 		static void SetReusedParameters();
-		
-		/// <summary>
-		/// Creates the window cloudflared will run inside of.
-		/// </summary>
-		static bool CreateHeadlessWindow();
 		
 		/// <summary>
 		/// Runs 'cloudflared.exe tunnel list'

@@ -22,17 +22,8 @@ using KalaServer::DNS;
 
 using std::string;
 using std::vector;
-using std::filesystem::exists;
 using std::filesystem::current_path;
 using std::filesystem::path;
-
-static string GetTunnelCommand(const string& tunnelFilePath)
-{
-	if (!exists(tunnelFilePath))
-	{
-		
-	}
-}
 
 int main()
 {
