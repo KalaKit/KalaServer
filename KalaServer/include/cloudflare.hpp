@@ -26,6 +26,8 @@ namespace KalaServer
 	private:
 		static inline bool isInitializing = true;
 		static inline bool isRunning = false;
+		
+		static string GetTunnelCommandFile(const string& tunnelCommandFilePath);
 
 		static void SetReusedParameters();
 

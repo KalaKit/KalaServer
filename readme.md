@@ -57,11 +57,19 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 
 ### With 'cloudflared' and Cloudflare
 
+- create a cloudflared tunnel if you havent yet
+	- log in to 'https://one.dash.cloudflare.com/'
+	- go to networks > tunnels
+	- select 'Create a tunnel'
+	- choose connector type 'Cloudflared' and click next
+	- enter tunnel name (needs to be save as you add to server)
+	- select 'Save tunnel'
 - download [the latest cloudflared-windows-amd64.exe](https://github.com/cloudflare/cloudflared/releases/latest)
 - copy to location where your server exe is
 - rename to 'cloudflared.exe'
-- call 'Server::server->EnableCloudflared();' in your server code right after initializing the server
+- call 'CloudFlare::Initialize();' in your server code right after initializing the server
 - compile the server and run with any port
+- follow first-time auth instructions through the server exe if you have not yet authorized a cloudflared tunnel
 - open your browser and go to 'http://yourdomain.com'
 
 ### With port forwarding (and via self-hosted dns in the future)

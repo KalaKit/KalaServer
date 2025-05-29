@@ -5,6 +5,7 @@
 
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #include "core.hpp"
 #include "server.hpp"
@@ -14,18 +15,34 @@
 using KalaServer::Core;
 using KalaServer::Server;
 using KalaServer::ErrorMessage;
-using KalaServer::ConsoleMessageType;
+using KalaServer::PopupReason;
 using KalaServer::CloudFlare;
 using KalaServer::DNS;
 
 using std::string;
 using std::vector;
+using std::filesystem::exists;
+using std::filesystem::current_path;
+using std::filesystem::path;
+
+static string GetTunnelCommand(const string& tunnelFilePath)
+{
+	if (!exists(tunnelFilePath))
+	{
+		
+	}
+}
 
 int main()
 {
 	int port = 80;
 
 	string serverName = "KalaServer";
+	string tunnelName = "KalaServer";
+
+	string tunnelFileName = "tunnelfile.txt";
+	string tunnelFilePath = path(current_path() / tunnelFileName).string();
+	
 	string domainName = "thekalakit.com";
 
 	ErrorMessage msg{};
@@ -50,7 +67,9 @@ int main()
 		whitelistedRoutesFolder,
 		whitelistedExtensions);
 
-	CloudFlare::RunCloudflared();
+	CloudFlare::Initialize(
+		tunnelName,
+		tunnelFilePath);
 	
 	//do not run dns and cloudflared together
 	//DNS::RunDNS();

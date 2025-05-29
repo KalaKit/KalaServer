@@ -75,6 +75,49 @@ namespace KalaServer
 		isRunning = true;
 		return true;
 	}
+	
+	string CloudFlare::GetTunnelCommandFile(const string& tunnelCommandFilePath)
+	{
+		if (!exists(tunnelCommandFilePath))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to start cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Tunnel command file '" + tunnelCommandFilePath + "' does not exist!");
+			return "";
+		}
+		
+		ifstream file(tunnelCommandFilePath);
+		if (!file)
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to start cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to open tunnel command file '" + tunnelCommandFilePath + "'!");
+			return "";
+		}
+		
+		stringstream buffer;
+		buffer << file.rdbuf();
+		if (buffer.str().empty())
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to start cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Tunnel command file '" + tunnelCommandFilePath + "' is empty!");
+			return "";
+		}
+		return buffer.str();
+	}
 
 	void CloudFlare::SetReusedParameters()
 	{
