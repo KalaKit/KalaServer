@@ -57,6 +57,8 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 
 ### With 'cloudflared' and Cloudflare
 
+This section assumes you already own a domain on cloudflare and have changed your domain nameservers to cloudflare and have set up atleast A and CNAME in dns records.
+
 - create a cloudflared tunnel if you havent yet
 	- log in to 'https://one.dash.cloudflare.com/'
 	- go to networks > tunnels
@@ -64,12 +66,12 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 	- choose connector type 'Cloudflared' and click next
 	- enter tunnel name (needs to be save as you add to server)
 	- select 'Save tunnel'
+	- copy the command text in 'run the following command'
+	- create a new file called tunneltoken.txt inside the folder where your server exe will go to and copy the contents of the copied text except 'cloudflared.exe service install ' inside it, make sure it has no leading or trailing spaces, just the token itself
+	- WARNING: Do NOT share tunneltoken.txt, anyone with this file can hijack your server. Keep it secure like a root password.
 - download [the latest cloudflared-windows-amd64.exe](https://github.com/cloudflare/cloudflared/releases/latest)
-- copy to location where your server exe is
-- rename to 'cloudflared.exe'
-- call 'CloudFlare::Initialize();' in your server code right after initializing the server
-- compile the server and run with any port
-- follow first-time auth instructions through the server exe if you have not yet authorized a cloudflared tunnel
+- copy to location where your server exe is and rename it to 'cloudflared.exe'
+- run the server with any port
 - open your browser and go to 'http://yourdomain.com'
 
 ### With port forwarding (and via self-hosted dns in the future)

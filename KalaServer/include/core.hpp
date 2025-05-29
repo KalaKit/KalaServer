@@ -30,9 +30,9 @@ namespace KalaServer
 		//Is the server currently running
 		static inline bool isRunning = false;
 
-		static bool Run();
+		static bool IsRunningAsAdmin();
 
-		static bool IsRunning() { return isRunning; }
+		static bool Run();
 
 		static void PrintConsoleMessage(
 			ConsoleMessageType type, 
@@ -43,5 +43,7 @@ namespace KalaServer
 			const string& message);
 			
 		static void Quit();
+	private:
+
 	};
 }

@@ -32,8 +32,8 @@ int main()
 	string serverName = "KalaServer";
 	string tunnelName = "KalaServer";
 
-	string tunnelFileName = "tunnelfile.txt";
-	string tunnelFilePath = path(current_path() / tunnelFileName).string();
+	string tunnelTokenFileName = "tunneltoken.txt";
+	string tunnelTokenFilePath = path(current_path() / tunnelTokenFileName).string();
 	
 	string domainName = "thekalakit.com";
 
@@ -61,7 +61,7 @@ int main()
 
 	CloudFlare::Initialize(
 		tunnelName,
-		tunnelFilePath);
+		tunnelTokenFilePath);
 	
 	//do not run dns and cloudflared together
 	//DNS::RunDNS();

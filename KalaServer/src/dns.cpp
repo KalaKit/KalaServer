@@ -7,6 +7,7 @@
 #include <string>
 
 #include "core.hpp"
+#include "server.hpp"
 #include "dns.hpp"
 #include "cloudflare.hpp"
 
@@ -19,6 +20,14 @@ namespace KalaServer
 {
 	bool DNS::RunDNS()
 	{
+		if (Server::server == nullptr)
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Cannot initialize dns if server has not yet been initialized!");
+			return false;
+		}
+
 		if (isInitializing)
 		{
 			Core::PrintConsoleMessage(

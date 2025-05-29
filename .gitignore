@@ -1,5 +1,11 @@
+# Ignore folders not needed for distribution
 out/
 .vs/
 build-debug/
 build-release/
-example/cloudflared.exe
+
+# Ignore common file types not needed for distribution
+*.exe
+
+# Ignore private and secret files
+tunneltoken.txt

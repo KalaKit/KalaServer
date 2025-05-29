@@ -40,6 +40,14 @@ namespace KalaServer
 		const string& whitelistedRoutesFolder,
 		const vector<string>& extensions)
 	{
+		if (!Core::IsRunningAsAdmin())
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"This program must be ran with admin privileges!");
+			return;
+		}
+
 		if (serverName == "")
 		{
 			Core::CreatePopup(
@@ -425,14 +433,17 @@ namespace KalaServer
 
 	void Server::Quit()
 	{
-		SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
-		if (thisSocket != INVALID_SOCKET)
+		if (Server::server != nullptr)
 		{
-			closesocket(thisSocket);
-			thisSocket = INVALID_SOCKET;
-			server->serverSocket = 0;
-		}
+			SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
+			if (thisSocket != INVALID_SOCKET)
+			{
+				closesocket(thisSocket);
+				thisSocket = INVALID_SOCKET;
+				server->serverSocket = 0;
+			}
 
-		WSACleanup();
+			WSACleanup();
+		}
 	}
 }

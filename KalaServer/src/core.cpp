@@ -4,6 +4,7 @@
 //Read LICENSE.md for more information.
 
 #include <Windows.h>
+#include <shellapi.h>
 #include <iostream>
 
 #include "core.hpp"
@@ -17,11 +18,37 @@ namespace KalaServer
 {
 	bool Core::Run()
 	{
-		bool result{};
+		bool isServerRunning = Server::server->Run();
 
-		result = Server::server->Run();
+		return isServerRunning;
+	}
 
-		return result;
+	bool Core::IsRunningAsAdmin()
+	{
+		BOOL isElevated = FALSE;
+		HANDLE token = nullptr;
+
+		if (OpenProcessToken(
+			GetCurrentProcess(),
+			TOKEN_QUERY,
+			&token))
+		{
+			TOKEN_ELEVATION elevation{};
+			DWORD size = sizeof(elevation);
+
+			if (GetTokenInformation(
+				token,
+				TokenElevation,
+				&elevation,
+				sizeof(elevation),
+				&size))
+			{
+				isElevated = elevation.TokenIsElevated;
+			}
+			CloseHandle(token);
+		}
+
+		return isElevated;
 	}
 
 	void Core::PrintConsoleMessage(
@@ -52,10 +79,16 @@ namespace KalaServer
 		const string& message)
 	{
 		string popupTitle{};
+		string serverName = "Server";
+		if (Server::server != nullptr
+			&& Server::server->GetServerName() != "")
+		{
+			serverName = Server::server->GetServerName();
+		}
 
 		if (reason == PopupReason::Reason_Error)
 		{
-			popupTitle = Server::server->GetServerName() + " error";
+			popupTitle = serverName + " error";
 
 			MessageBoxA(
 				nullptr,
@@ -68,7 +101,7 @@ namespace KalaServer
 		}
 		else if (reason == PopupReason::Reason_Warning)
 		{
-			popupTitle = Server::server->GetServerName() + "  warning";
+			popupTitle = serverName + "  warning";
 
 			MessageBoxA(
 				nullptr,
