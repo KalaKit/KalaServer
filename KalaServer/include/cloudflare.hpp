@@ -11,12 +11,13 @@ namespace KalaServer
 	{
 	public:
 		/// <summary>
-		/// Start up dns. Must not be running dns with this.
+		/// Start up cloudflared. Must not be running dns with this.
 		/// Returns true if initialized successfully.
 		/// </summary>
-		static bool RunCloudflared();
+		static bool Initialize(
+			const string& tunnelName,
+			const string& tunnelFilePath);
 
-		static bool IsInitializing() { return isInitializing; }
 		static bool IsRunning() { return isRunning; }
 
 		/// <summary>
@@ -27,14 +28,23 @@ namespace KalaServer
 		static inline bool isInitializing = true;
 		static inline bool isRunning = false;
 		
-		static string GetTunnelCommandFile(const string& tunnelCommandFilePath);
+		static inline string tunnelName;
+		static inline string tunnelCommandFile;
+		
+		static string GetTunnelCommandFile();
 
 		static void SetReusedParameters();
-
+		
 		/// <summary>
 		/// Creates the window cloudflared will run inside of.
 		/// </summary>
 		static bool CreateHeadlessWindow();
+		
+		/// <summary>
+		/// Runs 'cloudflared.exe tunnel list'
+		/// through cloudflared.exe as a separate process.
+		/// </summary>
+		static bool TunnelExists();
 
 		/// <summary>
 		/// Runs 'cloudflared.exe tunnel login'

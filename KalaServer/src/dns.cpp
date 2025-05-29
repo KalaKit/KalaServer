@@ -19,6 +19,15 @@ namespace KalaServer
 {
 	bool DNS::RunDNS()
 	{
+		if (isInitializing)
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Cannot initialize dns while it is already being initialized!");
+			return false;
+		}
+		isInitializing = true;
+		
 		if (CloudFlare::IsRunning())
 		{
 			Core::CreatePopup(
@@ -28,6 +37,7 @@ namespace KalaServer
 				"Reason:"
 				"\n"
 				"Cannot run DNS and cloudflared together!");
+			isInitializing = false;
 			return false;
 		}
 
@@ -35,6 +45,7 @@ namespace KalaServer
 			ConsoleMessageType::Type_Warning,
 			"DNS is currently a placeholder! This does nothing.");
 
+		isInitializing = false;
 		isRunning = true;
 		return true;
 	}

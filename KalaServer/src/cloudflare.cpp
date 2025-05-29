@@ -27,6 +27,7 @@ using std::replace;
 namespace KalaServer
 {
 	static HANDLE cloudFlareWindowProcess{};
+	static HANDLE cloudFlareTunnelListProcess{};
 	static HANDLE cloudFlareCertProcess{};
 	static HANDLE cloudFlareCreateTunnelProcess{};
 	static HANDLE cloudFlareTunnelProcess{};
@@ -39,8 +40,35 @@ namespace KalaServer
 	string certPath{};
 	string tunnelConfigPath{};
 
-	bool CloudFlare::RunCloudflared()
+	bool CloudFlare::Initialize(
+		const string& tunnelName,
+		const string& tunnelFilePath)
 	{
+		if (isInitializing)
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Cannot initialize cloudflared while it is already being initialized!");
+			return false;
+		}
+		
+		if (tunnelName == "")
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start cloudflared with empty tunnel name name!");
+			return false;
+		}
+		if (tunnelFilePath == "")
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start cloudflared with empty tunnel file path!");
+			return false;
+		}
+		
+		isInitializing = true;
+		
 		if (DNS::IsRunning())
 		{
 			Core::CreatePopup(
@@ -50,11 +78,9 @@ namespace KalaServer
 				"Reason:"
 				"\n"
 				"Cannot run DNS and cloudflared together!");
+			isInitializing = false;
 			return false;
 		}
-
-		cloudFlaredName = "cloudflared.exe";
-		cloudflaredPath = path(current_path() / cloudFlaredName).string();
 
 		if (!exists(cloudflaredPath))
 		{
@@ -65,20 +91,26 @@ namespace KalaServer
 				"Reason:"
 				"\n"
 				"Failed to find cloudflared.exe!");
+			isInitializing = false;
 			return false;
 		}
 
 		SetReusedParameters();
 
-		if (!CreateHeadlessWindow()) return false;
+		if (!CreateHeadlessWindow())
+		{
+			isInitializing = false;
+			return false;
+		}
 
+		isInitializing = false;
 		isRunning = true;
 		return true;
 	}
 	
-	string CloudFlare::GetTunnelCommandFile(const string& tunnelCommandFilePath)
+	string CloudFlare::GetTunnelCommandFile()
 	{
-		if (!exists(tunnelCommandFilePath))
+		if (!exists(tunnelCommandFile))
 		{
 			Core::CreatePopup(
 				PopupReason::Reason_Error,
@@ -86,11 +118,11 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Tunnel command file '" + tunnelCommandFilePath + "' does not exist!");
+				"Tunnel command file '" + tunnelCommandFile + "' does not exist!");
 			return "";
 		}
 		
-		ifstream file(tunnelCommandFilePath);
+		ifstream file(tunnelCommandFile);
 		if (!file)
 		{
 			Core::CreatePopup(
@@ -99,7 +131,7 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Failed to open tunnel command file '" + tunnelCommandFilePath + "'!");
+				"Failed to open tunnel command file '" + tunnelCommandFile + "'!");
 			return "";
 		}
 		
@@ -113,7 +145,7 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Tunnel command file '" + tunnelCommandFilePath + "' is empty!");
+				"Tunnel command file '" + tunnelCommandFile + "' is empty!");
 			return "";
 		}
 		return buffer.str();
@@ -121,6 +153,8 @@ namespace KalaServer
 
 	void CloudFlare::SetReusedParameters()
 	{
+		cloudFlaredName = "cloudflared.exe";
+		cloudflaredPath = path(current_path() / cloudFlaredName).string();
 		cloudFlaredParentPath = current_path().string();
 
 		cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
@@ -223,10 +257,63 @@ namespace KalaServer
 			ConsoleMessageType::Type_Message,
 			"Created cloudflared process successfully. PID: " + to_string(pi.dwProcessId));
 
-		if (!exists(certPath)) CreateCert();
+		if (!TunnelExists()) CreateCert();
 		else RunTunnel();
 
 		return true;
+	}
+	
+	bool CloudFlare::TunnelExists()
+	{
+		string tunnelName = Server::server->GetTunnelName();
+		
+		wstring wParentFolderPath(cloudFlaredParentPath.begin(), cloudFlaredParentPath.end());
+		wstring wExePath(cloudflaredPath.begin(), cloudflaredPath.end());
+
+		//initialize structures for process creation
+		STARTUPINFOW si;
+		PROCESS_INFORMATION pi;
+		ZeroMemory(&si, sizeof(si));
+		ZeroMemory(&pi, sizeof(pi));
+		si.cb = sizeof(si);
+
+		string command = "tunnel list";
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [Cloudflared command] " + command);
+
+		wstring wideCommand(command.begin(), command.end());
+		if (!CreateProcessW
+		(
+			wExePath.c_str(),          //path to the executable
+			const_cast<LPWSTR>(wideCommand.c_str()), //command line arguments
+			nullptr,                   //process handle not inheritable
+			nullptr,                   //thread handle not inheritable
+			FALSE,                     //handle inheritance
+			0,                         //creation flags
+			nullptr,                   //use parent's environment block
+			wParentFolderPath.c_str(), //use parent's starting directory
+			&si,                       //pointer to STARTUPINFO structure
+			&pi                        //pointer to PROCESS_INFORMATION structure
+		))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create process for listing tunnels!");
+			return false;
+		}
+
+		//close thread handle and store process
+		CloseHandle(pi.hThread);
+		cloudFlareTunnelListProcess = pi.hProcess;
+
+		WaitForSingleObject(pi.hProcess, INFINITE);
+
+		//return true or false
 	}
 
 	void CloudFlare::CreateCert()

@@ -16,7 +16,6 @@ namespace KalaServer
 		/// </summary>
 		static bool RunDNS();
 
-		static bool IsInitializing() { return isInitializing; }
 		static bool IsRunning() { return isRunning; }
 
 		/// <summary>
@@ -24,7 +23,6 @@ namespace KalaServer
 		/// </summary>
 		static void Quit();
 	private:
-		static inline bool isInitializing = true;
 		static inline bool isRunning = false;
 	};
 }

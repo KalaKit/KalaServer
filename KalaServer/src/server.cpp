@@ -40,6 +40,21 @@ namespace KalaServer
 		const string& whitelistedRoutesFolder,
 		const vector<string>& extensions)
 	{
+		if (serverName == "")
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with empty server name!");
+			return;
+		}
+		if (domainName == "")
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with empty domain name!");
+			return;
+		}
+		
 		server = make_unique<Server>(
 			port,
 			serverName,
