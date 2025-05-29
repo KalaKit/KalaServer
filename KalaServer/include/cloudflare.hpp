@@ -31,7 +31,7 @@ namespace KalaServer
 		static inline string tunnelName;
 		static inline string tunnelToken;
 		static inline string tunnelTokenFilePath;
-		
+
 		/// <summary>
 		/// Returns the tunnel token as a string from its file.
 		/// </summary>
@@ -40,9 +40,24 @@ namespace KalaServer
 		/// <summary>
 		/// Trim the tunnel token from any unexpected newlines or spaces.
 		/// </summary>
-		/// <param name="newTunnelToken"></param>
-		/// <returns></returns>
 		static string TrimTunnelToken(const string& newTunnelToken);
+
+		/// <summary>
+		/// Runs 'cloudflared.exe tunnel login'
+		/// through cloudflared.exe as a separate process.
+		/// </summary>
+		static void CreateCert();
+
+		/// <summary>
+		/// Runs 'cloudflared.exe tunnel token/create <tunnelName>'
+		/// through cloudflared.exe as a separate process.
+		/// </summary>
+		static void CreateTunnelCredentials();
+
+		/// <summary>
+		/// Checks whether the cloudflared service has already been installed or not on this machine.
+		/// </summary>
+		static bool ServiceExists();
 
 		/// <summary>
 		/// Runs 'cloudflared.exe tunnel list'
@@ -54,13 +69,12 @@ namespace KalaServer
 		/// Runs 'cloudflared.exe service install <token>'
 		/// through cloudflared.exe as a separate process.
 		/// </summary>
-		static void CreateTunnel();
+		static void InstallTunnel();
 
 		/// <summary>
-		/// Runs 'tunnel run kalaserver'
+		/// Runs 'tunnel run <tunnelName>'
 		/// through cloudflared.exe as a separate process.
 		/// </summary>
-		/// <returns></returns>
 		static void RunTunnel();
 	};
 }

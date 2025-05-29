@@ -103,8 +103,15 @@ namespace KalaServer
 
 		tunnelToken = GetTunnelTokenText();
 
-		if (!TunnelExists()) CreateTunnel();
-		else RunTunnel();
+		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
+		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
+		if (!exists(certPath)) CreateCert();
+
+		string tunnelFile = tunnelName + ".json";
+		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
+		if (!exists(tunnelFilePath)) CreateTunnelCredentials();
+		if (!TunnelExists()) InstallTunnel();
+		RunTunnel();
 
 		isInitializing = false;
 		isRunning = true;
@@ -216,6 +223,136 @@ namespace KalaServer
 
 		return newTunnelToken.substr(start, end - start);
 	}
+
+	void CloudFlare::CreateCert()
+	{
+		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
+		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
+
+		wstring wParentFolderPath(current_path().string().begin(), current_path().string().end());
+
+		//initialize structures for process creation
+		STARTUPINFOW si;
+		PROCESS_INFORMATION pi;
+		ZeroMemory(&si, sizeof(si));
+		ZeroMemory(&pi, sizeof(pi));
+		si.cb = sizeof(si);
+
+		string command = "cloudflared.exe tunnel login";
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [Cloudflared command] " + command);
+
+		wstring wideCommand(command.begin(), command.end());
+		if (!CreateProcessW
+		(
+			nullptr,                   //path to the executable
+			const_cast<LPWSTR>(wideCommand.c_str()), //command line arguments
+			nullptr,                   //process handle not inheritable
+			nullptr,                   //thread handle not inheritable
+			FALSE,                     //handle inheritance
+			0,                         //creation flags
+			nullptr,                   //use parent's environment block
+			wParentFolderPath.c_str(), //use parent's starting directory
+			&si,                       //pointer to STARTUPINFO structure
+			&pi                        //pointer to PROCESS_INFORMATION structure
+		))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create process for creating cert!");
+			return;
+		}
+
+		//close thread handle and process
+		CloseHandle(pi.hThread);
+
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Launched browser to authorize with CloudFlare. PID: " + to_string(pi.dwProcessId));
+
+		WaitForSingleObject(pi.hProcess, INFINITE);
+		CloseHandle(pi.hProcess);
+
+		if (!exists(certPath))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create cert through 'cloudflared.exe tunnel login'!");
+		}
+	}
+
+	void CloudFlare::CreateTunnelCredentials()
+	{
+		string targetCommand = TunnelExists() ? "token" : "create";
+
+		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
+		string tunnelFile = tunnelName + ".json";
+		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
+
+		wstring wParentFolderPath(current_path().string().begin(), current_path().string().end());
+
+		//initialize structures for process creation
+		STARTUPINFOW si;
+		PROCESS_INFORMATION pi;
+		ZeroMemory(&si, sizeof(si));
+		ZeroMemory(&pi, sizeof(pi));
+		si.cb = sizeof(si);
+
+		string command = "cloudflared.exe tunnel " + targetCommand + " " + tunnelName;
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [Cloudflared command] " + command);
+
+		wstring wideCommand(command.begin(), command.end());
+		if (!CreateProcessW
+		(
+			nullptr,                   //path to the executable
+			const_cast<LPWSTR>(wideCommand.c_str()), //command line arguments
+			nullptr,                   //process handle not inheritable
+			nullptr,                   //thread handle not inheritable
+			FALSE,                     //handle inheritance
+			0,                         //creation flags
+			nullptr,                   //use parent's environment block
+			wParentFolderPath.c_str(), //use parent's starting directory
+			&si,                       //pointer to STARTUPINFO structure
+			&pi                        //pointer to PROCESS_INFORMATION structure
+		))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create process for creating credentials!");
+			return;
+		}
+
+		//close thread handle and process
+		CloseHandle(pi.hThread);
+		WaitForSingleObject(pi.hProcess, INFINITE);
+		CloseHandle(pi.hProcess);
+
+		if (!exists(tunnelFilePath))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create tunnel credentials with 'cloudflared.exe tunnel " + targetCommand + "'!");
+		}
+	}
 	
 	bool CloudFlare::TunnelExists()
 	{
@@ -321,8 +458,20 @@ namespace KalaServer
 		return tunnelExists;
 	}
 
-	void CloudFlare::CreateTunnel()
+	void CloudFlare::InstallTunnel()
 	{
+		if (TunnelExists()
+			|| ServiceExists())
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"Cloudflared service is already installed. Skipping installation.");
+
+			RunTunnel();
+
+			return;
+		}
+
 		string serverName = Server::server->GetServerName();
 		string parentFolderPath = current_path().string();
 		wstring wParentFolderPath(parentFolderPath.begin(), parentFolderPath.end());
@@ -372,6 +521,48 @@ namespace KalaServer
 		//close thread handle and store process
 		CloseHandle(pi.hThread);
 		cloudFlareTunnelProcess = pi.hProcess;
+	}
+
+	bool CloudFlare::ServiceExists()
+	{
+		string serviceName = "Cloudflared";
+
+		SC_HANDLE scm = OpenSCManager(
+			nullptr,
+			nullptr,
+			SC_MANAGER_ENUMERATE_SERVICE);
+		if (!scm)
+		{
+			return false;
+		}
+
+		bool found = false;
+		ENUM_SERVICE_STATUS_PROCESS services[1024];
+		DWORD bytesNeeded = 0, servicesReturned = 0, resumeHandle = 0;
+
+		if (EnumServicesStatusExA(
+			scm,
+			SC_ENUM_PROCESS_INFO,
+			SERVICE_WIN32,
+			SERVICE_STATE_ALL,
+			reinterpret_cast<LPBYTE>(&services),
+			sizeof(services),
+			&bytesNeeded,
+			&servicesReturned,
+			&resumeHandle,
+			nullptr))
+		{
+			for (DWORD i = 0; i < servicesReturned; ++i)
+			{
+				if (serviceName == services[i].lpServiceName)
+				{
+					found = true;
+					break;
+				}
+			}
+		}
+		CloseServiceHandle(scm);
+		return found;
 	}
 
 	void CloudFlare::RunTunnel()
