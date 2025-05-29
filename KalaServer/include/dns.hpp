@@ -23,6 +23,7 @@ namespace KalaServer
 		/// </summary>
 		static void Quit();
 	private:
+		static inline bool isInitializing = false;
 		static inline bool isRunning = false;
 	};
 }

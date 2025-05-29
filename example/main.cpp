@@ -15,6 +15,7 @@
 using KalaServer::Core;
 using KalaServer::Server;
 using KalaServer::ErrorMessage;
+using KalaServer::ConsoleMessageType;
 using KalaServer::PopupReason;
 using KalaServer::CloudFlare;
 using KalaServer::DNS;

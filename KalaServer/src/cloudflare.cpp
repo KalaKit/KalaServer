@@ -22,14 +22,12 @@ using std::string;
 using std::wstring;
 using std::to_string;
 using std::ofstream;
+using std::ifstream;
+using std::stringstream;
 using std::replace;
 
 namespace KalaServer
 {
-	static HANDLE cloudFlareWindowProcess{};
-	static HANDLE cloudFlareTunnelListProcess{};
-	static HANDLE cloudFlareCertProcess{};
-	static HANDLE cloudFlareCreateTunnelProcess{};
 	static HANDLE cloudFlareTunnelProcess{};
 
 	string cloudFlaredName{};
@@ -105,6 +103,11 @@ namespace KalaServer
 
 		isInitializing = false;
 		isRunning = true;
+
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Cloudflared initialization completed.");
+
 		return true;
 	}
 	
@@ -249,9 +252,9 @@ namespace KalaServer
 			return false;
 		}
 
-		//close thread handle and store process
-		cloudFlareWindowProcess = pi.hProcess;
+		//close thread handle and process
 		CloseHandle(pi.hThread);
+		CloseHandle(pi.hProcess);
 
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
@@ -265,17 +268,39 @@ namespace KalaServer
 	
 	bool CloudFlare::TunnelExists()
 	{
-		string tunnelName = Server::server->GetTunnelName();
-		
-		wstring wParentFolderPath(cloudFlaredParentPath.begin(), cloudFlaredParentPath.end());
-		wstring wExePath(cloudflaredPath.begin(), cloudflaredPath.end());
+		HANDLE hReadPipe{};
+		HANDLE hWritePipe{};
+		SECURITY_ATTRIBUTES sa
+		{
+			sizeof(SECURITY_ATTRIBUTES),
+			nullptr,
+			TRUE
+		};
+
+		if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to start cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create pipe for cloudflared tunnel list!");
+			return false;
+		}
+
+		SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
 
 		//initialize structures for process creation
-		STARTUPINFOW si;
-		PROCESS_INFORMATION pi;
-		ZeroMemory(&si, sizeof(si));
-		ZeroMemory(&pi, sizeof(pi));
+		STARTUPINFOW si{};
+		PROCESS_INFORMATION pi{};
 		si.cb = sizeof(si);
+		si.dwFlags |= STARTF_USESTDHANDLES;
+		si.hStdOutput = hWritePipe;
+		si.hStdError = hWritePipe;
+
+		wstring wParentFolderPath(cloudFlaredParentPath.begin(), cloudFlaredParentPath.end());
+		wstring wExePath(cloudflaredPath.begin(), cloudflaredPath.end());
 
 		string command = "tunnel list";
 		Core::PrintConsoleMessage(
@@ -289,7 +314,7 @@ namespace KalaServer
 			const_cast<LPWSTR>(wideCommand.c_str()), //command line arguments
 			nullptr,                   //process handle not inheritable
 			nullptr,                   //thread handle not inheritable
-			FALSE,                     //handle inheritance
+			TRUE,                      //handle inheritance
 			0,                         //creation flags
 			nullptr,                   //use parent's environment block
 			wParentFolderPath.c_str(), //use parent's starting directory
@@ -297,6 +322,9 @@ namespace KalaServer
 			&pi                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
+			CloseHandle(hReadPipe);
+			CloseHandle(hWritePipe);
+
 			Core::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
@@ -308,12 +336,30 @@ namespace KalaServer
 		}
 
 		//close thread handle and store process
+		CloseHandle(hWritePipe);
 		CloseHandle(pi.hThread);
-		cloudFlareTunnelListProcess = pi.hProcess;
 
+		//read output from the pipe
+		string output{};
+		char buffer[512]{};
+		DWORD bytesRead = 0;
+		while (ReadFile(
+			hReadPipe,
+			buffer,
+			sizeof(buffer) - 1,
+			&bytesRead,
+			nullptr))
+		{
+			if (bytesRead == 0) break;
+			buffer[bytesRead] = '\0';
+			output += buffer;
+		}
+
+		CloseHandle(hReadPipe);
 		WaitForSingleObject(pi.hProcess, INFINITE);
-
-		//return true or false
+		CloseHandle(pi.hProcess);
+		
+		return output.find(tunnelName) != string::npos;
 	}
 
 	void CloudFlare::CreateCert()
@@ -358,15 +404,15 @@ namespace KalaServer
 			return;
 		}
 
-		//close thread handle and store process
+		//close thread handle and process
 		CloseHandle(pi.hThread);
-		cloudFlareCertProcess = pi.hProcess;
 
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Launched browser to authorize with CloudFlare. PID: " + to_string(pi.dwProcessId));
 
 		WaitForSingleObject(pi.hProcess, INFINITE);
+		CloseHandle(pi.hProcess);
 
 		if (!exists(certPath))
 		{
@@ -427,11 +473,10 @@ namespace KalaServer
 			return;
 		}
 
-		//close thread handle and store process
+		//close thread handle and process
 		CloseHandle(pi.hThread);
-		cloudFlareCreateTunnelProcess = pi.hProcess;
-
 		WaitForSingleObject(pi.hProcess, INFINITE);
+		CloseHandle(pi.hProcess);
 
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
@@ -592,11 +637,10 @@ namespace KalaServer
 			return;
 		}
 
-		//close thread handle and store process
+		//close thread handle and process
 		CloseHandle(pi.hThread);
-		cloudFlareCreateTunnelProcess = pi.hProcess;
-
 		WaitForSingleObject(pi.hProcess, INFINITE);
+		CloseHandle(pi.hProcess);
 
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
@@ -665,27 +709,6 @@ namespace KalaServer
 				ConsoleMessageType::Type_Error,
 				"Cannot shut down cloudflared because it hasn't been started!");
 			return;
-		}
-
-		if (cloudFlareWindowProcess)
-		{
-			TerminateProcess(cloudFlareWindowProcess, 0);
-			CloseHandle(cloudFlareWindowProcess);
-			cloudFlareWindowProcess = nullptr;
-		}
-
-		if (cloudFlareCertProcess)
-		{
-			TerminateProcess(cloudFlareCertProcess, 0);
-			CloseHandle(cloudFlareCertProcess);
-			cloudFlareCertProcess = nullptr;
-		}
-
-		if (cloudFlareCreateTunnelProcess)
-		{
-			TerminateProcess(cloudFlareCreateTunnelProcess, 0);
-			CloseHandle(cloudFlareCreateTunnelProcess);
-			cloudFlareCreateTunnelProcess = nullptr;
 		}
 
 		if (cloudFlareTunnelProcess)

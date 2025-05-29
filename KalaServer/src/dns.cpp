@@ -41,12 +41,13 @@ namespace KalaServer
 			return false;
 		}
 
+		isInitializing = false;
+		isRunning = true;
+
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Warning,
 			"DNS is currently a placeholder! This does nothing.");
 
-		isInitializing = false;
-		isRunning = true;
 		return true;
 	}
 
