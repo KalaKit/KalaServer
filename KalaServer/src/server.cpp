@@ -183,7 +183,7 @@ namespace KalaServer
 		return false;
 	}
 
-	bool Server::IsBannedIP(const string& targetIP)
+	bool Server::IsBannedIP(const string& targetIP) const
 	{
 		string bannedBotsFile = server->GetBannedBotsFilePath();
 
@@ -221,28 +221,38 @@ namespace KalaServer
 
 	void Server::StopBannedIP(
 		const BannedIP& target,
-		uintptr_t clientSocket)
+		uintptr_t clientSocket) const
 	{
-		const string banMessage =
-			"HTTP/1.1 403 Forbidden\r\n"
-			"Content-Type: text/plain\r\n"
-			"Connection: close\r\n"
-			"Content-Length: 128\r\n"
-			"\r\n"
-			"Access denied: Your IP has been banned for most likely being a bot.\n"
-			"Message the website master on Discord @greenlaser if you want to get back access.\n";
+		string body{};
+		string statusLine = "HTTP/1.1 403 Forbidden";
 
-		SOCKET clientRealSocket = static_cast<SOCKET>(clientSocket);
+		string result = server->ServeFile(server->errorMessage.error403);
+		if (result == "")
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Failed to load 403 error page!");
+		}
+		else body = result;
+
+		string response =
+			statusLine + "\r\n"
+			"Content-Type: text/html\r\n"
+			"Content-Length: " + to_string(body.size()) + "\r\n"
+			"Connection: close\r\n\r\n" + body;
+
+		SOCKET clientRawSocket = static_cast<SOCKET>(clientSocket);
+
 		send(
-			clientRealSocket,
-			banMessage.c_str(),
-			static_cast<int>(banMessage.size()),
+			clientRawSocket,
+			response.c_str(), 
+			static_cast<int>(response.size()), 
 			0);
-		shutdown(clientRealSocket, SD_BOTH);
-		closesocket(clientRealSocket);
+
+		closesocket(clientRawSocket);
 	}
 
-	void Server::BanIP(const BannedIP& target, uintptr_t clientSocket)
+	void Server::BanIP(const BannedIP& target, uintptr_t clientSocket) const
 	{
 		string bannedBotsPath = server->GetBannedBotsFilePath();
 
@@ -293,7 +303,7 @@ namespace KalaServer
 		server->StopBannedIP(target, clientSocket);
 	}
 
-	void Server::AddInitialWhitelistedRoutes()
+	void Server::AddInitialWhitelistedRoutes() const
 	{
 		if (server->whitelistedRoutesFolder == ""
 			|| !exists(current_path() / server->whitelistedRoutesFolder))
@@ -329,7 +339,7 @@ namespace KalaServer
 		}
 	}
 
-	void Server::AddNewWhitelistedRoute(const string& rootPath, const string& filePath)
+	void Server::AddNewWhitelistedRoute(const string& rootPath, const string& filePath) const
 	{
 		if (server->whitelistedRoutes.contains(rootPath))
 		{
@@ -355,7 +365,7 @@ namespace KalaServer
 			ConsoleMessageType::Type_Message,
 			"Added new route '" + rootPath + "'");
 	}
-	void Server::AddNewWhitelistedExtension(const string& newExtension)
+	void Server::AddNewWhitelistedExtension(const string& newExtension) const
 	{
 		for (const auto& extension : server->whitelistedExtensions)
 		{
@@ -374,7 +384,7 @@ namespace KalaServer
 			"Added new extension '" + newExtension + "'");
 	}
 
-	void Server::RemoveWhitelistedRoute(const string& thisRoute)
+	void Server::RemoveWhitelistedRoute(const string& thisRoute) const
 	{
 		string foundRoute{};
 		if (server->whitelistedRoutes.contains(thisRoute))
@@ -389,7 +399,7 @@ namespace KalaServer
 				"Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!");
 		}
 	}
-	void Server::RemoveWhitelistedExtension(const string& thisExtension)
+	void Server::RemoveWhitelistedExtension(const string& thisExtension) const
 	{
 		string foundExtension{};
 		for (const auto& extension : server->whitelistedExtensions)
@@ -554,10 +564,6 @@ namespace KalaServer
 				}
 				else
 				{
-					Core::PrintConsoleMessage(
-						ConsoleMessageType::Type_Message,
-						"Loading route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
-
 					try
 					{
 						string result = server->ServeFile(filePath);
@@ -597,6 +603,31 @@ namespace KalaServer
 				}
 			}
 
+			sockaddr_storage addr{};
+			socklen_t addrLen = sizeof(addr);
+			getpeername(
+				clientSocket,
+				reinterpret_cast<sockaddr*>(&addr),
+				&addrLen);
+
+			char ipStr[INET6_ADDRSTRLEN]{};
+			getnameinfo(
+				reinterpret_cast<sockaddr*>(&addr),
+				addrLen,
+				ipStr,
+				sizeof(ipStr),
+				nullptr,
+				0,
+				NI_NUMERICHOST);
+			string clientIP = ipStr;
+
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"========== LOADING ROUTE ==========\n"
+				" IP    : " + clientIP + "\n"
+				" Route : " + filePath + "\n"
+				"===================================\n");
+
 			string response =
 				statusLine + "\r\n"
 				"Content-Type: text/html\r\n"
@@ -608,14 +639,14 @@ namespace KalaServer
 				response.c_str(),
 				static_cast<int>(response.size()),
 				0);
-		}
 
-		closesocket(clientSocket);
+			closesocket(clientSocket);
+		}
 
 		return true;
 	}
 
-	void Server::Quit()
+	void Server::Quit() const
 	{
 		if (Server::server != nullptr)
 		{

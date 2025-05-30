@@ -72,7 +72,7 @@ namespace KalaServer
 		/// <summary>
 		/// Closes the server. Use Core::Quit instead of this.
 		/// </summary>
-		void Quit();
+		void Quit() const;
 
 		string GetBannedBotsFilePath() { return bannedBotsFile; }
 
@@ -85,32 +85,32 @@ namespace KalaServer
 		/// <summary>
 		/// Returns banned ip + reason if IP address is banned and shouldnt be allowed to access any routes.
 		/// </summary>
-		bool IsBannedIP(const string& ip);
+		bool IsBannedIP(const string& ip) const;
 
 		/// <summary>
 		/// Throw a simple banned message for a banned IP trying to access any route.
 		/// </summary>
 		void StopBannedIP(
 			const BannedIP& target,
-			uintptr_t clientSocket);
+			uintptr_t clientSocket) const;
 		/// <summary>
 		/// Add info about banned ip to banned-bots.txt.
 		/// </summary>
 		/// <param name="target"></param>
 		void BanIP(
 			const BannedIP& target,
-			uintptr_t clientSocket);
+			uintptr_t clientSocket) const;
 
 		void SetServerName(const string& newServerName) { serverName = newServerName; }
 		void SetDomainName(const string& newDomainName) { domainName = newDomainName; }
 
-		void AddNewWhitelistedRoute(const string& rootPath, const string& filePath);
-		void AddNewWhitelistedExtension(const string& newExtension);
+		void AddNewWhitelistedRoute(const string& rootPath, const string& filePath) const;
+		void AddNewWhitelistedExtension(const string& newExtension) const;
 
-		void RemoveWhitelistedRoute(const string& thisRoute);
-		void RemoveWhitelistedExtension(const string& thisExtension);
+		void RemoveWhitelistedRoute(const string& thisRoute) const;
+		void RemoveWhitelistedExtension(const string& thisExtension) const;
 
-		bool RouteExists(const string& thisRoute)
+		bool RouteExists(const string& thisRoute) const
 		{
 			return whitelistedRoutes.contains(thisRoute);
 		}
@@ -131,7 +131,7 @@ namespace KalaServer
 
 		string ServeFile(const string& route);
 	private:
-		void AddInitialWhitelistedRoutes();
+		void AddInitialWhitelistedRoutes() const;
 
 		mutable uintptr_t serverSocket{}; //Current active socket
 		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
