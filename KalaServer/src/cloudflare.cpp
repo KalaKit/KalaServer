@@ -91,14 +91,12 @@ namespace KalaServer
 			isInitializing = false;
 			return false;
 		}
-
+		
 		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
 		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
 		if (!exists(certPath)) CreateCert();
 
-		string tunnelFile = tunnelName + ".json";
-		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
-		if (!exists(tunnelFilePath)) CreateTunnelCredentials();
+		if (!exists(tunnelTokenFilePath)) CreateTunnelCredentials();
 		
 		if (!TunnelExists()) InstallTunnel();
 		
@@ -272,7 +270,7 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Text file text length '" + to_string(textLength) + "' is too small or too big! You probably didn't copy the text correctly.");
+				"Text file '" + textFilePath + "' text length '" + to_string(textLength) + "' is too small or too big! You probably didn't copy the text correctly.");
 			return "";
 		}
 
@@ -284,7 +282,7 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Text file contains incorrect info! You probably didn't copy the text correctly.");
+				"Text file '" + textFilePath + "' contains incorrect info! You probably didn't copy the text correctly.");
 			return "";
 		}
 
