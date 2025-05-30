@@ -59,6 +59,7 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 
 This section assumes you already own a domain on cloudflare and have changed your domain nameservers to cloudflare and have set up atleast A and CNAME in dns records.
 
+- copy 'config.yml' template from 'example' folder to your 'Users' path inside a new '.cloudflared' folder and fill the slots with template values
 - create a cloudflared tunnel if you havent yet
 	- log in to 'https://one.dash.cloudflare.com/'
 	- go to networks > tunnels

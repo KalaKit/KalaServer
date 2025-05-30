@@ -36,12 +36,6 @@ int main()
 
 	string tunnelTokenFileName = "tunneltoken.txt";
 	string tunnelTokenFilePath = path(current_path() / tunnelTokenFileName).string();
-	
-	string tunnelIDFileName = "tunnelid.txt";
-	string tunnelIDFilePath = path(current_path() / tunnelIDFileName).string();
-	
-	string accountTagFileName = "accounttag.txt";
-	string accountTagFilePath = path(current_path() / accountTagFileName).string();
 
 	ErrorMessage msg{};
 	msg.error403 = "/errors/403";
@@ -68,9 +62,7 @@ int main()
 	CloudFlare::Initialize(
 		true,                 //shut down cloudflared at server exit
 		tunnelName,
-		tunnelTokenFilePath,
-		tunnelIDFilePath,
-		accountTagFilePath);
+		tunnelTokenFilePath);
 	
 	//do not run dns and cloudflared together
 	//DNS::RunDNS();

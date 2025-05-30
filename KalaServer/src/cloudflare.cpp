@@ -7,6 +7,7 @@
 #include <string>
 #include <Windows.h>
 #include <fstream>
+#include <chrono>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -18,6 +19,7 @@
 using std::filesystem::current_path;
 using std::filesystem::exists;
 using std::filesystem::path;
+using std::filesystem::directory_iterator;
 using std::string;
 using std::wstring;
 using std::to_string;
@@ -28,12 +30,12 @@ using std::replace;
 
 namespace KalaServer
 {
+	static HANDLE tunnelRunHandle{};
+	
 	bool CloudFlare::Initialize(
 		bool shouldCloseCloudflaredAtShutdown,
 		const string& newTunnelName,
-		const string& newTunnelTokenFilePath,
-		const string& newTunnelIDFilePath,
-		const string& newAccountTagFilePath)
+		const string& newTunnelTokenFilePath)
 	{
 		if (Server::server == nullptr)
 		{
@@ -53,9 +55,7 @@ namespace KalaServer
 		
 		if (!CloudflarePreInitializeCheck(
 			newTunnelName,
-			newTunnelTokenFilePath,
-			newTunnelIDFilePath,
-			newAccountTagFilePath))
+			newTunnelTokenFilePath))
 		{
 			return false;
 		}
@@ -102,31 +102,20 @@ namespace KalaServer
 				"  [CLOUDFLARE_MESSAGE] Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
 		}
 
-		string tunnelFile = tunnelID + ".json";
-		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
-		replace(tunnelFilePath.begin(), tunnelFilePath.end(), '\\', '/');
-		
-		string configFile = "config.yml";
-		string configFilePath = path(path(cloudFlareFolder) / configFile).string();
-		replace(configFilePath.begin(), configFilePath.end(), '\\', '/');
-		if (!exists(tunnelFilePath)
-			|| !exists(configFilePath))
-		{
-			CreateTunnelCredentials();
-		}
+		if (tunnelID == "") CreateTunnelCredentials();
 		else
 		{
-			Core::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared yml and json files already exist at '" + cloudFlareFolder + "'. Skipping creation.");
-		}
+			string tunnelFile = tunnelID + ".json";
+			tunnelIDFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
+			replace(tunnelIDFilePath.begin(), tunnelIDFilePath.end(), '\\', '/');
 		
-		if (!TunnelExists()) InstallTunnel();
-		else
-		{
-			Core::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared tunnel already exists. Skipping installation.");
+			if (!exists(tunnelIDFilePath)) CreateTunnelCredentials();
+			else
+			{
+				Core::PrintConsoleMessage(
+					ConsoleMessageType::Type_Message,
+					"  [CLOUDFLARE_MESSAGE] Cloudflared json file already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
+			}	
 		}
 		
 		RunTunnel();
@@ -143,9 +132,7 @@ namespace KalaServer
 	
 	bool CloudFlare::CloudflarePreInitializeCheck(
 		const string& newTunnelName,
-		const string& newTunnelTokenFilePath,
-		const string& newTunnelIDFilePath,
-		const string& newAccountTagFilePath)
+		const string& newTunnelTokenFilePath)
 	{
 		if (newTunnelName == "")
 		{
@@ -165,6 +152,7 @@ namespace KalaServer
 				"Reason:"
 				"\n"
 				"Tunnel name length '" + to_string(tunnelNameLength) + "' is out of range! Must be between 3 and 32 characters.");
+			return false;
 		}
 		tunnelName = newTunnelName;
 
@@ -199,67 +187,30 @@ namespace KalaServer
 		tunnelToken = tunnelTokenResult;
 		tunnelTokenFilePath = newTunnelTokenFilePath;
 		
-		if (newTunnelIDFilePath == "")
+		if (tunnelIDFilePath != ""
+			&& path(tunnelIDFilePath).extension().string() == ".json")
 		{
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Tunnel id file path is empty!");
-			return false;
+			tunnelID = path(tunnelIDFilePath).stem().string();
 		}
-		if (!exists(newTunnelIDFilePath))
+		if (tunnelID == "")
 		{
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Tunnel ID file path '" + newTunnelIDFilePath + "' does not exist!");
-			return false;
+			string newestTunnelID{};
+			file_time_type newestTime{};
+			for (const auto& file : directory_iterator(cloudFlareFolder))
+			{
+				if (path(tunnelIDFilePath).extension().string() == ".json")
+				{
+					auto lastWrite = last_write_time(file);
+					if (lastWrite > newestTime)
+					{
+						
+					}
+				}
+				tunnelID = path(file).stem().string();
+				break;
+			}
+			if (newestTunnelID != "") tunnelID = newestTunnelID;
 		}
-		string tunnelIDResult = 
-			GetTextFileValue(
-			newTunnelIDFilePath,
-			36, 
-			36);
-		if (tunnelIDResult == "") return false;
-		tunnelID = tunnelIDResult;
-		tunnelIDFilePath = newTunnelIDFilePath;
-		
-		if (newAccountTagFilePath == "")
-		{
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Account tag file path is empty!");
-			return false;
-		}
-		if (!exists(newAccountTagFilePath))
-		{
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Account tag file path '" + newAccountTagFilePath + "' does not exist!");
-			return false;
-		}
-		string accountTagResult = 
-			GetTextFileValue(
-			newAccountTagFilePath,
-			32, 
-			32);
-		if (accountTagResult == "") return false;
-		accountTag = accountTagResult;
-		accountTagFilePath = newAccountTagFilePath;
 		
 		return true;
 	}
@@ -344,7 +295,7 @@ namespace KalaServer
 		ZeroMemory(&pi, sizeof(pi));
 		si.cb = sizeof(si);
 
-		string command = "cloudflared.exe tunnel login";
+		string command = "cloudflared tunnel login";
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command);
@@ -370,7 +321,7 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Failed to create process for creating cert!");
+				"Failed to create process for creating cert for tunnel '" + tunnelName + "'!");
 			return;
 		}
 
@@ -392,7 +343,7 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Failed to create tunnel cert file in '" + cloudFlareFolder + "'!");
+				"Failed to create tunnel cert file for tunnel '" + tunnelName + "' in '" + cloudFlareFolder + "'!");
 		}
 		
 		Core::PrintConsoleMessage(
@@ -404,95 +355,47 @@ namespace KalaServer
 	{
 		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
 		
-		string tunnelFile = tunnelID + ".json";
-		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
-		replace(tunnelFilePath.begin(), tunnelFilePath.end(), '\\', '/');
-		
-		string configFile = "config.yml";
-		string configFilePath = path(path(cloudFlareFolder) / configFile).string();
-		replace(configFilePath.begin(), configFilePath.end(), '\\', '/');
-		
-		if (exists(tunnelFilePath)
-			&& exists(configFilePath))
+		if (tunnelIDFilePath != ""
+			&& path(tunnelIDFilePath).extension().string() == ".json")
 		{
 			Core::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared credentials .json and .yml files already exist at '" + cloudFlareFolder + "'. Skipping creation.");
+				"  [CLOUDFLARE_MESSAGE] Cloudflared credentials json file for tunnel '" + tunnelName + "' already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
 			return;
 		}
 		
-		//
-		// CREATE .json FILE
-		//
+		wstring wParentFolderPath(current_path().string().begin(), current_path().string().end());
 		
-		if (!exists(tunnelFilePath))
-		{
-			Core::PrintConsoleMessage(
+		//
+		// DELETE OLD TUNNEL
+		//
+
+		//initialize structures for process creation
+		STARTUPINFOW si1;
+		PROCESS_INFORMATION pi1;
+		ZeroMemory(&si1, sizeof(si1));
+		ZeroMemory(&pi1, sizeof(pi1));
+		si1.cb = sizeof(si1);
+
+		string command1 = "cloudflared tunnel delete " + tunnelName;
+		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"Creating new tunnel credentials json file at '" + tunnelFilePath + "'.");
-		
-			ofstream tunnelFile(tunnelFilePath);
-			if (!tunnelFile)
-			{
-				Core::CreatePopup(
-					PopupReason::Reason_Error,
-					"Failed to set up cloudflared!"
-					"\n\n"
-					"Reason:"
-					"\n"
-					"Unable to open tunnel credentials json file for editing at '" + tunnelFilePath + "'!");
-				return;
-			}
-		
-			tunnelFile << "{\n";
-			tunnelFile << "  \"TunnelID\": \"" << tunnelID << "\",\n";
-			tunnelFile << "  \"TunnelSecret\": \"" << tunnelToken << "\",\n";
-			tunnelFile << "  \"AccountTag\": \"" << accountTag << "\",\n";
-			tunnelFile << "  \"TunnelName\": \"" << tunnelName << "\"\n";
-			tunnelFile << "}\n";
-		
-			tunnelFile.close();
-		}
-		
-		//
-		// CREATE .yml FILE
-		//
-		
-		if (!exists(configFilePath))
-		{				
-			Core::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"Creating new tunnel credentials yml file at '" + configFilePath + "'.");
-		
-			ofstream configFile(configFilePath);
-			if (!configFile)
-			{
-				Core::CreatePopup(
-					PopupReason::Reason_Error,
-					"Failed to set up cloudflared!"
-					"\n\n"
-					"Reason:"
-					"\n"
-					"Unable to open tunnel credentials yml file for editing at '" + configFilePath + "'!");
-				return;
-			}
-		
-			configFile << "tunnel: " << tunnelID << "\n";
-			configFile << "credentials-file: " << tunnelFilePath << "\n";
-			configFile << "\n";
-			configFile << "ingress: \n";
-			configFile << "  - hostname: " << Server::server->GetDomainName() << "\n";
-			configFile << "    service: http://127.0.0.1:80\n";
-			configFile << "  - service: http_status:404\n";
-		
-			configFile.close();
-		}
-		
-		//
-		// FINISH
-		//
-		
-		if (!exists(tunnelFilePath))
+			"  [CLOUDFLARE_COMMAND] " + command1);
+
+		wstring wideCommand1(command1.begin(), command1.end());
+		if (!CreateProcessW
+		(
+			nullptr,                   //path to the executable
+			const_cast<LPWSTR>(wideCommand1.c_str()), //command line arguments
+			nullptr,                   //process handle not inheritable
+			nullptr,                   //thread handle not inheritable
+			FALSE,                     //handle inheritance
+			0,                         //creation flags
+			nullptr,                   //use parent's environment block
+			wParentFolderPath.c_str(), //use parent's starting directory
+			&si1,                      //pointer to STARTUPINFO structure
+			&pi1                       //pointer to PROCESS_INFORMATION structure
+		))
 		{
 			Core::CreatePopup(
 				PopupReason::Reason_Error,
@@ -500,10 +403,45 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Failed to create tunnel credentials json file for tunnel '" + tunnelName + "' at '" + tunnelFilePath + "'!");
+				"Failed to create process for deleting tunnel '" + tunnelName + "'!");
+			return;
 		}
+
+		//close thread handle and process
+		WaitForSingleObject(pi1.hProcess, INFINITE);
+		CloseHandle(pi1.hThread);
+		CloseHandle(pi1.hProcess);
 		
-		if (!exists(configFilePath))
+		//
+		// CREATE NEW TUNNEL
+		//
+		
+		//initialize structures for process creation
+		STARTUPINFOW si2;
+		PROCESS_INFORMATION pi2;
+		ZeroMemory(&si2, sizeof(si2));
+		ZeroMemory(&pi2, sizeof(pi2));
+		si2.cb = sizeof(si2);
+
+		string command2 = "cloudflared tunnel create " + tunnelName;
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [CLOUDFLARE_COMMAND] " + command2);
+
+		wstring wideCommand2(command2.begin(), command2.end());
+		if (!CreateProcessW
+		(
+			nullptr,                   //path to the executable
+			const_cast<LPWSTR>(wideCommand2.c_str()), //command line arguments
+			nullptr,                   //process handle not inheritable
+			nullptr,                   //thread handle not inheritable
+			FALSE,                     //handle inheritance
+			0,                         //creation flags
+			nullptr,                   //use parent's environment block
+			wParentFolderPath.c_str(), //use parent's starting directory
+			&si2,                      //pointer to STARTUPINFO structure
+			&pi2                       //pointer to PROCESS_INFORMATION structure
+		))
 		{
 			Core::CreatePopup(
 				PopupReason::Reason_Error,
@@ -511,54 +449,64 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Failed to create tunnel credentials yml file for tunnel '" + tunnelName + "' at '" + configFilePath + "'!");
+				"Failed to create process for creating tunnel '" + tunnelName + "'!");
+			return;
+		}
+
+		//close thread handle and process
+		WaitForSingleObject(pi2.hProcess, INFINITE);
+		CloseHandle(pi2.hThread);
+		CloseHandle(pi2.hProcess);
+		
+		//
+		// FINISH TUNNEL CREATION
+		//
+		
+		if (tunnelIDFilePath != ""
+			&& path(tunnelIDFilePath).extension().string() == ".json"
+			&& !exists(tunnelIDFilePath))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create tunnel credentials json file for tunnel '" + tunnelName + "' at '" + tunnelIDFilePath + "'!");
+			return;
 		}
 		
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials files for tunnel '" + tunnelName + "'.");
+			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials json file for tunnel '" + tunnelName + "'.");
+			
+		Core::CreatePopup(
+			PopupReason::Reason_Warning,
+			"Before continuing to route DNS, you must manually insert the tunnel ID into config.yml.\n\n"
+			"Please update the following fields:\n"
+			"  tunnel: <insert tunnel ID here>\n"
+			"  credentials-file: <insert full path to .json file>\n\n"
+			"Press OK to continue once you’ve updated config.yml. If the tunnel ID is incorrect, DNS routing will fail and 'cloudflared tunnel run' will not work."
+		);
+			
+		RouteTunnel();
 	}
-	
-	bool CloudFlare::TunnelExists()
+
+	void CloudFlare::RouteTunnel()
 	{
-		HANDLE hReadPipe{};
-		HANDLE hWritePipe{};
-		SECURITY_ATTRIBUTES sa
-		{
-			sizeof(SECURITY_ATTRIBUTES),
-			nullptr,
-			TRUE
-		};
-
-		if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
-		{
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create pipe for cloudflared tunnel list!");
-			return false;
-		}
-
-		SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
-
 		//initialize structures for process creation
-		STARTUPINFOW si{};
-		PROCESS_INFORMATION pi{};
+		STARTUPINFOW si;
+		PROCESS_INFORMATION pi;
+		ZeroMemory(&si, sizeof(si));
+		ZeroMemory(&pi, sizeof(pi));
 		si.cb = sizeof(si);
-		si.dwFlags |= STARTF_USESTDHANDLES;
-		si.hStdOutput = hWritePipe;
-		si.hStdError = hWritePipe;
 
-		string parentFolderPath = current_path().string();
-		wstring wParentFolderPath(parentFolderPath.begin(), parentFolderPath.end());
-
-		string command = "cloudflared.exe tunnel list";
+		string command = "cloudflared tunnel route dns " + Server::server->GetDomainName() + " " + tunnelName;
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command);
+	
+		wstring wParentFolderPath(current_path().string().begin(), current_path().string().end());
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
@@ -567,7 +515,7 @@ namespace KalaServer
 			const_cast<LPWSTR>(wideCommand.c_str()), //command line arguments
 			nullptr,                   //process handle not inheritable
 			nullptr,                   //thread handle not inheritable
-			TRUE,                      //handle inheritance
+			FALSE,                     //handle inheritance
 			0,                         //creation flags
 			nullptr,                   //use parent's environment block
 			wParentFolderPath.c_str(), //use parent's starting directory
@@ -575,137 +523,31 @@ namespace KalaServer
 			&pi                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			CloseHandle(hReadPipe);
-			CloseHandle(hWritePipe);
-
 			Core::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Failed to create process for listing tunnels!");
-			return false;
+				"Failed to create process for routing dns for tunnel '" + tunnelName + "'!");
+			return;
 		}
 
-		//close thread handle and store process
-		CloseHandle(hWritePipe);
-		CloseHandle(pi.hThread);
-		
+		//close thread handle and process
 		WaitForSingleObject(pi.hProcess, INFINITE);
-
-		//read output from the pipe
-		string output{};
-		char buffer[512]{};
-		DWORD bytesRead = 0;
-		while (ReadFile(
-			hReadPipe,
-			buffer,
-			sizeof(buffer) - 1,
-			&bytesRead,
-			nullptr))
-		{
-			if (bytesRead == 0) break;
-			buffer[bytesRead] = '\0';
-			output += buffer;
-		}
-
-		CloseHandle(hReadPipe);
+		CloseHandle(pi.hThread);
 		CloseHandle(pi.hProcess);
-
-		bool tunnelExists = output.find(tunnelName) != string::npos;
-		if (!tunnelExists)
-		{
-			Core::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"Tunnel with the name '" + tunnelName + "' does not exist. Starting a new one.");
-		}
-		
-		return tunnelExists;
-	}
-	
-	bool CloudFlare::ServiceExists()
-	{
-		string serviceName = "Cloudflared";
-
-		SC_HANDLE scm = OpenSCManager(
-			nullptr,
-			nullptr,
-			SC_MANAGER_ENUMERATE_SERVICE);
-		if (!scm)
-		{
-			return false;
-		}
-
-		bool found = false;
-		ENUM_SERVICE_STATUS_PROCESS services[1024];
-		DWORD bytesNeeded = 0, servicesReturned = 0, resumeHandle = 0;
-
-		if (EnumServicesStatusExA(
-			scm,
-			SC_ENUM_PROCESS_INFO,
-			SERVICE_WIN32,
-			SERVICE_STATE_ALL,
-			reinterpret_cast<LPBYTE>(&services),
-			sizeof(services),
-			&bytesNeeded,
-			&servicesReturned,
-			&resumeHandle,
-			nullptr))
-		{
-			for (DWORD i = 0; i < servicesReturned; ++i)
-			{
-				if (serviceName == services[i].lpServiceName)
-				{
-					found = true;
-					break;
-				}
-			}
-		}
-		CloseServiceHandle(scm);
-		return found;
-	}
-
-	void CloudFlare::InstallTunnel()
-	{
-		if (TunnelExists()
-			|| ServiceExists())
-		{
-			Core::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared service is already installed. Skipping installation.");
-
-			RunTunnel();
-
-			return;
-		}
-		
-		string command = "cloudflared.exe service install " + tunnelToken;
-		Core::PrintConsoleMessage(
-			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command);
-			
-		int result = system(command.c_str());
-		
-		if (result != 0)
-		{
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create cloudflared tunnel '" + tunnelName + "'! Exit code: " + to_string(result));
-			return;
-		}
 		
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Installed new cloudflared tunnel '" + tunnelName + "'.");
+			"  [CLOUDFLARE_SUCCESS] Routed cloudflared dns for tunnel '" + tunnelName + "'.");
 	}
 
 	void CloudFlare::RunTunnel()
 	{	
+		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
+		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
+	
 		//initialize structures for process creation
 		STARTUPINFOW si;
 		PROCESS_INFORMATION pi;
@@ -716,7 +558,7 @@ namespace KalaServer
 		string parentFolderPath = current_path().string();
 		wstring wParentFolderPath(parentFolderPath.begin(), parentFolderPath.end());
 
-		string command = "cloudflared.exe tunnel run " + tunnelName;
+		string command = "cloudflared --origin-ca-pool=\"" + certPath + "\" tunnel run " + tunnelName;
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command);
@@ -748,7 +590,7 @@ namespace KalaServer
 
 		//close thread handle and process
 		CloseHandle(pi.hThread);
-		CloseHandle(pi.hProcess);
+		tunnelRunHandle = pi.hProcess;
 		
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
@@ -765,22 +607,12 @@ namespace KalaServer
 			return;
 		}
 
-		if (closeCloudflaredAtShutdown)
+		if (closeCloudflaredAtShutdown
+			&& tunnelRunHandle)
 		{
-			int result = system("taskkill /IM cloudflared.exe /F");
-		
-			if (result != 0)
-			{
-				Core::CreatePopup(
-					PopupReason::Reason_Warning,
-					"Failed to terminate cloudflared.exe! Exit code: " + to_string(result));
-			}
-			else
-			{
-				Core::PrintConsoleMessage(
-					ConsoleMessageType::Type_Message,
-					"  [CLOUDFLARE_SUCCESS] Cloudflared.exe was terminated.");
-			}	
+			TerminateProcess(tunnelRunHandle, 0);
+			CloseHandle(tunnelRunHandle);
+			tunnelRunHandle = nullptr;	
 		}
 		else
 		{

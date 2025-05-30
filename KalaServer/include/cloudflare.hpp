@@ -17,9 +17,7 @@ namespace KalaServer
 		static bool Initialize(
 			bool shouldCloseCloudflaredAtShutdown,
 			const string& tunnelName,
-			const string& tunnelTokenFilePath,
-			const string& tunnelIDFilePath,
-			const string& accountTagFilePath);
+			const string& tunnelTokenFilePath);
 
 		static bool IsRunning() { return isRunning; }
 
@@ -34,24 +32,19 @@ namespace KalaServer
 		static inline bool isRunning = false;
 		
 		static inline string tunnelName;
-		
+
 		static inline string tunnelToken;
 		static inline string tunnelTokenFilePath;
 		
-		static inline string tunnelID;
-		static inline string tunnelIDFilePath;
-		
-		static inline string accountTag;
-		static inline string accountTagFilePath;
+		static inline string tunnelID{};
+		static inline string tunnelIDFilePath{};
 		
 		/// <summary>
 		/// Returns true if all the data passed to cloudflared is valid.
 		/// </summary>
 		static bool CloudflarePreInitializeCheck(
 			const string& tunnelName,
-			const string& tunnelTokenFilePath,
-			const string& tunnelIDFilePath,
-			const string& accountTagFilePath);
+			const string& tunnelTokenFilePath);
 
 		/// <summary>
 		/// Returns the value of tunnel token, id or tag as a string from its file.
@@ -62,37 +55,27 @@ namespace KalaServer
 			int maxLength = 300);
 
 		/// <summary>
-		/// Runs 'cloudflared.exe tunnel login'
-		/// through cloudflared.exe as a separate process.
+		/// Runs 'cloudflared tunnel login'
+		/// through cloudflared as a separate process.
 		/// </summary>
 		static void CreateCert();
 
 		/// <summary>
-		/// Runs 'cloudflared.exe tunnel token/create <tunnelName>'
-		/// through cloudflared.exe as a separate process.
+		/// Runs 'cloudflared tunnel delete <tunnelName>'
+		/// and 'cloudflared tunnel create <tunnelName>'
+		/// through cloudflared as a separate process.
 		/// </summary>
 		static void CreateTunnelCredentials();
 
 		/// <summary>
-		/// Runs 'cloudflared.exe tunnel list'
-		/// through cloudflared.exe as a separate process.
+		/// Runs 'cloudflared route dns thekalakit.com KalaServer'
+		/// through cloudflared as a separate process.
 		/// </summary>
-		static bool TunnelExists();
-		
-		/// <summary>
-		/// Checks whether the cloudflared service has already been installed or not on this machine.
-		/// </summary>
-		static bool ServiceExists();
-
-		/// <summary>
-		/// Runs 'cloudflared.exe service install <token>'
-		/// through cloudflared.exe as a separate process.
-		/// </summary>
-		static void InstallTunnel();
+		static void RouteTunnel();
 
 		/// <summary>
 		/// Runs 'tunnel run <tunnelName>'
-		/// through cloudflared.exe as a separate process.
+		/// through cloudflared as a separate process.
 		/// </summary>
 		static void RunTunnel();
 	};

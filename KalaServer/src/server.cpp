@@ -293,6 +293,14 @@ namespace KalaServer
 				"Neither cloudflared or dns was started! Please run atleast one of them.");
 			return false;
 		}
+		
+		for (int i = 0; i < 600; ++i)
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"Server is alive...");
+			Sleep(100);
+		}
 
 		SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
 		SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);

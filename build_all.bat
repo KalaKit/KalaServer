@@ -15,10 +15,6 @@ set "TUNNELTOKEN_ORIGIN=%PROJECT_ROOT%\example\tunneltoken.txt"
 set "TUNNELTOKEN_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\tunneltoken.txt"
 set "TUNNELTOKEN_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\tunneltoken.txt"
 
-set "TUNNELID_ORIGIN=%PROJECT_ROOT%\example\tunnelid.txt"
-set "TUNNELID_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\tunnelid.txt"
-set "TUNNELID_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\tunnelid.txt"
-
 set "ACCOUNTTAG_ORIGIN=%PROJECT_ROOT%\example\accounttag.txt"
 set "ACCOUNTTAG_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\accounttag.txt"
 set "ACCOUNTTAG_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\accounttag.txt"
@@ -37,12 +33,6 @@ if not exist "%CLOUDFLARED_ORIGIN%" (
 
 if not exist "%TUNNELTOKEN_ORIGIN%" (
 	echo Failed to find tunneltoken.txt!
-	pause
-	exit /b 1
-)
-
-if not exist "%TUNNELID_ORIGIN%" (
-	echo Failed to find tunnelid.txt!
 	pause
 	exit /b 1
 )
@@ -129,12 +119,6 @@ copy /Y "%TUNNELTOKEN_ORIGIN%" "%TUNNELTOKEN_DEBUG_TARGET%"
 echo Copied tunneltoken.txt to debug target.
 copy /Y "%TUNNELTOKEN_ORIGIN%" "%TUNNELTOKEN_RELEASE_TARGET%"
 echo Copied tunneltoken.txt to release target.
-
-:: Copy tunnelid.txt
-copy /Y "%TUNNELID_ORIGIN%" "%TUNNELID_DEBUG_TARGET%"
-echo Copied tunnelid.txt to debug target.
-copy /Y "%TUNNELID_ORIGIN%" "%TUNNELID_RELEASE_TARGET%"
-echo Copied tunnelid.txt to release target.
 
 :: Copy accounttag.txt
 copy /Y "%ACCOUNTTAG_ORIGIN%" "%ACCOUNTTAG_DEBUG_TARGET%"
