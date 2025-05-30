@@ -9,3 +9,5 @@ build-release/
 
 # Ignore private and secret files
 tunneltoken.txt
+tunnelid.txt
+accounttag.txt

@@ -30,12 +30,18 @@ int main()
 	int port = 80;
 
 	string serverName = "KalaServer";
+	string domainName = "thekalakit.com";
+	
 	string tunnelName = "KalaServer";
 
 	string tunnelTokenFileName = "tunneltoken.txt";
 	string tunnelTokenFilePath = path(current_path() / tunnelTokenFileName).string();
 	
-	string domainName = "thekalakit.com";
+	string tunnelIDFileName = "tunnelid.txt";
+	string tunnelIDFilePath = path(current_path() / tunnelIDFileName).string();
+	
+	string accountTagFileName = "accounttag.txt";
+	string accountTagFilePath = path(current_path() / accountTagFileName).string();
 
 	ErrorMessage msg{};
 	msg.error403 = "/errors/403";
@@ -60,8 +66,11 @@ int main()
 		whitelistedExtensions);
 
 	CloudFlare::Initialize(
+		true,                 //shut down cloudflared at server exit
 		tunnelName,
-		tunnelTokenFilePath);
+		tunnelTokenFilePath,
+		tunnelIDFilePath,
+		accountTagFilePath);
 	
 	//do not run dns and cloudflared together
 	//DNS::RunDNS();

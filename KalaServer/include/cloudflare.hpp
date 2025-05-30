@@ -15,8 +15,11 @@ namespace KalaServer
 		/// Returns true if initialized successfully.
 		/// </summary>
 		static bool Initialize(
+			bool shouldCloseCloudflaredAtShutdown,
 			const string& tunnelName,
-			const string& tunnelTokenFilePath);
+			const string& tunnelTokenFilePath,
+			const string& tunnelIDFilePath,
+			const string& accountTagFilePath);
 
 		static bool IsRunning() { return isRunning; }
 
@@ -25,22 +28,38 @@ namespace KalaServer
 		/// </summary>
 		static void Quit();
 	private:
+		static inline bool closeCloudflaredAtShutdown = true;
+	
 		static inline bool isInitializing = false;
 		static inline bool isRunning = false;
 		
 		static inline string tunnelName;
+		
 		static inline string tunnelToken;
 		static inline string tunnelTokenFilePath;
+		
+		static inline string tunnelID;
+		static inline string tunnelIDFilePath;
+		
+		static inline string accountTag;
+		static inline string accountTagFilePath;
+		
+		/// <summary>
+		/// Returns true if all the data passed to cloudflared is valid.
+		/// </summary>
+		static bool CloudflarePreInitializeCheck(
+			const string& tunnelName,
+			const string& tunnelTokenFilePath,
+			const string& tunnelIDFilePath,
+			const string& accountTagFilePath);
 
 		/// <summary>
-		/// Returns the tunnel token as a string from its file.
+		/// Returns the value of tunnel token, id or tag as a string from its file.
 		/// </summary>
-		static string GetTunnelTokenText();
-
-		/// <summary>
-		/// Trim the tunnel token from any unexpected newlines or spaces.
-		/// </summary>
-		static string TrimTunnelToken(const string& newTunnelToken);
+		static string GetTextFileValue(
+			const string& textPath,
+			int minLength = 32, 
+			int maxLength = 300);
 
 		/// <summary>
 		/// Runs 'cloudflared.exe tunnel login'
@@ -55,15 +74,15 @@ namespace KalaServer
 		static void CreateTunnelCredentials();
 
 		/// <summary>
-		/// Checks whether the cloudflared service has already been installed or not on this machine.
-		/// </summary>
-		static bool ServiceExists();
-
-		/// <summary>
 		/// Runs 'cloudflared.exe tunnel list'
 		/// through cloudflared.exe as a separate process.
 		/// </summary>
 		static bool TunnelExists();
+		
+		/// <summary>
+		/// Checks whether the cloudflared service has already been installed or not on this machine.
+		/// </summary>
+		static bool ServiceExists();
 
 		/// <summary>
 		/// Runs 'cloudflared.exe service install <token>'
