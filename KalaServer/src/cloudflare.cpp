@@ -24,6 +24,7 @@ using std::to_string;
 using std::ofstream;
 using std::ifstream;
 using std::stringstream;
+using std::replace;
 
 namespace KalaServer
 {
@@ -371,42 +372,94 @@ namespace KalaServer
 	void CloudFlare::CreateTunnelCredentials()
 	{
 		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
-		string tunnelFile = tunnelName + ".json";
-		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
 		
-		if (exists(tunnelFilePath))
+		string tunnelFile = tunnelID + ".json";
+		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
+		replace(tunnelFilePath.begin(), tunnelFilePath.end(), '\\', '/');
+		
+		string configFile = "config.yml";
+		string configFilePath = path(path(cloudFlareFolder) / configFile).string();
+		replace(configFilePath.begin(), configFilePath.end(), '\\', '/');
+		
+		if (exists(tunnelFilePath)
+			&& exists(configFilePath))
 		{
 			Core::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared credentials file already exists at '" + tunnelFilePath + "'. Skipping creation.");
+				"  [CLOUDFLARE_MESSAGE] Cloudflared credentials .json and .yml files already exist at '" + cloudFlareFolder + "'. Skipping creation.");
 			return;
 		}
 		
-		Core::PrintConsoleMessage(
-			ConsoleMessageType::Type_Warning,
-			"Creating new tunnel credentials file at '" + tunnelFilePath + "'.");
+		//
+		// CREATE .json FILE
+		//
 		
-		ofstream file(tunnelFilePath);
-		if (!file)
+		if (!exists(tunnelFilePath))
 		{
-			Core::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Unable to open tunnel credentials file for editing at '" + tunnelFilePath + "'!");
-			return;
+			Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Warning,
+			"Creating new tunnel credentials json file at '" + tunnelFilePath + "'.");
+		
+			ofstream tunnelFile(tunnelFilePath);
+			if (!tunnelFile)
+			{
+				Core::CreatePopup(
+					PopupReason::Reason_Error,
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Unable to open tunnel credentials json file for editing at '" + tunnelFilePath + "'!");
+				return;
+			}
+		
+			tunnelFile << "{\n";
+			tunnelFile << "  \"TunnelID\": \"" << tunnelID << "\",\n";
+			tunnelFile << "  \"TunnelSecret\": \"" << tunnelToken << "\",\n";
+			tunnelFile << "  \"AccountTag\": \"" << accountTag << "\",\n";
+			tunnelFile << "  \"TunnelName\": \"" << tunnelName << "\"\n";
+			tunnelFile << "}\n";
+		
+			tunnelFile.close();
 		}
 		
-		file << "{\n";
-		file << "  \"TunnelID\": \"" << tunnelID << "\",\n";
-		file << "  \"TunnelSecret\": \"" << tunnelToken << "\",\n";
-		file << "  \"AccountTag\": \"" << accountTag << "\",\n";
-		file << "  \"TunnelName\": \"" << tunnelName << "\"\n";
-		file << "}\n";
+		//
+		// CREATE .yml FILE
+		//
 		
-		file.close();
+		if (!exists(configFilePath))
+		{				
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Warning,
+				"Creating new tunnel credentials yml file at '" + configFilePath + "'.");
+		
+			ofstream configFile(configFilePath);
+			if (!configFile)
+			{
+				Core::CreatePopup(
+					PopupReason::Reason_Error,
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Unable to open tunnel credentials yml file for editing at '" + configFilePath + "'!");
+				return;
+			}
+		
+			configFile << "tunnel: " << tunnelID << "\n";
+			configFile << "credentials-file: " << tunnelFilePath << "\n";
+			configFile << "\n";
+			configFile << "ingress: \n";
+			configFile << "  - hostname: " << Server::server->GetDomainName() << "\n";
+			configFile << "    service: http://127.0.0.1:80\n";
+			configFile << "  - service: http_status:404\n";
+		
+			configFile.close();
+		}
+		
+		//
+		// FINISH
+		//
 		
 		if (!exists(tunnelFilePath))
 		{
@@ -416,12 +469,23 @@ namespace KalaServer
 				"\n\n"
 				"Reason:"
 				"\n"
-				"Failed to create tunnel credentials file for tunnel '" + tunnelName + "' at '" + cloudFlareFolder + "'!");
+				"Failed to create tunnel credentials json file for tunnel '" + tunnelName + "' at '" + tunnelFilePath + "'!");
+		}
+		
+		if (!exists(configFilePath))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create tunnel credentials yml file for tunnel '" + tunnelName + "' at '" + configFilePath + "'!");
 		}
 		
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials file for tunnel '" + tunnelName + "' at '" + tunnelFilePath + "'.");
+			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials json file for tunnel '" + tunnelName + "' at '" + tunnelFilePath + "' and yml file at '" + configFilePath + "'.");
 	}
 	
 	bool CloudFlare::TunnelExists()
