@@ -6,23 +6,28 @@
 #include <filesystem>
 #include <string>
 
-#include "core.hpp"
-#include "server.hpp"
-#include "dns.hpp"
-#include "cloudflare.hpp"
+#include "core/core.hpp"
+#include "core/server.hpp"
+#include "dns/cloudflare.hpp"
+#include "dns/dns.hpp"
+
+using KalaKit::Core::KalaServer;
+using KalaKit::Core::Server;
+using KalaKit::Core::ConsoleMessageType;
+using KalaKit::Core::PopupReason;
 
 using std::filesystem::current_path;
 using std::filesystem::exists;
 using std::filesystem::path;
 using std::string;
 
-namespace KalaServer
+namespace KalaKit::DNS
 {
-	bool DNS::RunDNS()
+	bool CustomDNS::RunDNS()
 	{
 		if (Server::server == nullptr)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Cannot initialize dns if server has not yet been initialized!");
 			return false;
@@ -30,7 +35,7 @@ namespace KalaServer
 
 		if (isInitializing)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Cannot initialize dns while it is already being initialized!");
 			return false;
@@ -39,7 +44,7 @@ namespace KalaServer
 		
 		if (CloudFlare::IsRunning())
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start DNS!"
 				"\n\n"
@@ -53,24 +58,24 @@ namespace KalaServer
 		isInitializing = false;
 		isRunning = true;
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Warning,
 			"DNS is currently a placeholder! This does nothing.");
 
 		return true;
 	}
 
-	void DNS::Quit()
+	void CustomDNS::Quit()
 	{
 		if (!isRunning)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Cannot shut down dns because it hasn't been started!");
 			return;
 		}
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"DNS was successfully shut down!");
 	}

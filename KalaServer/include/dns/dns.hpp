@@ -5,9 +5,9 @@
 
 #pragma once
 
-namespace KalaServer
+namespace KalaKit::DNS
 {
-	class DNS
+	class CustomDNS
 	{
 	public:
 		/// <summary>

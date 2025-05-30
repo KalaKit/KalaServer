@@ -12,10 +12,17 @@
 #include <sstream>
 #include <filesystem>
 
-#include "core.hpp"
-#include "server.hpp"
-#include "cloudflare.hpp"
-#include "dns.hpp"
+#include "core/core.hpp"
+#include "core/server.hpp"
+#include "dns/cloudflare.hpp"
+#include "dns/dns.hpp"
+
+using KalaKit::Core::KalaServer;
+using KalaKit::Core::Server;
+using KalaKit::Core::ConsoleMessageType;
+using KalaKit::Core::PopupReason;
+using KalaKit::DNS::CloudFlare;
+using KalaKit::DNS::CustomDNS;
 
 using std::cout;
 using std::map;
@@ -33,7 +40,7 @@ using std::ofstream;
 using std::ios;
 using std::string_view;
 
-namespace KalaServer
+namespace KalaKit::Core
 {
 	void Server::Initialize(
 		int port,
@@ -44,9 +51,9 @@ namespace KalaServer
 		const vector<string>& blacklistedKeywords,
 		const vector<string>& extensions)
 	{
-		if (!Core::IsRunningAsAdmin())
+		if (!KalaServer::IsRunningAsAdmin())
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"This program must be ran with admin privileges!");
 			return;
@@ -54,14 +61,14 @@ namespace KalaServer
 
 		if (serverName == "")
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Cannot start server with empty server name!");
 			return;
 		}
 		if (domainName == "")
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Cannot start server with empty domain name!");
 			return;
@@ -76,7 +83,7 @@ namespace KalaServer
 			blacklistedKeywords,
 			extensions);
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Initializing " + Server::server->GetServerName() + " ..."
 			"\n\n"
@@ -94,21 +101,21 @@ namespace KalaServer
 			ofstream log(bannedBotsFile);
 			if (!log)
 			{
-				Core::CreatePopup(
+				KalaServer::CreatePopup(
 					PopupReason::Reason_Error,
 					"Failed to create banned-bots.txt!");
 				return;
 			}
 			log.close();
 
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"Created 'banned-bots.txt' at root directory.");
 		}
 
 		server->AddInitialWhitelistedRoutes();
 		
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"\n"
 			"=============================="
@@ -121,7 +128,7 @@ namespace KalaServer
 		WSADATA wsaData{};
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"WSAStartup failed!");
 		}
@@ -131,7 +138,7 @@ namespace KalaServer
 
 		if (thisSocket == INVALID_SOCKET)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Socket creation failed!");
 		}
@@ -146,23 +153,23 @@ namespace KalaServer
 			(sockaddr*)&serverAddr,
 			sizeof(serverAddr)) == SOCKET_ERROR)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Bind failed!");
 		}
 
 		if (listen(thisSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Listen failed!");
 		}
 
 		cout << "Server is running on port '" << server->port << "'.\n";
 
-		Core::isRunning = true;
+		KalaServer::isRunning = true;
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"\n"
 			"=============================="
@@ -192,7 +199,7 @@ namespace KalaServer
 		ifstream file(bannedBotsFile);
 		if (!file)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Failed to open 'banned-bots.txt' to check if IP is banned or not!");
 			return false;
@@ -229,7 +236,7 @@ namespace KalaServer
 		string result = server->ServeFile(server->errorMessage.error403);
 		if (result == "")
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Failed to load 403 error page!");
 		}
@@ -259,7 +266,7 @@ namespace KalaServer
 		ifstream readFile(bannedBotsPath);
 		if (!readFile)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Failed to read 'banned-bots.txt' to ban IP!");
 			return;
@@ -282,7 +289,7 @@ namespace KalaServer
 		ofstream writeFile(bannedBotsPath, ios::app);
 		if (!writeFile)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Failed to write into 'banned-bots.txt' to ban IP!");
 			return;
@@ -292,7 +299,7 @@ namespace KalaServer
 
 		writeFile.close();
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"\n"
 			"=============== BANNED IP ===============\n"
@@ -308,7 +315,7 @@ namespace KalaServer
 		if (server->whitelistedRoutesFolder == ""
 			|| !exists(current_path() / server->whitelistedRoutesFolder))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Whitelisted routes root folder '" + server->whitelistedRoutesFolder + "' is empty or does not exist!");
 			return;
@@ -343,7 +350,7 @@ namespace KalaServer
 	{
 		if (server->whitelistedRoutes.contains(rootPath))
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Warning,
 				"Route '" + rootPath + "' has already been whitelisted!");
 			return;
@@ -352,7 +359,7 @@ namespace KalaServer
 		path fullPath = path(filePath);
 		if (!exists(fullPath))
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Page path '" + filePath + "' does not exist!.");
 
@@ -361,7 +368,7 @@ namespace KalaServer
 
 		server->whitelistedRoutes[rootPath] = filePath;
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Added new route '" + rootPath + "'");
 	}
@@ -371,7 +378,7 @@ namespace KalaServer
 		{
 			if (extension == newExtension)
 			{
-				Core::PrintConsoleMessage(
+				KalaServer::PrintConsoleMessage(
 					ConsoleMessageType::Type_Warning,
 					"Extension '" + extension + "' has already been whitelisted!");
 				return;
@@ -379,7 +386,7 @@ namespace KalaServer
 		}
 
 		server->whitelistedExtensions.push_back(newExtension);
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Added new extension '" + newExtension + "'");
 	}
@@ -394,7 +401,7 @@ namespace KalaServer
 
 		if (foundRoute == "")
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Warning,
 				"Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!");
 		}
@@ -413,7 +420,7 @@ namespace KalaServer
 
 		if (foundExtension == "")
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Warning,
 				"Extension '" + thisExtension + "' cannot be removed because it hasn't been whitelisted!");
 		}
@@ -440,9 +447,9 @@ namespace KalaServer
 	bool Server::Run() const
 	{
 		if (!CloudFlare::IsRunning()
-			&& !DNS::IsRunning())
+			&& !CustomDNS::IsRunning())
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Neither cloudflared or dns was started! Please run atleast one of them.");
 			return false;
@@ -452,7 +459,7 @@ namespace KalaServer
 		SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
 		if (clientSocket == INVALID_SOCKET)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Accept failed!");
 			return false;
@@ -466,7 +473,7 @@ namespace KalaServer
 			string filePath = "/";
 
 #ifdef _DEBUG
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"Raw HTTP request:\n" + request);
 #endif
@@ -524,14 +531,14 @@ namespace KalaServer
 
 			if (!server->RouteExists(filePath))
 			{
-				Core::PrintConsoleMessage(
+				KalaServer::PrintConsoleMessage(
 					ConsoleMessageType::Type_Message,
 					"User tried to access non-existing route '" + filePath + "'!");
 
 				string result = server->ServeFile(server->errorMessage.error404);
 				if (result == "")
 				{
-					Core::PrintConsoleMessage(
+					KalaServer::PrintConsoleMessage(
 						ConsoleMessageType::Type_Error,
 						"Failed to load 404 error page!");
 				}
@@ -547,14 +554,14 @@ namespace KalaServer
 
 				if (!isAllowedFile)
 				{
-					Core::PrintConsoleMessage(
+					KalaServer::PrintConsoleMessage(
 						ConsoleMessageType::Type_Warning,
 						"User tried to access forbidden route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
 
 					string result = server->ServeFile(server->errorMessage.error403);
 					if (result == "")
 					{
-						Core::PrintConsoleMessage(
+						KalaServer::PrintConsoleMessage(
 							ConsoleMessageType::Type_Error,
 							"Failed to load 403 error page!");
 					}
@@ -572,7 +579,7 @@ namespace KalaServer
 							string errorResult = server->ServeFile(server->errorMessage.error500);
 							if (errorResult == "")
 							{
-								Core::PrintConsoleMessage(
+								KalaServer::PrintConsoleMessage(
 									ConsoleMessageType::Type_Error,
 									"Failed to load 500 error page!");
 							}
@@ -582,7 +589,7 @@ namespace KalaServer
 					}
 					catch (const exception& e)
 					{
-						Core::PrintConsoleMessage(
+						KalaServer::PrintConsoleMessage(
 							ConsoleMessageType::Type_Error,
 							"Error 500 when requesting page ("
 							+ filePath
@@ -592,7 +599,7 @@ namespace KalaServer
 						string result = server->ServeFile(server->errorMessage.error500);
 						if (result == "")
 						{
-							Core::PrintConsoleMessage(
+							KalaServer::PrintConsoleMessage(
 								ConsoleMessageType::Type_Error,
 								"Failed to load 500 error page!");
 						}
@@ -621,7 +628,7 @@ namespace KalaServer
 				NI_NUMERICHOST);
 			string clientIP = ipStr;
 
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"========== LOADING ROUTE ==========\n"
 				" IP    : " + clientIP + "\n"

@@ -5,8 +5,12 @@
 
 #pragma once
 
-namespace KalaServer
+#include <string>
+
+namespace KalaKit::DNS
 {
+	using std::string;
+
 	class CloudFlare
 	{
 	public:

@@ -7,18 +7,18 @@
 #include <vector>
 #include <filesystem>
 
-#include "core.hpp"
-#include "server.hpp"
-#include "cloudflare.hpp"
-#include "dns.hpp"
+#include "core/core.hpp"
+#include "core/server.hpp"
+#include "dns/cloudflare.hpp"
+#include "dns/dns.hpp"
 
-using KalaServer::Core;
-using KalaServer::Server;
-using KalaServer::ErrorMessage;
-using KalaServer::ConsoleMessageType;
-using KalaServer::PopupReason;
-using KalaServer::CloudFlare;
-using KalaServer::DNS;
+using KalaKit::Core::KalaServer;
+using KalaKit::Core::Server;
+using KalaKit::Core::ErrorMessage;
+using KalaKit::Core::ConsoleMessageType;
+using KalaKit::Core::PopupReason;
+using KalaKit::DNS::CloudFlare;
+using KalaKit::DNS::CustomDNS;
 
 using std::string;
 using std::vector;
@@ -85,14 +85,14 @@ int main()
 	//do not run dns and cloudflared together
 	//DNS::RunDNS();
 		
-	Core::PrintConsoleMessage(
+	KalaServer::PrintConsoleMessage(
 		ConsoleMessageType::Type_Message,
 		"Reached render loop successfully!");
 
-	while (Core::isRunning)
+	while (KalaServer::isRunning)
 	{
-		Core::Run();
+		KalaServer::Run();
 	}
 
-	Core::Quit();
+	KalaServer::Quit();
 }

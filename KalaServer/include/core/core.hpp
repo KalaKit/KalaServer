@@ -7,7 +7,7 @@
 
 #include <string>
 
-namespace KalaServer
+namespace KalaKit::Core
 {
 	using std::string;
 
@@ -24,7 +24,7 @@ namespace KalaServer
 		Reason_Warning
 	};
 
-	class Core
+	class KalaServer
 	{
 	public:
 		//Is the server currently running

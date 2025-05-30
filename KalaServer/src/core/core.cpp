@@ -7,23 +7,26 @@
 #include <shellapi.h>
 #include <iostream>
 
-#include "core.hpp"
-#include "server.hpp"
-#include "cloudflare.hpp"
-#include "dns.hpp"
+#include "core/core.hpp"
+#include "core/server.hpp"
+#include "dns/cloudflare.hpp"
+#include "dns/dns.hpp"
+
+using KalaKit::DNS::CloudFlare;
+using KalaKit::DNS::CustomDNS;
 
 using std::cout;
 
-namespace KalaServer
+namespace KalaKit::Core
 {
-	bool Core::Run()
+	bool KalaServer::Run()
 	{
 		bool isServerRunning = Server::server->Run();
 
 		return isServerRunning;
 	}
 
-	bool Core::IsRunningAsAdmin()
+	bool KalaServer::IsRunningAsAdmin()
 	{
 		BOOL isElevated = FALSE;
 		HANDLE token = nullptr;
@@ -51,7 +54,7 @@ namespace KalaServer
 		return isElevated;
 	}
 
-	void Core::PrintConsoleMessage(
+	void KalaServer::PrintConsoleMessage(
 		ConsoleMessageType type,
 		const string& message)
 	{
@@ -74,7 +77,7 @@ namespace KalaServer
 		cout << result + "\n";
 	}
 
-	void Core::CreatePopup(
+	void KalaServer::CreatePopup(
 		PopupReason reason,
 		const string& message)
 	{
@@ -112,12 +115,12 @@ namespace KalaServer
 		}
 	}
 
-	void Core::Quit()
+	void KalaServer::Quit()
 	{
 		Server::server->Quit();
 
 		if (CloudFlare::IsRunning()) CloudFlare::Quit();
-		if (DNS::IsRunning()) DNS::Quit();
+		if (CustomDNS::IsRunning()) CustomDNS::Quit();
 		
 		exit(0);
 	}

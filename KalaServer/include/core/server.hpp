@@ -10,7 +10,7 @@
 #include <map>
 #include <vector>
 
-namespace KalaServer
+namespace KalaKit::Core
 {
 	using std::string;
 	using std::unique_ptr;

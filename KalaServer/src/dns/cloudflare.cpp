@@ -12,10 +12,15 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#include "core.hpp"
-#include "server.hpp"
-#include "cloudflare.hpp"
-#include "dns.hpp"
+#include "core/core.hpp"
+#include "core/server.hpp"
+#include "dns/cloudflare.hpp"
+#include "dns/dns.hpp"
+
+using KalaKit::Core::KalaServer;
+using KalaKit::Core::Server;
+using KalaKit::Core::ConsoleMessageType;
+using KalaKit::Core::PopupReason;
 
 using std::filesystem::current_path;
 using std::filesystem::exists;
@@ -32,7 +37,7 @@ using std::replace;
 using std::cin;
 using std::cout;
 
-namespace KalaServer
+namespace KalaKit::DNS
 {
 	static HANDLE tunnelRunHandle{};
 	
@@ -43,7 +48,7 @@ namespace KalaServer
 	{
 		if (Server::server == nullptr)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Cannot initialize cloudflared if server has not yet been initialized!");
 			return false;
@@ -51,7 +56,7 @@ namespace KalaServer
 
 		if (isInitializing)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Cannot initialize cloudflared while it is already being initialized!");
 			return false;
@@ -68,9 +73,9 @@ namespace KalaServer
 		
 		closeCloudflaredAtShutdown = shouldCloseCloudflaredAtShutdown;
 		
-		if (DNS::IsRunning())
+		if (CustomDNS::IsRunning())
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -85,7 +90,7 @@ namespace KalaServer
 		string cloudflaredPath = path(current_path() / cloudFlaredName).string();
 		if (!exists(cloudflaredPath))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -101,7 +106,7 @@ namespace KalaServer
 		if (!exists(certPath)) CreateCert();
 		else
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"  [CLOUDFLARE_MESSAGE] Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
 		}
@@ -116,7 +121,7 @@ namespace KalaServer
 			if (!exists(tunnelIDFilePath)) CreateTunnelCredentials();
 			else
 			{
-				Core::PrintConsoleMessage(
+				KalaServer::PrintConsoleMessage(
 					ConsoleMessageType::Type_Message,
 					"  [CLOUDFLARE_MESSAGE] Cloudflared json file already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
 			}	
@@ -127,7 +132,7 @@ namespace KalaServer
 		isInitializing = false;
 		isRunning = true;
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Cloudflared initialization completed.");
 
@@ -142,7 +147,7 @@ namespace KalaServer
 
 		if (newTunnelName == "")
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Cannot start cloudflared with empty tunnel name!");
 			return false;
@@ -151,7 +156,7 @@ namespace KalaServer
 		if (tunnelNameLength < 3
 			|| tunnelNameLength > 32)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -164,7 +169,7 @@ namespace KalaServer
 
 		if (newTunnelTokenFilePath == "")
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -175,7 +180,7 @@ namespace KalaServer
 		}
 		if (!exists(newTunnelTokenFilePath))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -231,7 +236,7 @@ namespace KalaServer
 		ifstream file(textFilePath);
 		if (!file)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -250,7 +255,7 @@ namespace KalaServer
 		if (textLength < minLength
 			|| textLength > maxLength)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -262,7 +267,7 @@ namespace KalaServer
 
 		if (fileResult.find(" ") != string::npos)
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to start cloudflared!"
 				"\n\n"
@@ -282,13 +287,13 @@ namespace KalaServer
 
 		if (exists(certPath))
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"  [CLOUDFLARE_MESSAGE] Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
 			return;
 		}
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Creating new tunnel cert file at '" + certPath + "'.");
 
@@ -303,7 +308,7 @@ namespace KalaServer
 		si.cb = sizeof(si);
 
 		string command = "cloudflared tunnel login";
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command);
 
@@ -322,7 +327,7 @@ namespace KalaServer
 			&pi                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -336,7 +341,7 @@ namespace KalaServer
 		WaitForSingleObject(pi.hProcess, INFINITE);
 		CloseHandle(pi.hThread);
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Launched browser to authorize with CloudFlare. PID: " + to_string(pi.dwProcessId));
 
@@ -344,7 +349,7 @@ namespace KalaServer
 
 		if (!exists(certPath))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -353,7 +358,7 @@ namespace KalaServer
 				"Failed to create tunnel cert file for tunnel '" + tunnelName + "' in '" + cloudFlareFolder + "'!");
 		}
 		
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_SUCCESS] Created new cloudflared cert file for tunnel '" + tunnelName + "'.");
 	}
@@ -365,7 +370,7 @@ namespace KalaServer
 		if (tunnelIDFilePath != ""
 			&& path(tunnelIDFilePath).extension().string() == ".json")
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"  [CLOUDFLARE_MESSAGE] Cloudflared credentials json file for tunnel '" + tunnelName + "' already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
 			return;
@@ -386,7 +391,7 @@ namespace KalaServer
 		si1.cb = sizeof(si1);
 
 		string command1 = "cloudflared tunnel delete " + tunnelName;
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command1);
 
@@ -405,7 +410,7 @@ namespace KalaServer
 			&pi1                       //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -432,7 +437,7 @@ namespace KalaServer
 		si2.cb = sizeof(si2);
 
 		string command2 = "cloudflared tunnel create " + tunnelName;
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command2);
 
@@ -451,7 +456,7 @@ namespace KalaServer
 			&pi2                       //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -474,7 +479,7 @@ namespace KalaServer
 			&& path(tunnelIDFilePath).extension().string() == ".json"
 			&& !exists(tunnelIDFilePath))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -484,11 +489,11 @@ namespace KalaServer
 			return;
 		}
 		
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials json file for tunnel '" + tunnelName + "'.");
 			
-		Core::CreatePopup(
+		KalaServer::CreatePopup(
 			PopupReason::Reason_Warning,
 			"Before continuing to route DNS, you must manually insert the tunnel ID into config.yml.\n\n"
 			"Please update the following fields:\n"
@@ -517,7 +522,7 @@ namespace KalaServer
 		si1.cb = sizeof(si1);
 
 		string command1 = "cloudflared tunnel route dns " + Server::server->GetDomainName() + " " + tunnelName;
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command1);
 
@@ -536,7 +541,7 @@ namespace KalaServer
 			&p1                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -563,7 +568,7 @@ namespace KalaServer
 		si2.cb = sizeof(si2);
 
 		string command2 = "cloudflared tunnel route dns www." + Server::server->GetDomainName() + " " + tunnelName;
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command2);
 
@@ -582,7 +587,7 @@ namespace KalaServer
 			&pi2                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -597,7 +602,7 @@ namespace KalaServer
 		CloseHandle(pi2.hThread);
 		CloseHandle(pi2.hProcess);
 		
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_SUCCESS] Routed cloudflared dns for tunnel '" + tunnelName + "'.");
 	}
@@ -630,7 +635,7 @@ namespace KalaServer
 			+ " --config " + configPath
 			+ " tunnel run " + tunnelName;
 #endif
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command);
 
@@ -649,7 +654,7 @@ namespace KalaServer
 			&pi                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			Core::CreatePopup(
+			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Failed to set up cloudflared!"
 				"\n\n"
@@ -663,7 +668,7 @@ namespace KalaServer
 		CloseHandle(pi.hThread);
 		tunnelRunHandle = pi.hProcess;
 		
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_SUCCESS] Running cloudflared tunnel.");
 	}
@@ -672,7 +677,7 @@ namespace KalaServer
 	{
 		if (!isRunning)
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Error,
 				"Cannot shut down cloudflared because it hasn't been started!");
 			return;
@@ -687,14 +692,14 @@ namespace KalaServer
 		}
 		else
 		{
-			Core::PrintConsoleMessage(
+			KalaServer::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"  [CLOUDFLARE_SUCCESS] Cloudflared was shut down.");
 		}
 		
 		isRunning = false;
 
-		Core::PrintConsoleMessage(
+		KalaServer::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Cloudflared was successfully shut down!");
 	}
