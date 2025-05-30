@@ -29,6 +29,9 @@ using std::filesystem::current_path;
 using std::filesystem::exists;
 using std::filesystem::recursive_directory_iterator;
 using std::make_unique;
+using std::ofstream;
+using std::ios;
+using std::string_view;
 
 namespace KalaServer
 {
@@ -38,6 +41,7 @@ namespace KalaServer
 		const string& domainName,
 		const ErrorMessage& errorMessage,
 		const string& whitelistedRoutesFolder,
+		const vector<string>& blacklistedKeywords,
 		const vector<string>& extensions)
 	{
 		if (!Core::IsRunningAsAdmin())
@@ -69,6 +73,7 @@ namespace KalaServer
 			domainName,
 			errorMessage,
 			whitelistedRoutesFolder,
+			blacklistedKeywords,
 			extensions);
 
 		Core::PrintConsoleMessage(
@@ -81,6 +86,25 @@ namespace KalaServer
 			"\n"
 			"=============================="
 			"\n");
+
+		server->bannedBotsFile = (path(current_path() / "banned-bots.txt")).string();
+		string bannedBotsFile = server->GetBannedBotsFilePath();
+		if (!exists(bannedBotsFile))
+		{
+			ofstream log(bannedBotsFile);
+			if (!log)
+			{
+				Core::CreatePopup(
+					PopupReason::Reason_Error,
+					"Failed to create banned-bots.txt!");
+				return;
+			}
+			log.close();
+
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"Created 'banned-bots.txt' at root directory.");
+		}
 
 		server->AddInitialWhitelistedRoutes();
 		
@@ -147,6 +171,126 @@ namespace KalaServer
 			"\n"
 			"=============================="
 			"\n");
+	}
+
+	bool Server::IsBlacklistedRoute(const string& route)
+	{
+		for (const auto& blacklistedKeyword : blacklistedKeywords)
+		{
+			if (route.find(blacklistedKeyword) != string::npos) return true;
+		}
+
+		return false;
+	}
+
+	bool Server::IsBannedIP(const string& targetIP)
+	{
+		string bannedBotsFile = server->GetBannedBotsFilePath();
+
+		bool result = false;
+
+		ifstream file(bannedBotsFile);
+		if (!file)
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Failed to open 'banned-bots.txt' to check if IP is banned or not!");
+			return false;
+		}
+
+		string line;
+		while (getline(file, line))
+		{
+			auto delimiterPos = line.find('|');
+			if (delimiterPos != string::npos)
+			{
+				string ip = line.substr(0, delimiterPos);
+				string reason = line.substr(delimiterPos + 1);
+				if (ip == targetIP)
+				{
+					result = true;
+					break;
+				}
+			}
+		}
+
+		file.close();
+
+		return result;
+	}
+
+	void Server::StopBannedIP(
+		const BannedIP& target,
+		uintptr_t clientSocket)
+	{
+		const string banMessage =
+			"HTTP/1.1 403 Forbidden\r\n"
+			"Content-Type: text/plain\r\n"
+			"Connection: close\r\n"
+			"Content-Length: 128\r\n"
+			"\r\n"
+			"Access denied: Your IP has been banned for most likely being a bot.\n"
+			"Message the website master on Discord @greenlaser if you want to get back access.\n";
+
+		SOCKET clientRealSocket = static_cast<SOCKET>(clientSocket);
+		send(
+			clientRealSocket,
+			banMessage.c_str(),
+			static_cast<int>(banMessage.size()),
+			0);
+		shutdown(clientRealSocket, SD_BOTH);
+		closesocket(clientRealSocket);
+	}
+
+	void Server::BanIP(const BannedIP& target, uintptr_t clientSocket)
+	{
+		string bannedBotsPath = server->GetBannedBotsFilePath();
+
+		ifstream readFile(bannedBotsPath);
+		if (!readFile)
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Failed to read 'banned-bots.txt' to ban IP!");
+			return;
+		}
+
+		string line;
+		while (getline(readFile, line))
+		{
+			auto delimiterPos = line.find('|');
+			if (delimiterPos != string::npos)
+			{
+				string ip = line.substr(0, delimiterPos);
+				string cleanedIP = ip.substr(0, ip.find_last_not_of(" \t") + 1);
+				if (cleanedIP == target.IP) return; //user is already banned
+			}
+		}
+
+		readFile.close();
+
+		ofstream writeFile(bannedBotsPath, ios::app);
+		if (!writeFile)
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Error,
+				"Failed to write into 'banned-bots.txt' to ban IP!");
+			return;
+		}
+
+		writeFile << target.IP << " | " << target.reason << "\n";
+
+		writeFile.close();
+
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"\n"
+			"=============== BANNED IP ===============\n"
+			" IP     : " + target.IP + "\n"
+			" Reason : Attempted access to blacklisted route '" + target.reason + "'\n"
+			"=========================================\n");
+
+		server->StopBannedIP(target, clientSocket);
 	}
 
 	void Server::AddInitialWhitelistedRoutes()
@@ -293,14 +437,6 @@ namespace KalaServer
 				"Neither cloudflared or dns was started! Please run atleast one of them.");
 			return false;
 		}
-		
-		for (int i = 0; i < 600; ++i)
-		{
-			Core::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"Server is alive...");
-			Sleep(100);
-		}
 
 		SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
 		SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
@@ -319,9 +455,11 @@ namespace KalaServer
 			string request(buffer);
 			string filePath = "/";
 
+#ifdef _DEBUG
 			Core::PrintConsoleMessage(
 				ConsoleMessageType::Type_Message,
 				"Raw HTTP request:\n" + request);
+#endif
 
 			if (request.starts_with("GET "))
 			{
@@ -330,6 +468,44 @@ namespace KalaServer
 				if (pathEnd != string::npos)
 				{
 					filePath = request.substr(pathStart, pathEnd - pathStart);
+				}
+			}
+
+			if (!server->blacklistedKeywords.empty())
+			{
+				sockaddr_storage addr{};
+				socklen_t addrLen = sizeof(addr);
+				getpeername(
+					clientSocket,
+					reinterpret_cast<sockaddr*>(&addr),
+					&addrLen);
+
+				char ipStr[INET6_ADDRSTRLEN]{};
+				getnameinfo(
+					reinterpret_cast<sockaddr*>(&addr),
+					addrLen,
+					ipStr,
+					sizeof(ipStr),
+					nullptr,
+					0,
+					NI_NUMERICHOST);
+				string clientIP = ipStr;
+
+				BannedIP banned;
+				banned.IP = clientIP;
+				banned.reason = filePath;
+
+				if (server->IsBlacklistedRoute(filePath)
+					&& !server->IsBannedIP(banned.IP))
+				{
+					server->BanIP(banned, static_cast<uintptr_t>(clientSocket));
+					return false;
+				}
+
+				if (server->IsBannedIP(banned.IP))
+				{
+					server->StopBannedIP(banned, static_cast<uintptr_t>(clientSocket));
+					return false;
 				}
 			}
 

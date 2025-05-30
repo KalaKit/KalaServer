@@ -15,10 +15,6 @@ set "TUNNELTOKEN_ORIGIN=%PROJECT_ROOT%\example\tunneltoken.txt"
 set "TUNNELTOKEN_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\tunneltoken.txt"
 set "TUNNELTOKEN_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\tunneltoken.txt"
 
-set "ACCOUNTTAG_ORIGIN=%PROJECT_ROOT%\example\accounttag.txt"
-set "ACCOUNTTAG_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\accounttag.txt"
-set "ACCOUNTTAG_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\accounttag.txt"
-
 if not exist "%CONTENT_ORIGIN%" (
 	echo Failed to find content folder!
 	pause
@@ -36,13 +32,6 @@ if not exist "%TUNNELTOKEN_ORIGIN%" (
 	pause
 	exit /b 1
 )
-
-if not exist "%ACCOUNTTAG_ORIGIN%" (
-	echo Failed to find accounttag.txt!
-	pause
-	exit /b 1
-)
-
 set "BUILD_DEBUG=%PROJECT_ROOT%build-debug"
 if exist "%BUILD_DEBUG%" (
 	rmdir /s /q "%BUILD_DEBUG%"
@@ -119,12 +108,6 @@ copy /Y "%TUNNELTOKEN_ORIGIN%" "%TUNNELTOKEN_DEBUG_TARGET%"
 echo Copied tunneltoken.txt to debug target.
 copy /Y "%TUNNELTOKEN_ORIGIN%" "%TUNNELTOKEN_RELEASE_TARGET%"
 echo Copied tunneltoken.txt to release target.
-
-:: Copy accounttag.txt
-copy /Y "%ACCOUNTTAG_ORIGIN%" "%ACCOUNTTAG_DEBUG_TARGET%"
-echo Copied accounttag.txt to debug target.
-copy /Y "%ACCOUNTTAG_ORIGIN%" "%ACCOUNTTAG_RELEASE_TARGET%"
-echo Copied accounttag.txt to release target.
 
 echo.
 echo ========================================

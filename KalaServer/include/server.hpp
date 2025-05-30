@@ -23,6 +23,12 @@ namespace KalaServer
 		string error404;
 		string error500;
 	};
+
+	struct BannedIP
+	{
+		string IP;
+		string reason;
+	};
 	
 	class Server
 	{
@@ -35,12 +41,14 @@ namespace KalaServer
 			string domainName,
 			ErrorMessage errorMessages,
 			string whitelistedRoutesFolder,
+			vector<string> blacklistedKeywords,
 			vector<string> whitelistedExtensions) :
 			port(port),
 			serverName(serverName),
 			domainName(domainName),
 			errorMessage(errorMessage),
 			whitelistedRoutesFolder(whitelistedRoutesFolder),
+			blacklistedKeywords(blacklistedKeywords),
 			whitelistedExtensions(whitelistedExtensions) {
 		}
 
@@ -53,6 +61,7 @@ namespace KalaServer
 			const string& domainName,
 			const ErrorMessage& errorMessage,
 			const string& whitelistedRoutesFolder,
+			const vector<string>& blacklistedKeywords,
 			const vector<string>& extensions);
 
 		/// <summary>
@@ -64,6 +73,33 @@ namespace KalaServer
 		/// Closes the server. Use Core::Quit instead of this.
 		/// </summary>
 		void Quit();
+
+		string GetBannedBotsFilePath() { return bannedBotsFile; }
+
+		/// <summary>
+		/// Check whether this route is allowed to be accessed.
+		/// If you access it you will get banned, it is used to keep away scrapers and bots.
+		/// </summary>
+		bool IsBlacklistedRoute(const string& route);
+
+		/// <summary>
+		/// Returns banned ip + reason if IP address is banned and shouldnt be allowed to access any routes.
+		/// </summary>
+		bool IsBannedIP(const string& ip);
+
+		/// <summary>
+		/// Throw a simple banned message for a banned IP trying to access any route.
+		/// </summary>
+		void StopBannedIP(
+			const BannedIP& target,
+			uintptr_t clientSocket);
+		/// <summary>
+		/// Add info about banned ip to banned-bots.txt.
+		/// </summary>
+		/// <param name="target"></param>
+		void BanIP(
+			const BannedIP& target,
+			uintptr_t clientSocket);
 
 		void SetServerName(const string& newServerName) { serverName = newServerName; }
 		void SetDomainName(const string& newDomainName) { domainName = newDomainName; }
@@ -99,12 +135,15 @@ namespace KalaServer
 
 		mutable uintptr_t serverSocket{}; //Current active socket
 		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
+		string bannedBotsFile{}; //The path to the banned bots file.
 
 		int port; //Local server port
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
+
 		ErrorMessage errorMessage; //File paths for server admin provided error pages, loads browser defaults otherwise.
 		string whitelistedRoutesFolder; //The folder path relative to the server where all pages are inside of.
+		vector<string> blacklistedKeywords; //All keywords that will ban you if you try to access any route with one of them inside it
 		vector<string> whitelistedExtensions; //All extensions that are allowed to be accessed
 	};
 }

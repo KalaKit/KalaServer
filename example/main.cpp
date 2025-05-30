@@ -51,12 +51,30 @@ int main()
 		".webp", ".webm", ".mp4", ".gif"
 	};
 
+	static const std::vector<std::string> blacklistedKeywords = 
+	{
+		//CMS / WordPress
+		"wp", "wp1", "wordpress", "includes",
+		"blog", "cms", "xml", "php",
+
+		//admin / Control Panels
+		"admin", "sito", "login", "register",
+
+		//shop / Web presence
+		"shop", "web",
+
+		//years (common archive or crawl targets)
+		"2026", "2025", "2024", "2023",
+		"2022", "2021", "2020", "2019"
+	};
+
 	Server::Initialize(
 		port,
 		serverName,
 		domainName,
 		msg,
 		whitelistedRoutesFolder,
+		blacklistedKeywords,
 		whitelistedExtensions);
 
 	CloudFlare::Initialize(

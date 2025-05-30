@@ -8,6 +8,7 @@
 #include <Windows.h>
 #include <fstream>
 #include <chrono>
+#include <iostream>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -20,6 +21,7 @@ using std::filesystem::current_path;
 using std::filesystem::exists;
 using std::filesystem::path;
 using std::filesystem::directory_iterator;
+using std::filesystem::file_time_type;
 using std::string;
 using std::wstring;
 using std::to_string;
@@ -27,6 +29,8 @@ using std::ofstream;
 using std::ifstream;
 using std::stringstream;
 using std::replace;
+using std::cin;
+using std::cout;
 
 namespace KalaServer
 {
@@ -134,6 +138,8 @@ namespace KalaServer
 		const string& newTunnelName,
 		const string& newTunnelTokenFilePath)
 	{
+		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
+
 		if (newTunnelName == "")
 		{
 			Core::CreatePopup(
@@ -198,16 +204,16 @@ namespace KalaServer
 			file_time_type newestTime{};
 			for (const auto& file : directory_iterator(cloudFlareFolder))
 			{
-				if (path(tunnelIDFilePath).extension().string() == ".json")
+				path filePath = file.path();
+				if (filePath.extension().string() == ".json")
 				{
 					auto lastWrite = last_write_time(file);
 					if (lastWrite > newestTime)
 					{
-						
+						newestTunnelID = filePath.stem().string();
+						newestTime = lastWrite;
 					}
 				}
-				tunnelID = path(file).stem().string();
-				break;
 			}
 			if (newestTunnelID != "") tunnelID = newestTunnelID;
 		}
@@ -273,7 +279,7 @@ namespace KalaServer
 	{
 		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
 		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
-		
+
 		if (exists(certPath))
 		{
 			Core::PrintConsoleMessage(
@@ -281,12 +287,13 @@ namespace KalaServer
 				"  [CLOUDFLARE_MESSAGE] Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
 			return;
 		}
-		
+
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"Creating new tunnel cert file at '" + certPath + "'.");
 
-		wstring wParentFolderPath(current_path().string().begin(), current_path().string().end());
+		string currentPath = current_path().string();
+		wstring wParentFolderPath(currentPath.begin(), currentPath.end());
 
 		//initialize structures for process creation
 		STARTUPINFOW si;
@@ -364,7 +371,8 @@ namespace KalaServer
 			return;
 		}
 		
-		wstring wParentFolderPath(current_path().string().begin(), current_path().string().end());
+		string currentPath = current_path().string();
+		wstring wParentFolderPath(currentPath.begin(), currentPath.end());
 		
 		//
 		// DELETE OLD TUNNEL
@@ -486,7 +494,7 @@ namespace KalaServer
 			"Please update the following fields:\n"
 			"  tunnel: <insert tunnel ID here>\n"
 			"  credentials-file: <insert full path to .json file>\n\n"
-			"Press OK to continue once you’ve updated config.yml. If the tunnel ID is incorrect, DNS routing will fail and 'cloudflared tunnel run' will not work."
+			"Press OK to continue once you've updated config.yml. If the tunnel ID is incorrect, DNS routing will fail and 'cloudflared tunnel run' will not work."
 		);
 			
 		RouteTunnel();
@@ -494,33 +502,38 @@ namespace KalaServer
 
 	void CloudFlare::RouteTunnel()
 	{
-		//initialize structures for process creation
-		STARTUPINFOW si;
-		PROCESS_INFORMATION pi;
-		ZeroMemory(&si, sizeof(si));
-		ZeroMemory(&pi, sizeof(pi));
-		si.cb = sizeof(si);
+		string currentPath = current_path().string();
+		wstring wParentFolderPath(currentPath.begin(), currentPath.end());
 
-		string command = "cloudflared tunnel route dns " + Server::server->GetDomainName() + " " + tunnelName;
+		//
+		// ROOT DOMAIN
+		//
+
+		//initialize structures for process creation
+		STARTUPINFOW si1;
+		PROCESS_INFORMATION p1;
+		ZeroMemory(&si1, sizeof(si1));
+		ZeroMemory(&p1, sizeof(p1));
+		si1.cb = sizeof(si1);
+
+		string command1 = "cloudflared tunnel route dns " + Server::server->GetDomainName() + " " + tunnelName;
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command);
-	
-		wstring wParentFolderPath(current_path().string().begin(), current_path().string().end());
+			"  [CLOUDFLARE_COMMAND] " + command1);
 
-		wstring wideCommand(command.begin(), command.end());
+		wstring wideCommand1(command1.begin(), command1.end());
 		if (!CreateProcessW
 		(
 			nullptr,                   //path to the executable
-			const_cast<LPWSTR>(wideCommand.c_str()), //command line arguments
+			const_cast<LPWSTR>(wideCommand1.c_str()), //command line arguments
 			nullptr,                   //process handle not inheritable
 			nullptr,                   //thread handle not inheritable
 			FALSE,                     //handle inheritance
 			0,                         //creation flags
 			nullptr,                   //use parent's environment block
 			wParentFolderPath.c_str(), //use parent's starting directory
-			&si,                       //pointer to STARTUPINFO structure
-			&pi                        //pointer to PROCESS_INFORMATION structure
+			&si1,                       //pointer to STARTUPINFO structure
+			&p1                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
 			Core::CreatePopup(
@@ -534,9 +547,55 @@ namespace KalaServer
 		}
 
 		//close thread handle and process
-		WaitForSingleObject(pi.hProcess, INFINITE);
-		CloseHandle(pi.hThread);
-		CloseHandle(pi.hProcess);
+		WaitForSingleObject(p1.hProcess, INFINITE);
+		CloseHandle(p1.hThread);
+		CloseHandle(p1.hProcess);
+
+		//
+		// SUBDOMAIN
+		//
+
+		//initialize structures for process creation
+		STARTUPINFOW si2;
+		PROCESS_INFORMATION pi2;
+		ZeroMemory(&si2, sizeof(si2));
+		ZeroMemory(&pi2, sizeof(pi2));
+		si2.cb = sizeof(si2);
+
+		string command2 = "cloudflared tunnel route dns www." + Server::server->GetDomainName() + " " + tunnelName;
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [CLOUDFLARE_COMMAND] " + command2);
+
+		wstring wideCommand2(command2.begin(), command2.end());
+		if (!CreateProcessW
+		(
+			nullptr,                   //path to the executable
+			const_cast<LPWSTR>(wideCommand2.c_str()), //command line arguments
+			nullptr,                   //process handle not inheritable
+			nullptr,                   //thread handle not inheritable
+			FALSE,                     //handle inheritance
+			0,                         //creation flags
+			nullptr,                   //use parent's environment block
+			wParentFolderPath.c_str(), //use parent's starting directory
+			&si2,                       //pointer to STARTUPINFO structure
+			&pi2                        //pointer to PROCESS_INFORMATION structure
+		))
+		{
+			Core::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create process for routing dns for tunnel '" + tunnelName + "'!");
+			return;
+		}
+
+		//close thread handle and process
+		WaitForSingleObject(pi2.hProcess, INFINITE);
+		CloseHandle(pi2.hThread);
+		CloseHandle(pi2.hProcess);
 		
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
@@ -547,6 +606,7 @@ namespace KalaServer
 	{	
 		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
 		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
+		string configPath = path(path(cloudFlareFolder) / "config.yml").string();
 	
 		//initialize structures for process creation
 		STARTUPINFOW si;
@@ -555,10 +615,21 @@ namespace KalaServer
 		ZeroMemory(&pi, sizeof(pi));
 		si.cb = sizeof(si);
 
-		string parentFolderPath = current_path().string();
-		wstring wParentFolderPath(parentFolderPath.begin(), parentFolderPath.end());
+		string currentPath = current_path().string();
+		wstring wParentFolderPath(currentPath.begin(), currentPath.end());
 
-		string command = "cloudflared --origin-ca-pool=\"" + certPath + "\" tunnel run " + tunnelName;
+#ifdef _DEBUG
+		string command = 
+			"cloudflared --origin-ca-pool " + certPath 
+			+ " --config " + configPath 
+			+ " --loglevel debug" 
+			+ " tunnel run " + tunnelName;
+#else
+		string command =
+		"cloudflared --origin-ca-pool " + certPath
+			+ " --config " + configPath
+			+ " tunnel run " + tunnelName;
+#endif
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
 			"  [CLOUDFLARE_COMMAND] " + command);

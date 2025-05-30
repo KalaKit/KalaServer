@@ -57,8 +57,18 @@ Compile the project from source using the existing CMakeLists.txt at root by run
 
 ### With 'cloudflared' and Cloudflare
 
-This section assumes you already own a domain on cloudflare and have changed your domain nameservers to cloudflare and have set up atleast A and CNAME in dns records.
+This section assumes you already own a domain on cloudflare.
 
+- add new DNS record to cloudflare domain:
+	- type: CNAME
+	- name: www
+	- content: yourtunnelname.yourdomain.yourextension (KalaServer.thekalakit.com)
+	- proxied: true
+- add new DNS record to cloudflare domain:
+	- type: CNAME
+	- name: yourdomain.yourextension
+	- content: yourtunnelname.yourdomain.yourextension (KalaServer.thekalakit.com)
+	- proxied: true
 - copy 'config.yml' template from 'example' folder to your 'Users' path inside a new '.cloudflared' folder and fill the slots with template values
 - create a cloudflared tunnel if you havent yet
 	- log in to 'https://one.dash.cloudflare.com/'
