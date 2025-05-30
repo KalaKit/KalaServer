@@ -95,10 +95,39 @@ namespace KalaServer
 		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
 		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
 		if (!exists(certPath)) CreateCert();
+		else
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"  [CLOUDFLARE_MESSAGE] Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
+		}
 
-		if (!exists(tunnelTokenFilePath)) CreateTunnelCredentials();
+		string tunnelFile = tunnelID + ".json";
+		string tunnelFilePath = path(path(cloudFlareFolder) / tunnelFile).string();
+		replace(tunnelFilePath.begin(), tunnelFilePath.end(), '\\', '/');
+		
+		string configFile = "config.yml";
+		string configFilePath = path(path(cloudFlareFolder) / configFile).string();
+		replace(configFilePath.begin(), configFilePath.end(), '\\', '/');
+		if (!exists(tunnelFilePath)
+			|| !exists(configFilePath))
+		{
+			CreateTunnelCredentials();
+		}
+		else
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"  [CLOUDFLARE_MESSAGE] Cloudflared yml and json files already exist at '" + cloudFlareFolder + "'. Skipping creation.");
+		}
 		
 		if (!TunnelExists()) InstallTunnel();
+		else
+		{
+			Core::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"  [CLOUDFLARE_MESSAGE] Cloudflared tunnel already exists. Skipping installation.");
+		}
 		
 		RunTunnel();
 
@@ -318,7 +347,7 @@ namespace KalaServer
 		string command = "cloudflared.exe tunnel login";
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [Cloudflared command] " + command);
+			"  [CLOUDFLARE_COMMAND] " + command);
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
@@ -365,6 +394,10 @@ namespace KalaServer
 				"\n"
 				"Failed to create tunnel cert file in '" + cloudFlareFolder + "'!");
 		}
+		
+		Core::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"  [CLOUDFLARE_SUCCESS] Created new cloudflared cert file for tunnel '" + tunnelName + "'.");
 	}
 
 	void CloudFlare::CreateTunnelCredentials()
@@ -395,7 +428,7 @@ namespace KalaServer
 		if (!exists(tunnelFilePath))
 		{
 			Core::PrintConsoleMessage(
-			ConsoleMessageType::Type_Warning,
+			ConsoleMessageType::Type_Message,
 			"Creating new tunnel credentials json file at '" + tunnelFilePath + "'.");
 		
 			ofstream tunnelFile(tunnelFilePath);
@@ -428,7 +461,7 @@ namespace KalaServer
 		if (!exists(configFilePath))
 		{				
 			Core::PrintConsoleMessage(
-				ConsoleMessageType::Type_Warning,
+				ConsoleMessageType::Type_Message,
 				"Creating new tunnel credentials yml file at '" + configFilePath + "'.");
 		
 			ofstream configFile(configFilePath);
@@ -483,7 +516,7 @@ namespace KalaServer
 		
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials json file for tunnel '" + tunnelName + "' at '" + tunnelFilePath + "' and yml file at '" + configFilePath + "'.");
+			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials files for tunnel '" + tunnelName + "'.");
 	}
 	
 	bool CloudFlare::TunnelExists()
@@ -525,7 +558,7 @@ namespace KalaServer
 		string command = "cloudflared.exe tunnel list";
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [Cloudflared command] " + command);
+			"  [CLOUDFLARE_COMMAND] " + command);
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
@@ -668,7 +701,7 @@ namespace KalaServer
 		
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Created new cloudflared tunnel '" + tunnelName + "'.");
+			"  [CLOUDFLARE_SUCCESS] Installed new cloudflared tunnel '" + tunnelName + "'.");
 	}
 
 	void CloudFlare::RunTunnel()
@@ -686,7 +719,7 @@ namespace KalaServer
 		string command = "cloudflared.exe tunnel run " + tunnelName;
 		Core::PrintConsoleMessage(
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLFARE_COMMAND] " + command);
+			"  [CLOUDFLARE_COMMAND] " + command);
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
