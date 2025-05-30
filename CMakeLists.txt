@@ -18,7 +18,7 @@ file(GLOB_RECURSE SERVER_SOURCE_FILES CONFIGURE_DEPENDS
 	${SRC_DIR}/*/*.cpp
 )
 
-add_library(KalaServer STATIC ${SERVER_SOURCE_FILES})
+add_library(KalaServer STATIC ${SERVER_SOURCE_FILES} "KalaServer/src/response/response.cpp")
 
 target_include_directories(KalaServer PUBLIC 
 	"${INCLUDE_DIR}"

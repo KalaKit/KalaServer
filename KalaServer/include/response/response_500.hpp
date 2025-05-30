@@ -5,7 +5,16 @@
 
 #pragma once
 
-namespace KalaKit::Response
-{
+#include "response/response.hpp"
 
+namespace KalaKit::ResponseSystem
+{
+	class Response_500 : public Response
+	{
+	public:
+		void Init(
+			const std::string& route,
+			const std::string& clientIP,
+			uintptr_t clientSocket) override;
+	};
 }
