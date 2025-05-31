@@ -11,11 +11,17 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <memory>
 
 #include "core/core.hpp"
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
+#include "response/response_ok.hpp"
+#include "response/response_404.hpp"
+#include "response/response_403.hpp"
+#include "response/response_500.hpp"
+#include "response/response_banned.hpp"
 
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::Server;
@@ -23,6 +29,11 @@ using KalaKit::Core::ConsoleMessageType;
 using KalaKit::Core::PopupReason;
 using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;
+using KalaKit::ResponseSystem::Response_OK;
+using KalaKit::ResponseSystem::Response_404;
+using KalaKit::ResponseSystem::Response_403;
+using KalaKit::ResponseSystem::Response_500;
+using KalaKit::ResponseSystem::Response_Banned;
 
 using std::cout;
 using std::map;
@@ -39,6 +50,11 @@ using std::make_unique;
 using std::ofstream;
 using std::ios;
 using std::string_view;
+using std::make_unique;
+using std::unique_ptr;
+using std::istringstream;
+using std::thread;
+using std::lock_guard;
 
 namespace KalaKit::Core
 {
@@ -182,9 +198,17 @@ namespace KalaKit::Core
 
 	bool Server::IsBlacklistedRoute(const string& route)
 	{
-		for (const auto& blacklistedKeyword : blacklistedKeywords)
+		istringstream ss(route);
+		string segment{};
+
+		while (getline(ss, segment, '/'))
 		{
-			if (route.find(blacklistedKeyword) != string::npos) return true;
+			if (segment.empty()) continue;
+
+			for (const auto& keyword : blacklistedKeywords)
+			{
+				if (segment.find(keyword) != string::npos) return true;
+			}
 		}
 
 		return false;
@@ -224,39 +248,6 @@ namespace KalaKit::Core
 		file.close();
 
 		return result;
-	}
-
-	void Server::StopBannedIP(
-		const BannedIP& target,
-		uintptr_t clientSocket) const
-	{
-		string body{};
-		string statusLine = "HTTP/1.1 403 Forbidden";
-
-		string result = server->ServeFile(server->errorMessage.error403);
-		if (result == "")
-		{
-			KalaServer::PrintConsoleMessage(
-				ConsoleMessageType::Type_Error,
-				"Failed to load 403 error page!");
-		}
-		else body = result;
-
-		string response =
-			statusLine + "\r\n"
-			"Content-Type: text/html\r\n"
-			"Content-Length: " + to_string(body.size()) + "\r\n"
-			"Connection: close\r\n\r\n" + body;
-
-		SOCKET clientRawSocket = static_cast<SOCKET>(clientSocket);
-
-		send(
-			clientRawSocket,
-			response.c_str(), 
-			static_cast<int>(response.size()), 
-			0);
-
-		closesocket(clientRawSocket);
 	}
 
 	void Server::BanIP(const BannedIP& target, uintptr_t clientSocket) const
@@ -307,7 +298,11 @@ namespace KalaKit::Core
 			" Reason : Attempted access to blacklisted route '" + target.reason + "'\n"
 			"=========================================\n");
 
-		server->StopBannedIP(target, clientSocket);
+		auto respBanned = make_unique<Response_Banned>();
+		respBanned->Init(
+			target.reason,
+			target.IP,
+			clientSocket);
 	}
 
 	void Server::AddInitialWhitelistedRoutes() const
@@ -444,7 +439,7 @@ namespace KalaKit::Core
 		return "";
 	}
 
-	bool Server::Run() const
+	void Server::Start() const
 	{
 		if (!CloudFlare::IsRunning()
 			&& !CustomDNS::IsRunning())
@@ -452,22 +447,83 @@ namespace KalaKit::Core
 			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Neither cloudflared or dns was started! Please run atleast one of them.");
-			return false;
+			return;
 		}
 
-		SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
-		SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
-		if (clientSocket == INVALID_SOCKET)
+		thread([]
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Accept failed!");
-			return false;
+			SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
+			while (KalaServer::isRunning)
+			{
+				SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
+				if (clientSocket == INVALID_SOCKET)
+				{
+					KalaServer::PrintConsoleMessage(
+						ConsoleMessageType::Type_Error,
+						"Accept failed: " + to_string(WSAGetLastError()));
+					return;
+				}
+				else
+				{
+					thread([clientSocket]
+						{
+							Server::server->HandleClient(static_cast<uintptr_t>(clientSocket));
+						}).detach();
+				}
+			}
+		}).detach();
+
+		thread([]
+		{
+			while (KalaServer::isRunning)
+			{
+				KalaServer::PrintConsoleMessage(
+					ConsoleMessageType::Type_Message,
+					"Server is still alive...");
+				Sleep(5000);
+			}
+		}).detach();
+	}
+
+	void Server::HandleClient(uintptr_t socket)
+	{
+		KalaServer::PrintConsoleMessage(
+			ConsoleMessageType::Type_Message,
+			"Entered handle client thread...");
+
+		SOCKET rawSocket = static_cast<SOCKET>(socket);
+
+		//prevent timeout - wait 5 seconds then exit
+
+		DWORD timeout = 5000; //5 seconds
+		setsockopt(
+			rawSocket, 
+			SOL_SOCKET,
+			SO_RCVTIMEO, 
+			(char*)&timeout, 
+			sizeof(timeout));
+
+		{
+			lock_guard lock(server->clientSocketsMutex);
+			server->activeClientSockets.insert(socket);
 		}
 
 		char buffer[2048] = {};
-		int bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-		if (bytesReceived > 0)
+		int bytesReceived = recv(rawSocket, buffer, sizeof(buffer) - 1, 0);
+		if (bytesReceived == 0)
+		{
+			KalaServer::PrintConsoleMessage(
+				ConsoleMessageType::Type_Warning,
+				"Client timed out or disconnected before sending request.");
+
+			{
+				std::lock_guard lock(server->clientSocketsMutex);
+				server->activeClientSockets.erase(socket);
+			}
+			closesocket(rawSocket);
+			return;
+		}
+		else
 		{
 			string request(buffer);
 			string filePath = "/";
@@ -488,41 +544,54 @@ namespace KalaKit::Core
 				}
 			}
 
+			string clientIP{};
+			const string cfHeader = "CF-Connecting-IP:";
+			size_t headerPos = request.find(cfHeader);
+			if (headerPos != string::npos)
+			{
+				size_t start = headerPos + cfHeader.size();
+				size_t end = request.find('\n', start);
+				if (end != string::npos)
+				{
+					clientIP = request.substr(start, end - start);
+					clientIP.erase(0, clientIP.find_first_not_of(" \t\r"));
+					clientIP.erase(clientIP.find_last_not_of(" \t\r") + 1);
+				}
+			}
+
+			KalaServer::PrintConsoleMessage(
+				ConsoleMessageType::Type_Message,
+				"Created new thread for user '" + clientIP + "'!");
+
+			BannedIP banned{};
+			banned.IP = clientIP;
+			banned.reason = filePath;
+
 			if (!server->blacklistedKeywords.empty())
 			{
-				sockaddr_storage addr{};
-				socklen_t addrLen = sizeof(addr);
-				getpeername(
-					clientSocket,
-					reinterpret_cast<sockaddr*>(&addr),
-					&addrLen);
-
-				char ipStr[INET6_ADDRSTRLEN]{};
-				getnameinfo(
-					reinterpret_cast<sockaddr*>(&addr),
-					addrLen,
-					ipStr,
-					sizeof(ipStr),
-					nullptr,
-					0,
-					NI_NUMERICHOST);
-				string clientIP = ipStr;
-
-				BannedIP banned;
-				banned.IP = clientIP;
-				banned.reason = filePath;
-
 				if (server->IsBlacklistedRoute(filePath)
-					&& !server->IsBannedIP(banned.IP))
+					&& !server->IsBannedIP(clientIP))
 				{
-					server->BanIP(banned, static_cast<uintptr_t>(clientSocket));
-					return false;
+					server->BanIP(banned, static_cast<uintptr_t>(rawSocket));
+					{
+						std::lock_guard lock(server->clientSocketsMutex);
+						server->activeClientSockets.erase(socket);
+					}
+					return;
 				}
 
-				if (server->IsBannedIP(banned.IP))
+				if (server->IsBannedIP(clientIP))
 				{
-					server->StopBannedIP(banned, static_cast<uintptr_t>(clientSocket));
-					return false;
+					auto respBanned = make_unique<Response_Banned>();
+					respBanned->Init(
+						filePath,
+						clientIP,
+						rawSocket);
+					{
+						std::lock_guard lock(server->clientSocketsMutex);
+						server->activeClientSockets.erase(socket);
+					}
+					return;
 				}
 			}
 
@@ -535,16 +604,16 @@ namespace KalaKit::Core
 					ConsoleMessageType::Type_Message,
 					"User tried to access non-existing route '" + filePath + "'!");
 
-				string result = server->ServeFile(server->errorMessage.error404);
-				if (result == "")
+				auto resp404 = make_unique<Response_404>();
+				resp404->Init(
+					filePath,
+					clientIP,
+					rawSocket);
 				{
-					KalaServer::PrintConsoleMessage(
-						ConsoleMessageType::Type_Error,
-						"Failed to load 404 error page!");
+					std::lock_guard lock(server->clientSocketsMutex);
+					server->activeClientSockets.erase(socket);
 				}
-				else body = result;
-
-				statusLine = "HTTP/1.1 404 Not Found";
+				return;
 			}
 			else
 			{
@@ -558,16 +627,16 @@ namespace KalaKit::Core
 						ConsoleMessageType::Type_Warning,
 						"User tried to access forbidden route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
 
-					string result = server->ServeFile(server->errorMessage.error403);
-					if (result == "")
+					auto resp403 = make_unique<Response_403>();
+					resp403->Init(
+						filePath,
+						clientIP,
+						rawSocket);
 					{
-						KalaServer::PrintConsoleMessage(
-							ConsoleMessageType::Type_Error,
-							"Failed to load 403 error page!");
+						std::lock_guard lock(server->clientSocketsMutex);
+						server->activeClientSockets.erase(socket);
 					}
-					else body = result;
-
-					statusLine = "HTTP/1.1 403 Forbidden";
+					return;
 				}
 				else
 				{
@@ -576,14 +645,16 @@ namespace KalaKit::Core
 						string result = server->ServeFile(filePath);
 						if (result == "")
 						{
-							string errorResult = server->ServeFile(server->errorMessage.error500);
-							if (errorResult == "")
+							auto resp500 = make_unique<Response_500>();
+							resp500->Init(
+								filePath,
+								clientIP,
+								rawSocket);
 							{
-								KalaServer::PrintConsoleMessage(
-									ConsoleMessageType::Type_Error,
-									"Failed to load 500 error page!");
+								std::lock_guard lock(server->clientSocketsMutex);
+								server->activeClientSockets.erase(socket);
 							}
-							else body = errorResult;
+							return;
 						}
 						else body = result;
 					}
@@ -596,61 +667,20 @@ namespace KalaKit::Core
 							+ ").\nError:\n"
 							+ e.what());
 
-						string result = server->ServeFile(server->errorMessage.error500);
-						if (result == "")
-						{
-							KalaServer::PrintConsoleMessage(
-								ConsoleMessageType::Type_Error,
-								"Failed to load 500 error page!");
-						}
-						else body = result;
+						auto resp500 = make_unique<Response_500>();
+						resp500->Init(
+							filePath,
+							clientIP,
+							rawSocket);
 
-						statusLine = "HTTP/1.1 500 Internal Server Error";
+						{
+							std::lock_guard lock(server->clientSocketsMutex);
+							server->activeClientSockets.erase(socket);
+						}
 					}
 				}
 			}
-
-			sockaddr_storage addr{};
-			socklen_t addrLen = sizeof(addr);
-			getpeername(
-				clientSocket,
-				reinterpret_cast<sockaddr*>(&addr),
-				&addrLen);
-
-			char ipStr[INET6_ADDRSTRLEN]{};
-			getnameinfo(
-				reinterpret_cast<sockaddr*>(&addr),
-				addrLen,
-				ipStr,
-				sizeof(ipStr),
-				nullptr,
-				0,
-				NI_NUMERICHOST);
-			string clientIP = ipStr;
-
-			KalaServer::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"========== LOADING ROUTE ==========\n"
-				" IP    : " + clientIP + "\n"
-				" Route : " + filePath + "\n"
-				"===================================\n");
-
-			string response =
-				statusLine + "\r\n"
-				"Content-Type: text/html\r\n"
-				"Content-Length: " + to_string(body.size()) + "\r\n"
-				"Connection: close\r\n\r\n" + body;
-
-			send(
-				clientSocket,
-				response.c_str(),
-				static_cast<int>(response.size()),
-				0);
-
-			closesocket(clientSocket);
 		}
-
-		return true;
 	}
 
 	void Server::Quit() const
@@ -664,6 +694,14 @@ namespace KalaKit::Core
 				thisSocket = INVALID_SOCKET;
 				server->serverSocket = 0;
 			}
+
+			for (uintptr_t userSocket : server->activeClientSockets)
+			{
+				SOCKET userRawSocket = static_cast<SOCKET>(userSocket);
+				shutdown(userRawSocket, SD_BOTH);
+				closesocket(userRawSocket);
+			}
+			server->activeClientSockets.clear();
 
 			WSACleanup();
 		}

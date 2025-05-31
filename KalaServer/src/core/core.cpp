@@ -19,11 +19,9 @@ using std::cout;
 
 namespace KalaKit::Core
 {
-	bool KalaServer::Run()
+	void KalaServer::Run()
 	{
-		bool isServerRunning = Server::server->Run();
-
-		return isServerRunning;
+		//gui etc runtime loop will go here in the future
 	}
 
 	bool KalaServer::IsRunningAsAdmin()

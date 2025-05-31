@@ -40,6 +40,7 @@ int main()
 	ErrorMessage msg{};
 	msg.error403 = "/errors/403";
 	msg.error404 = "/errors/404";
+	msg.error418 = "/errors/418";
 	msg.error500 = "/errors/500";
 	
 	static const string whitelistedRoutesFolder = "content/pages";
@@ -53,6 +54,7 @@ int main()
 
 	static const std::vector<std::string> blacklistedKeywords = 
 	{
+		/*
 		//CMS / WordPress
 		"wp", "wp1", "wordpress", "includes",
 		"blog", "cms", "xml", "php",
@@ -66,6 +68,7 @@ int main()
 		//years (common archive or crawl targets)
 		"2026", "2025", "2024", "2023",
 		"2022", "2021", "2020", "2019"
+		*/
 	};
 
 	Server::Initialize(
@@ -88,6 +91,8 @@ int main()
 	KalaServer::PrintConsoleMessage(
 		ConsoleMessageType::Type_Message,
 		"Reached render loop successfully!");
+
+	Server::server->Start();
 
 	while (KalaServer::isRunning)
 	{

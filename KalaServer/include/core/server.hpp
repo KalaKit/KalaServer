@@ -9,6 +9,9 @@
 #include <memory>
 #include <map>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <unordered_set>
 
 namespace KalaKit::Core
 {
@@ -16,11 +19,15 @@ namespace KalaKit::Core
 	using std::unique_ptr;
 	using std::map;
 	using std::vector;
+	using std::atomic;
+	using std::mutex;
+	using std::unordered_set;
 
 	struct ErrorMessage
 	{
 		string error403;
 		string error404;
+		string error418;
 		string error500;
 	};
 
@@ -34,6 +41,10 @@ namespace KalaKit::Core
 	{
 	public:
 		static inline unique_ptr<Server> server;
+
+		//File paths for server admin provided error pages,
+		//loads browser defaults otherwise.
+		ErrorMessage errorMessage;
 
 		Server(
 			int port,
@@ -65,9 +76,14 @@ namespace KalaKit::Core
 			const vector<string>& extensions);
 
 		/// <summary>
-		/// Runs the server loop. Use Core::Run instead of this.
+		/// Starts up the accept function. Run this only once, not every frame.
 		/// </summary>
-		bool Run() const;
+		void Start() const;
+
+		/// <summary>
+		/// Handle each client in its own thread.
+		/// </summary>
+		void HandleClient(uintptr_t);
 
 		/// <summary>
 		/// Closes the server. Use Core::Quit instead of this.
@@ -87,12 +103,6 @@ namespace KalaKit::Core
 		/// </summary>
 		bool IsBannedIP(const string& ip) const;
 
-		/// <summary>
-		/// Throw a simple banned message for a banned IP trying to access any route.
-		/// </summary>
-		void StopBannedIP(
-			const BannedIP& target,
-			uintptr_t clientSocket) const;
 		/// <summary>
 		/// Add info about banned ip to banned-bots.txt.
 		/// </summary>
@@ -134,6 +144,9 @@ namespace KalaKit::Core
 		void AddInitialWhitelistedRoutes() const;
 
 		mutable uintptr_t serverSocket{}; //Current active socket
+		mutex clientSocketsMutex;
+		unordered_set<uintptr_t> activeClientSockets;
+
 		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
 		string bannedBotsFile{}; //The path to the banned bots file.
 
@@ -141,7 +154,6 @@ namespace KalaKit::Core
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
 
-		ErrorMessage errorMessage; //File paths for server admin provided error pages, loads browser defaults otherwise.
 		string whitelistedRoutesFolder; //The folder path relative to the server where all pages are inside of.
 		vector<string> blacklistedKeywords; //All keywords that will ban you if you try to access any route with one of them inside it
 		vector<string> whitelistedExtensions; //All extensions that are allowed to be accessed

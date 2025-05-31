@@ -36,12 +36,12 @@ namespace KalaKit::ResponseSystem
 		/// </summary>
 		virtual void Send() const;
 
-		string statusLine;
-		string contentType;
-		string body;
+		string statusLine{};
+		string contentType{};
+		string body{};
 
-		string route;
-		string clientIP;
-		uintptr_t clientSocket;
+		string route{};
+		string clientIP{};
+		uintptr_t clientSocket{};
 	};
 }

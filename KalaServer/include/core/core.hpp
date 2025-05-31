@@ -32,7 +32,10 @@ namespace KalaKit::Core
 
 		static bool IsRunningAsAdmin();
 
-		static bool Run();
+		/// <summary>
+		/// Runs the server every frame.
+		/// </summary>
+		static void Run();
 
 		static void PrintConsoleMessage(
 			ConsoleMessageType type, 
