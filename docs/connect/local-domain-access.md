@@ -9,6 +9,6 @@
 	- set specific local port to 8080
 	- allow connection
 	- profile: All
-	- name: KalaServer
+	- name: yourservername
 - run the server (which listens on port 8080)
 - open your browser and go to 'http://yourdomain.yourextension:8080'
