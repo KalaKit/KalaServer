@@ -6,7 +6,6 @@
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <wininet.h>
-#include <iostream>
 #include <map>
 #include <Windows.h>
 #include <fstream>
@@ -38,7 +37,6 @@ using KalaKit::ResponseSystem::Response_403;
 using KalaKit::ResponseSystem::Response_500;
 using KalaKit::ResponseSystem::Response_Banned;
 
-using std::cout;
 using std::map;
 using std::exit;
 using std::to_string;
@@ -112,11 +110,9 @@ namespace KalaKit::Core
 			false,
 			ConsoleMessageType::Type_Message,
 			"",
-			"Initializing " + Server::server->GetServerName() + " ..."
-			"\n\n"
 			"=============================="
 			"\n"
-			"Adding core routes..."
+			"Initializing server '" + Server::server->GetServerName() + "'"
 			"\n"
 			"=============================="
 			"\n");
@@ -144,19 +140,6 @@ namespace KalaKit::Core
 		}
 
 		server->AddInitialWhitelistedRoutes();
-		
-		KalaServer::PrintConsoleMessage(
-			0,
-			false,
-			ConsoleMessageType::Type_Message,
-			"",
-			"\n"
-			"=============================="
-			"\n"
-			"Connecting to network..."
-			"\n"
-			"=============================="
-			"\n");
 		
 		WSADATA wsaData{};
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
@@ -198,7 +181,12 @@ namespace KalaKit::Core
 				"Listen failed!");
 		}
 
-		cout << "Server is running on port '" << server->port << "'.\n";
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SERVER",
+			"\nServer is running on port '" + to_string(server->port) + "'.");
 
 		KalaServer::isRunning = true;
 

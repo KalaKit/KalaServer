@@ -8,7 +8,6 @@
 #include <Windows.h>
 #include <fstream>
 #include <chrono>
-#include <iostream>
 #include <thread>
 #include <sstream>
 #include <set>
