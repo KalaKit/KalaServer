@@ -11,6 +11,7 @@ namespace KalaKit::ResponseSystem
 {
 	class Response_OK : public Response
 	{
+	public:
 		void Init(
 			const std::string& route,
 			const std::string& clientIP,

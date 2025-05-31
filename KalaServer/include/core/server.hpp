@@ -47,7 +47,8 @@ namespace KalaKit::Core
 		ErrorMessage errorMessage;
 
 		Server(
-			int port,
+			unsigned int port,
+			unsigned int healthTimer,
 			string serverName,
 			string domainName,
 			ErrorMessage errorMessages,
@@ -55,6 +56,7 @@ namespace KalaKit::Core
 			vector<string> blacklistedKeywords,
 			vector<string> whitelistedExtensions) :
 			port(port),
+			healthTimer(healthTimer),
 			serverName(serverName),
 			domainName(domainName),
 			errorMessage(errorMessage),
@@ -67,7 +69,8 @@ namespace KalaKit::Core
 		/// Initializes the server. Must be ran first before any other components.
 		/// </summary>
 		static void Initialize(
-			int port,
+			unsigned int port,
+			unsigned int healthTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
@@ -76,16 +79,21 @@ namespace KalaKit::Core
 			const vector<string>& extensions);
 
 		/// <summary>
-		/// Starts up the accept function. Run this only once, not every frame.
+		/// Returns true if a connection to google.com can be made.
 		/// </summary>
-		void Start() const;
+		bool HasInternet();
 
 		/// <summary>
-		/// Handle each client in its own thread.
+		/// Returns true if the current server tunnel is alive and healthy.
 		/// </summary>
-		void HandleClient(uintptr_t);
+		bool IsTunnelAlive(uintptr_t tunnelHandle);
 
-		void SocketCleanup(uintptr_t clientSocket);
+		/// <summary>
+		/// Starts up the server accept loop and health status report.
+		/// Run this only once, not every frame.
+		/// </summary>
+		/// <param name="healthTimer">How often should the health report be sent (seconds)?</param>
+		void Start() const;
 
 		/// <summary>
 		/// Closes the server. Use Core::Quit instead of this.
@@ -113,6 +121,11 @@ namespace KalaKit::Core
 			const BannedIP& target,
 			uintptr_t clientSocket) const;
 
+		/// <summary>
+		/// Allows server to start accepting connections. Do not call manually.
+		/// </summary>
+		void SetServerReadyState(bool newReadyState) { isServerReady = newReadyState; };
+
 		void SetServerName(const string& newServerName) { serverName = newServerName; }
 		void SetDomainName(const string& newDomainName) { domainName = newDomainName; }
 
@@ -135,6 +148,7 @@ namespace KalaKit::Core
 			return false;
 		}
 
+		bool IsServerReady() const { return isServerReady; }
 		string GetServerName() { return serverName; }
 		string GetDomainName() { return domainName; }
 
@@ -145,6 +159,22 @@ namespace KalaKit::Core
 	private:
 		void AddInitialWhitelistedRoutes() const;
 
+		/// <summary>
+		/// Header parser for getting the results from a cloudflared header.
+		/// </summary>
+		string ExtractHeader(
+			const string& request,
+			const string& headerName);
+
+		/// <summary>
+		/// Handle each client in its own thread.
+		/// </summary>
+		void HandleClient(uintptr_t);
+
+		void SocketCleanup(uintptr_t clientSocket);
+
+		bool isServerReady = false; //Used to check if server is ready to start.
+
 		mutable uintptr_t serverSocket{}; //Current active socket
 		mutex clientSocketsMutex;
 		unordered_set<uintptr_t> activeClientSockets;
@@ -152,7 +182,8 @@ namespace KalaKit::Core
 		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
 		string bannedBotsFile{}; //The path to the banned bots file.
 
-		int port; //Local server port
+		unsigned int port; //Local server port
+		unsigned int healthTimer; //Countdown until server reports health check.
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
 

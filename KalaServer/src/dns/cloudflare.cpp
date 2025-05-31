@@ -9,6 +9,9 @@
 #include <fstream>
 #include <chrono>
 #include <iostream>
+#include <thread>
+#include <sstream>
+#include <set>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -34,13 +37,12 @@ using std::ofstream;
 using std::ifstream;
 using std::stringstream;
 using std::replace;
-using std::cin;
-using std::cout;
+using std::istringstream;
+using std::thread;
+using std::set;
 
 namespace KalaKit::DNS
 {
-	static HANDLE tunnelRunHandle{};
-	
 	bool CloudFlare::Initialize(
 		bool shouldCloseCloudflaredAtShutdown,
 		const string& newTunnelName,
@@ -664,28 +666,62 @@ namespace KalaKit::DNS
 		string certPath = path(path(cloudFlareFolder) / "cert.pem").string();
 		string configPath = path(path(cloudFlareFolder) / "config.yml").string();
 	
+		HANDLE hReadPipe{};
+		HANDLE hWritePipe{};
+		SECURITY_ATTRIBUTES sa{};
+		sa.nLength = sizeof(sa);
+		sa.bInheritHandle = TRUE;
+		sa.lpSecurityDescriptor = nullptr;
+
+		if (!CreatePipe(
+			&hReadPipe,
+			&hWritePipe,
+			&sa,
+			0))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to create read/write pipe for tunnel '" + tunnelName + "'!");
+			return;
+		}
+		if (!SetHandleInformation(
+			hReadPipe,
+			HANDLE_FLAG_INHERIT,
+			0))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Failed to set up cloudflared!"
+				"\n\n"
+				"Reason:"
+				"\n"
+				"Failed to set up pipe handle inheritance for tunnel '" + tunnelName + "'!");
+			return;
+		}
+
 		//initialize structures for process creation
 		STARTUPINFOW si;
 		PROCESS_INFORMATION pi;
 		ZeroMemory(&si, sizeof(si));
 		ZeroMemory(&pi, sizeof(pi));
 		si.cb = sizeof(si);
+		si.dwFlags |= STARTF_USESTDHANDLES;
+		si.hStdOutput = hWritePipe;
+		si.hStdError = hWritePipe;
 
 		string currentPath = current_path().string();
 		wstring wParentFolderPath(currentPath.begin(), currentPath.end());
 
-#ifdef _DEBUG
 		string command = 
 			"cloudflared --origin-ca-pool " + certPath 
 			+ " --config " + configPath 
 			+ " --loglevel debug" 
 			+ " tunnel run " + tunnelName;
-#else
-		string command =
-		"cloudflared --origin-ca-pool " + certPath
-			+ " --config " + configPath
-			+ " tunnel run " + tunnelName;
-#endif
+
 		KalaServer::PrintConsoleMessage(
 			2,
 			true,
@@ -720,7 +756,8 @@ namespace KalaKit::DNS
 
 		//close thread handle and process
 		CloseHandle(pi.hThread);
-		tunnelRunHandle = pi.hProcess;
+		CloseHandle(hWritePipe);
+		tunnelRunHandle = reinterpret_cast<uintptr_t>(pi.hProcess);
 		
 		KalaServer::PrintConsoleMessage(
 			0,
@@ -728,6 +765,123 @@ namespace KalaKit::DNS
 			ConsoleMessageType::Type_Message,
 			"CLOUDFLARE",
 			"Running cloudflared tunnel.");
+
+		void* convertedHandle = reinterpret_cast<void*>(hReadPipe);
+		PipeCloudflareMessages(convertedHandle);
+	}
+
+	void CloudFlare::PipeCloudflareMessages(void* handle)
+	{
+		HANDLE hReadPipe = reinterpret_cast<HANDLE>(handle);
+
+		thread([hReadPipe]
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Message,
+				"CLOUDFLARE",
+				"Piping cloudflare messages to internal console.");
+
+			char buffer[2048]{};
+			DWORD bytesRead = 0;
+
+			while (ReadFile(
+				hReadPipe,
+				buffer,
+				sizeof(buffer) - 1,
+				&bytesRead,
+				nullptr)
+				&& bytesRead > 0)
+			{
+				buffer[bytesRead] = '\0';
+				istringstream stream(buffer);
+				string line{};
+				while (getline(stream, line))
+				{
+					if (line.find("Registered tunnel connection connIndex=") != string::npos)
+					{
+						size_t pos = line.find("connIndex=") + strlen("connIndex=");
+						int index = stoi(line.substr(pos));
+
+						if (index == 0) isConn0Healthy = true;
+						else if (index == 1) isConn1Healthy = true;
+						else if (index == 2) isConn2Healthy = true;
+						else if (index == 3) isConn3Healthy = true;
+
+						KalaServer::PrintConsoleMessage(
+							0,
+							true,
+							ConsoleMessageType::Type_Message,
+							"CLOUDFLARE",
+							"Connection '" + to_string(index) + "' has been marked healthy!");
+
+						if (isConn0Healthy
+							&& isConn1Healthy
+							&& isConn2Healthy
+							&& isConn3Healthy
+							&& !Server::server->IsServerReady())
+						{
+							Server::server->SetServerReadyState(true);
+							Server::server->Start();
+						}
+					}
+
+					if (line.find("Unregistered tunnel connection connIndex=") != string::npos)
+					{
+						size_t pos = line.find("connIndex=") + strlen("connIndex=");
+						int index = stoi(line.substr(pos));
+
+						if (index == 0) isConn0Healthy = false;
+						else if (index == 1) isConn1Healthy = false;
+						else if (index == 2) isConn2Healthy = false;
+						else if (index == 3) isConn3Healthy = false;
+
+						KalaServer::PrintConsoleMessage(
+							0,
+							true,
+							ConsoleMessageType::Type_Warning,
+							"CLOUDFLARE",
+							"Connection '" + to_string(index) + "' has been marked unhealthy."
+							"Cloudflare could not maintain a tunnel through it.");
+					}
+
+					//strip cloudflare timestamp
+
+					size_t prefixEnd = line.find(' ', 24);
+					if (line.size() < 28)
+					{
+						KalaServer::PrintConsoleMessage(
+							2,
+							true,
+							ConsoleMessageType::Type_Message,
+							"CLOUDFLARE_LOG",
+							line);
+						continue;
+					}
+
+					//extract message type
+
+					string typeStr = line.substr(21, 3);
+					ConsoleMessageType type = ConsoleMessageType::Type_Message;
+					if (typeStr == "ERR") type = ConsoleMessageType::Type_Error;
+					else if (typeStr == "WRN") type = ConsoleMessageType::Type_Warning;
+					else if (typeStr == "DBG") type = ConsoleMessageType::Type_Debug;
+
+					//extract rest of message after message type
+
+					string message = line.substr(25);
+
+					KalaServer::PrintConsoleMessage(
+						2,
+						true,
+						type,
+						"CLOUDFLARE_LOG",
+						message);
+				}
+			}
+			CloseHandle(hReadPipe);
+		}).detach();
 	}
 
 	void CloudFlare::Quit()
@@ -743,12 +897,19 @@ namespace KalaKit::DNS
 			return;
 		}
 
-		if (closeCloudflaredAtShutdown
-			&& tunnelRunHandle)
+		HANDLE rawTunnelRunHandle = reinterpret_cast<HANDLE>(tunnelRunHandle);
+
+		if (rawTunnelRunHandle
+			&& rawTunnelRunHandle != INVALID_HANDLE_VALUE)
+
 		{
-			TerminateProcess(tunnelRunHandle, 0);
-			CloseHandle(tunnelRunHandle);
-			tunnelRunHandle = nullptr;	
+			if (closeCloudflaredAtShutdown
+				&& tunnelRunHandle)
+			{
+				TerminateProcess(rawTunnelRunHandle, 0);
+				CloseHandle(rawTunnelRunHandle);
+				tunnelRunHandle = NULL;
+			}
 		}
 		else
 		{

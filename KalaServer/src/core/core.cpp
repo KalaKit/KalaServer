@@ -101,7 +101,7 @@ namespace KalaKit::Core
 			timeStampContent = timeBuffer;
 		}
 
-		if (customTag != "") customTagContent = customTag + " ";
+		if (customTag != "") customTagContent = "[" + customTag + "] ";
 
 		switch (type)
 		{

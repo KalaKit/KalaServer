@@ -14,6 +14,16 @@ namespace KalaKit::DNS
 	class CloudFlare
 	{
 	public:
+		static inline string tunnelName{};
+
+		static inline string tunnelToken{};
+		static inline string tunnelTokenFilePath{};
+
+		static inline string tunnelID{};
+		static inline string tunnelIDFilePath{};
+
+		static inline uintptr_t tunnelRunHandle{};
+
 		/// <summary>
 		/// Start up cloudflared. Must not be running dns with this.
 		/// Returns true if initialized successfully.
@@ -25,6 +35,28 @@ namespace KalaKit::DNS
 
 		static bool IsRunning() { return isRunning; }
 
+		static bool IsConnHealthy(unsigned int conn)
+		{
+			switch (conn)
+			{
+			default:
+				return false;
+			case 0:
+				return isConn0Healthy;
+				break;
+			case 1:
+				return isConn1Healthy;
+				break;
+			case 2:
+				return isConn2Healthy;
+				break;
+			case 3:
+				return isConn3Healthy;
+				break;
+			}
+			return false;
+		}
+
 		/// <summary>
 		/// Shut down cloudflared.
 		/// </summary>
@@ -34,14 +66,11 @@ namespace KalaKit::DNS
 	
 		static inline bool isInitializing = false;
 		static inline bool isRunning = false;
-		
-		static inline string tunnelName;
 
-		static inline string tunnelToken;
-		static inline string tunnelTokenFilePath;
-		
-		static inline string tunnelID{};
-		static inline string tunnelIDFilePath{};
+		static inline bool isConn0Healthy = false;
+		static inline bool isConn1Healthy = false;
+		static inline bool isConn2Healthy = false;
+		static inline bool isConn3Healthy = false;
 		
 		/// <summary>
 		/// Returns true if all the data passed to cloudflared is valid.
@@ -82,5 +111,10 @@ namespace KalaKit::DNS
 		/// through cloudflared as a separate process.
 		/// </summary>
 		static void RunTunnel();
+
+		/// <summary>
+		/// Pipes all cloudflare messages to internal console messaging system for better style.
+		/// </summary>
+		static void PipeCloudflareMessages(void* handle);
 	};
 }

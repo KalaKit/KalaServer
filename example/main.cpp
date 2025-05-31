@@ -31,7 +31,9 @@ using std::chrono::milliseconds;
 
 int main()
 {
-	int port = 80;
+	unsigned int port = 80;
+
+	unsigned int healthTimer = 60;
 
 	string serverName = "KalaServer";
 	string domainName = "thekalakit.com";
@@ -51,6 +53,7 @@ int main()
 
 	static const vector<string> whitelistedExtensions =
 	{
+		".html", ".css", ".js", ".txt",
 		".png", ".jpg", ".jpeg", ".ico",
 		".mp3", ".wav", ".flac", ".ogg",
 		".webp", ".webm", ".mp4", ".gif"
@@ -58,7 +61,6 @@ int main()
 
 	static const std::vector<std::string> blacklistedKeywords = 
 	{
-		/*
 		//CMS / WordPress
 		"wp", "wp1", "wordpress", "includes",
 		"blog", "cms", "xml", "php",
@@ -72,11 +74,11 @@ int main()
 		//years (common archive or crawl targets)
 		"2026", "2025", "2024", "2023",
 		"2022", "2021", "2020", "2019"
-		*/
 	};
 
 	Server::Initialize(
 		port,
+		healthTimer,
 		serverName,
 		domainName,
 		msg,
@@ -98,8 +100,6 @@ int main()
 		ConsoleMessageType::Type_Message,
 		"SERVER",
 		"Reached render loop successfully!");
-
-	Server::server->Start();
 
 	while (KalaServer::isRunning)
 	{

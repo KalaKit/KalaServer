@@ -5,6 +5,7 @@
 
 #include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <wininet.h>
 #include <iostream>
 #include <map>
 #include <Windows.h>
@@ -12,6 +13,8 @@
 #include <sstream>
 #include <filesystem>
 #include <memory>
+
+#pragma comment(lib, "Wininet.lib")
 
 #include "core/core.hpp"
 #include "core/server.hpp"
@@ -57,11 +60,13 @@ using std::thread;
 using std::lock_guard;
 using std::chrono::seconds;
 using std::this_thread::sleep_for;
+using std::wstring;
 
 namespace KalaKit::Core
 {
 	void Server::Initialize(
-		int port,
+		unsigned int port,
+		unsigned int healthTimer,
 		const string& serverName,
 		const string& domainName,
 		const ErrorMessage& errorMessage,
@@ -94,6 +99,7 @@ namespace KalaKit::Core
 		
 		server = make_unique<Server>(
 			port,
+			healthTimer,
 			serverName,
 			domainName,
 			errorMessage,
@@ -321,7 +327,7 @@ namespace KalaKit::Core
 			"\n"
 			"=============== BANNED IP ===============\n"
 			" IP     : " + target.IP + "\n"
-			" Reason : Attempted access to blacklisted route '" + target.reason + "'\n"
+			" Reason : Attempted access to bot/scraper route '" + target.reason + "'\n"
 			"=========================================\n");
 
 		auto respBanned = make_unique<Response_Banned>();
@@ -346,25 +352,33 @@ namespace KalaKit::Core
 		{
 			string cleanedRoute = path(route).generic_string();
 
-			bool isBlacklistedRoute = true;
+			bool isWhiteListed = false;
 			for (const auto& ext : Server::server->whitelistedExtensions)
 			{
-				if (!path(route).has_extension()
-					|| path(route).extension() == ext)
+				if (path(route).extension() == ext)
 				{
-					isBlacklistedRoute = false;
+					isWhiteListed = true;
 					break;
 				}
 			}
-			if (isBlacklistedRoute) continue;
+			if (!isWhiteListed) continue;
 
-			//get clean route
-			path relativePath = relative(route.path(), server->whitelistedRoutesFolder);
-			relativePath.replace_extension("");
-			string correctRootPath = "/" + relativePath.generic_string();
+			//get clean route for html files
+			string correctRootPath{};
+			if (path(route).extension() == ".html")
+			{
+				path relativePath = relative(route.path(), server->whitelistedRoutesFolder);
+				relativePath.replace_extension("");
+				correctRootPath = "/" + relativePath.generic_string();
 
-			//fix index.html root path
-			if (correctRootPath == "/index") correctRootPath = "/";
+				//fix index.html root path
+				if (correctRootPath == "/index") correctRootPath = "/";
+			}
+			else
+			{
+				path relativePath = relative(route.path(), server->whitelistedRoutesFolder);
+				correctRootPath = "/" + relativePath.generic_string();
+			}
 
 			//use actual file path directly
 			string correctFilePath = route.path().generic_string();
@@ -476,24 +490,136 @@ namespace KalaKit::Core
 
 	string Server::ServeFile(const string& route)
 	{
-		auto it = server->whitelistedRoutes.find(route);
-		if (it != whitelistedRoutes.end())
+		try
 		{
+			auto it = server->whitelistedRoutes.find(route);
+
+			if (it == whitelistedRoutes.end())
+			{
+				KalaServer::PrintConsoleMessage(
+					0,
+					true,
+					ConsoleMessageType::Type_Error,
+					"SERVE-FILE",
+					"Route '" + route + "' is not whitelisted!");
+				return "";
+			}
+			
 			path fullFilePath = it->second;
 			ifstream file(fullFilePath);
-			if (file)
+			if (!file)
 			{
-				stringstream buffer{};
-				buffer << file.rdbuf();
-				return buffer.str();
+				KalaServer::PrintConsoleMessage(
+					0,
+					true,
+					ConsoleMessageType::Type_Error,
+					"SERVE-FILE",
+					"Failed to open file '" + fullFilePath.generic_string() + "'!");
+				return "";
 			}
+
+			stringstream buffer{};
+			buffer << file.rdbuf();
+			return buffer.str();
+		}
+		catch (const exception& e)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVE-FILE",
+				"Exception while serving route '" + route + "':\n" + e.what());
+			return "";
 		}
 
 		return "";
 	}
 
+	bool Server::HasInternet()
+	{
+		if (CloudFlare::tunnelName == "")
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Cannot check for internet access because tunnel name has not been assigned.");
+			return false;
+		}
+
+		const string url = "https://www.google.com";
+		const wstring wideTunnelName(url.begin(), url.end());
+		HINTERNET hInternet = InternetOpenW(
+			const_cast<LPWSTR>(wideTunnelName.c_str()),
+			INTERNET_OPEN_TYPE_DIRECT,
+			NULL,
+			NULL,
+			0);
+
+		if (!hInternet) return false;
+
+		HINTERNET hUrl = InternetOpenUrlW(
+			hInternet,
+			wstring(url.begin(), url.end()).c_str(),
+			NULL,
+			0,
+			INTERNET_FLAG_NO_UI,
+			0);
+		bool result = (hUrl != nullptr);
+
+		if (hUrl) InternetCloseHandle(hUrl);
+		if (hInternet) InternetCloseHandle(hInternet);
+
+		return result;
+	}
+
+	bool Server::IsTunnelAlive(uintptr_t tunnelHandle)
+	{
+		if (tunnelHandle == NULL)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Cannot check for tunnel state because tunnel '" + CloudFlare::tunnelName + "' is not running.");
+			return false;
+		}
+
+		HANDLE rawTunnelHandle = reinterpret_cast<HANDLE>(tunnelHandle);
+
+		if (rawTunnelHandle == INVALID_HANDLE_VALUE)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Cannot check for tunnel state because handle for tunnel '" + CloudFlare::tunnelName + "' is invalid.");
+			return false;
+		}
+
+		return
+			rawTunnelHandle
+			&& WaitForSingleObject(rawTunnelHandle, 0)
+			== WAIT_TIMEOUT;
+	}
+
 	void Server::Start() const
 	{
+		if (!Server::server->isServerReady)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Server '" + Server::server->serverName + "' is not ready to start! Do not call this manually.");
+			return;
+		}
+
 		if (!CloudFlare::IsRunning()
 			&& !CustomDNS::IsRunning())
 		{
@@ -505,9 +631,39 @@ namespace KalaKit::Core
 
 		thread([]
 		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				false,
+				ConsoleMessageType::Type_Message,
+				"",
+				"\n"
+				"=============================="
+				"\n"
+				"Ready to accept connections!"
+				"\n"
+				"=============================="
+				"\n");
+
 			SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
 			while (KalaServer::isRunning)
 			{
+				bool isHealthy = CloudFlare::IsConnHealthy(0)
+					&& CloudFlare::IsConnHealthy(1)
+					&& CloudFlare::IsConnHealthy(2)
+					&& CloudFlare::IsConnHealthy(3);
+
+				if (!isHealthy)
+				{
+					bool isOnline =
+						Server::server->IsTunnelAlive(CloudFlare::tunnelRunHandle)
+						&& Server::server->HasInternet();
+
+					if (isOnline) return; //returns to ensure all connections are healthy
+
+					sleep_for(seconds(1)); //wait a second instead of spamming full check every frame
+					return; //returns to ensure all connections are healthy
+				}
+
 				SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
 				if (clientSocket == INVALID_SOCKET)
 				{
@@ -529,19 +685,76 @@ namespace KalaKit::Core
 			}
 		}).detach();
 
-		thread([]
+		unsigned int healthTimer = Server::server->healthTimer;
+		if (healthTimer > 0)
 		{
-			while (KalaServer::isRunning)
+			thread([healthTimer]
 			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Message,
-					"SERVER",
-					"Server is still alive...");
-				sleep_for(seconds(10));
+				while (KalaServer::isRunning)
+				{
+					bool hasInternet = Server::server->HasInternet();
+					bool isTunnelAlive = Server::server->IsTunnelAlive(CloudFlare::tunnelRunHandle);
+
+					string internetStatus = hasInternet ? "[NET: OK]" : "[NET: FAIL]";
+					string tunnelStatus = isTunnelAlive ? "[TUNNEL: OK]" : "[TUNNEL: FAIL]";
+
+					string fullStatus =
+						"Server status: " + internetStatus
+						+ ", " + tunnelStatus;
+
+					KalaServer::PrintConsoleMessage(
+						0,
+						true,
+						ConsoleMessageType::Type_Message,
+						"SERVER",
+						fullStatus);
+					sleep_for(seconds(healthTimer));
+				}
+			}).detach();
+		}
+	}
+
+	string Server::ExtractHeader(
+		const string& request, 
+		const string& headerName)
+	{
+		string result{};
+		istringstream stream(request);
+
+		string line{};
+		while (getline(stream, line))
+		{
+			size_t colonPos = line.find(':');
+			if (colonPos != string::npos)
+			{
+				string key = line.substr(0, colonPos);
+				string value = line.substr(colonPos + 1);
+
+				//trim whitespace
+
+				key.erase(remove_if(key.begin(), key.end(), ::isspace), key.end());
+				value.erase(0, value.find_first_not_of(" \t\r\n"));
+				value.erase(value.find_last_not_of(" \t\r\n") + 1);
+
+				//case-insensitive compare
+
+				transform(key.begin(), key.end(), key.begin(), ::tolower);
+				string lowerHeader = headerName;
+				transform(lowerHeader.begin(), lowerHeader.end(), lowerHeader.begin(), ::tolower);
+
+				if (key == lowerHeader)
+				{
+					size_t comma = value.find(',');
+					if (comma != string::npos)
+					{
+						value = value.substr(0, comma);
+					}
+
+					return value;
+				}
 			}
-		}).detach();
+		}
+		return result;
 	}
 
 	void Server::HandleClient(uintptr_t socket)
@@ -549,7 +762,7 @@ namespace KalaKit::Core
 		KalaServer::PrintConsoleMessage(
 			2,
 			true,
-			ConsoleMessageType::Type_Message,
+			ConsoleMessageType::Type_Debug,
 			"CLIENT",
 			"Socket [" + to_string(socket) + "] entered handle client thread...");
 
@@ -624,19 +837,22 @@ namespace KalaKit::Core
 				}
 			}
 
-			string clientIP{};
-			const string cfHeader = "CF-Connecting-IP:";
-			size_t headerPos = request.find(cfHeader);
-			if (headerPos != string::npos)
+			//attempts to get client ip from cloudflare header
+
+			string clientIP = ExtractHeader(
+				request,
+				"Cf-Connecting-Ip");
+
+			if (clientIP.empty())
 			{
-				size_t start = headerPos + cfHeader.size();
-				size_t end = request.find('\n', start);
-				if (end != string::npos)
-				{
-					clientIP = request.substr(start, end - start);
-					clientIP.erase(0, clientIP.find_first_not_of(" \t\r"));
-					clientIP.erase(clientIP.find_last_not_of(" \t\r") + 1);
-				}
+				clientIP = "localhost";
+
+				KalaServer::PrintConsoleMessage(
+					0,
+					true,
+					ConsoleMessageType::Type_Warning,
+					"SERVER",
+					"Failed to get client IP for socket [" + to_string(socket) + "]! User is most likely localhost.");
 			}
 
 			KalaServer::PrintConsoleMessage(
@@ -644,7 +860,7 @@ namespace KalaKit::Core
 				true,
 				ConsoleMessageType::Type_Message,
 				"CLIENT",
-				"Created new thread for client [" + to_string(socket) + " - '" + clientIP + "']!");
+				"New client connected [" + to_string(socket) + " - '" + clientIP + "']!");
 
 			BannedIP banned{};
 			banned.IP = clientIP;
@@ -743,7 +959,16 @@ namespace KalaKit::Core
 							Server::server->SocketCleanup(socket);
 							return;
 						}
-						else body = result;
+						else
+						{
+							auto resp200 = make_unique<Response_OK>();
+							resp200->Init(
+								filePath,
+								clientIP,
+								rawSocket);
+							Server::server->SocketCleanup(socket);
+							return;
+						}
 					}
 					catch (const exception& e)
 					{
@@ -761,7 +986,6 @@ namespace KalaKit::Core
 							filePath,
 							clientIP,
 							rawSocket);
-
 						Server::server->SocketCleanup(socket);
 					}
 				}
@@ -771,8 +995,10 @@ namespace KalaKit::Core
 
 	void Server::SocketCleanup(uintptr_t clientSocket)
 	{
-		lock_guard lock(server->clientSocketsMutex);
-		server->activeClientSockets.erase(clientSocket);
+		{
+			std::lock_guard lock(server->clientSocketsMutex);
+			server->activeClientSockets.erase(clientSocket);
+		}
 	}
 
 	void Server::Quit() const

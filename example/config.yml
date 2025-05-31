@@ -1,7 +1,19 @@
-tunnel: template-cloudflared-json-file-name-with-no-extension
-credentials-file: template-cloudflared-json-file-path
+tunnel: your-cloudflared-json-file-name
+credentials-file: your-cloudflared-json-file-full-path
 
 ingress:
-  - hostname: template-domain-name
-    service: http://127.0.0.1:80 (or something else)
+  - hostname: your-domain-name.your-domain-extension
+    service: http://localhost:80
+    originRequest:
+      httpHostHeader: your-domain-name.your-domain-extension
+      ipHeaders:
+        - CF-Connecting-IP
+
+  - hostname: www.your-domain-name.your-domain-extension
+    service: http://localhost:80
+    originRequest:
+      httpHostHeader: your-domain-name.your-domain-extension
+      ipHeaders:
+        - CF-Connecting-IP
+
   - service: http_status:404
