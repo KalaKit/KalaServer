@@ -40,9 +40,6 @@ int main()
 	
 	string tunnelName = "KalaServer";
 
-	string tunnelTokenFileName = "tunneltoken.txt";
-	string tunnelTokenFilePath = path(current_path() / tunnelTokenFileName).string();
-
 	ErrorMessage msg{};
 	msg.error403 = "/errors/403";
 	msg.error404 = "/errors/404";
@@ -111,8 +108,7 @@ int main()
 
 	CloudFlare::Initialize(
 		true,                 //shut down cloudflared at server exit
-		tunnelName,
-		tunnelTokenFilePath);
+		tunnelName);
 	
 	//do not run dns and cloudflared together
 	//DNS::RunDNS();

@@ -11,10 +11,6 @@ set "CLOUDFLARED_ORIGIN=%PROJECT_ROOT%\example\cloudflared.exe"
 set "CLOUDFLARED_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\cloudflared.exe"
 set "CLOUDFLARED_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\cloudflared.exe"
 
-set "TUNNELTOKEN_ORIGIN=%PROJECT_ROOT%\example\tunneltoken.txt"
-set "TUNNELTOKEN_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\tunneltoken.txt"
-set "TUNNELTOKEN_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\tunneltoken.txt"
-
 if not exist "%CONTENT_ORIGIN%" (
 	echo Failed to find content folder!
 	pause
@@ -27,11 +23,6 @@ if not exist "%CLOUDFLARED_ORIGIN%" (
 	exit /b 1
 )
 
-if not exist "%TUNNELTOKEN_ORIGIN%" (
-	echo Failed to find tunneltoken.txt!
-	pause
-	exit /b 1
-)
 set "BUILD_DEBUG=%PROJECT_ROOT%build-debug"
 if exist "%BUILD_DEBUG%" (
 	rmdir /s /q "%BUILD_DEBUG%"
@@ -102,12 +93,6 @@ copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_DEBUG_TARGET%"
 echo Copied cloudflared.exe to debug target.
 copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_RELEASE_TARGET%"
 echo Copied cloudflared.exe to release target.
-
-:: Copy tunneltoken.txt
-copy /Y "%TUNNELTOKEN_ORIGIN%" "%TUNNELTOKEN_DEBUG_TARGET%"
-echo Copied tunneltoken.txt to debug target.
-copy /Y "%TUNNELTOKEN_ORIGIN%" "%TUNNELTOKEN_RELEASE_TARGET%"
-echo Copied tunneltoken.txt to release target.
 
 echo.
 echo ========================================

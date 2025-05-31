@@ -1,5 +1,9 @@
 # How to get access locally
 
+- make sure hosts doesnt have your localhost ip
+	- open 'C:\Windows\System32\drivers\etc\hosts'
+	- remove or comment out '127.0.0.1   yourdomain.yourextension' at the bottom
+
 - allow port '30000' through firewall
 	- add inbound rule
 	- choose port

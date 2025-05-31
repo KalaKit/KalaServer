@@ -43,10 +43,12 @@ using std::set;
 
 namespace KalaKit::DNS
 {
+	static string tunnelID{};
+	static string tunnelIDFilePath{};
+
 	bool CloudFlare::Initialize(
 		bool shouldCloseCloudflaredAtShutdown,
-		const string& newTunnelName,
-		const string& newTunnelTokenFilePath)
+		const string& newTunnelName)
 	{
 		if (Server::server == nullptr)
 		{
@@ -70,9 +72,7 @@ namespace KalaKit::DNS
 			return false;
 		}
 		
-		if (!CloudflarePreInitializeCheck(
-			newTunnelName,
-			newTunnelTokenFilePath))
+		if (!CloudflarePreInitializeCheck(newTunnelName))
 		{
 			return false;
 		}
@@ -157,8 +157,7 @@ namespace KalaKit::DNS
 	}
 	
 	bool CloudFlare::CloudflarePreInitializeCheck(
-		const string& newTunnelName,
-		const string& newTunnelTokenFilePath)
+		const string& newTunnelName)
 	{
 		string cloudFlareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
 
@@ -183,37 +182,6 @@ namespace KalaKit::DNS
 			return false;
 		}
 		tunnelName = newTunnelName;
-
-		if (newTunnelTokenFilePath == "")
-		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Tunnel token file path '" + newTunnelTokenFilePath + "' is empty!");
-			return false;
-		}
-		if (!exists(newTunnelTokenFilePath))
-		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Tunnel token file path '" + newTunnelTokenFilePath + "' does not exist!");
-			return false;
-		}
-		string tunnelTokenResult = 
-			GetTextFileValue(
-			newTunnelTokenFilePath,
-			150, 
-			300);
-		if (tunnelTokenResult == "") return false;
-		tunnelToken = tunnelTokenResult;
-		tunnelTokenFilePath = newTunnelTokenFilePath;
 		
 		if (tunnelIDFilePath != ""
 			&& path(tunnelIDFilePath).extension().string() == ".json")

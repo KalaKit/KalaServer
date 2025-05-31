@@ -8,7 +8,4 @@ build-release/
 *.exe
 
 # Ignore private and secret files
-tunneltoken.txt
-tunnelid.txt
-accounttag.txt
 banned-bots.txt

@@ -15,13 +15,6 @@ namespace KalaKit::DNS
 	{
 	public:
 		static inline string tunnelName{};
-
-		static inline string tunnelToken{};
-		static inline string tunnelTokenFilePath{};
-
-		static inline string tunnelID{};
-		static inline string tunnelIDFilePath{};
-
 		static inline uintptr_t tunnelRunHandle{};
 
 		/// <summary>
@@ -30,8 +23,7 @@ namespace KalaKit::DNS
 		/// </summary>
 		static bool Initialize(
 			bool shouldCloseCloudflaredAtShutdown,
-			const string& tunnelName,
-			const string& tunnelTokenFilePath);
+			const string& tunnelName);
 
 		static bool IsRunning() { return isRunning; }
 
@@ -75,9 +67,7 @@ namespace KalaKit::DNS
 		/// <summary>
 		/// Returns true if all the data passed to cloudflared is valid.
 		/// </summary>
-		static bool CloudflarePreInitializeCheck(
-			const string& tunnelName,
-			const string& tunnelTokenFilePath);
+		static bool CloudflarePreInitializeCheck(const string& tunnelName);
 
 		/// <summary>
 		/// Returns the value of tunnel token, id or tag as a string from its file.

@@ -2,6 +2,10 @@
 
 This section assumes you already own a domain on cloudflare.
 
+- make sure hosts doesnt have your localhost ip
+	- open 'C:\Windows\System32\drivers\etc\hosts'
+	- remove or comment out '127.0.0.1   yourdomain.yourextension' at the bottom
+
 - add new DNS record to cloudflare domain:
 	- type: CNAME
 	- name: www
@@ -23,9 +27,6 @@ This section assumes you already own a domain on cloudflare.
 	- choose connector type 'Cloudflared' and click next
 	- enter tunnel name (needs to be save as you add to server)
 	- select 'Save tunnel'
-	- copy the command text in 'run the following command'
-	- create a new file called tunneltoken.txt inside the folder where your server exe will go to and copy the contents of the copied text except 'cloudflared.exe service install ' inside it, make sure it has no leading or trailing spaces, just the token itself
-	- WARNING: Do NOT share tunneltoken.txt, anyone with this file can hijack your server. Keep it secure like a root password.
 	
 - Add a new cloudflared application
 	- log in to 'https://one.dash.cloudflare.com/'
