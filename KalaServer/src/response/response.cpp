@@ -33,9 +33,11 @@ namespace KalaKit::ResponseSystem
 		closesocket(socket);
 
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [RESPONSE] " 
-			+ clientIP 
+			"RESPONSE",
+			"[" + to_string(clientSocket) + " - '" + clientIP + "']"
 			+ " -> " 
 			+ route
 			+ " ["

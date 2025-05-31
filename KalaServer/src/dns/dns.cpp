@@ -28,7 +28,10 @@ namespace KalaKit::DNS
 		if (Server::server == nullptr)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"CUSTOM_DNS",
 				"Cannot initialize dns if server has not yet been initialized!");
 			return false;
 		}
@@ -36,7 +39,10 @@ namespace KalaKit::DNS
 		if (isInitializing)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"CUSTOM_DNS",
 				"Cannot initialize dns while it is already being initialized!");
 			return false;
 		}
@@ -59,7 +65,10 @@ namespace KalaKit::DNS
 		isRunning = true;
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Warning,
+			"CUSTOM_DNS",
 			"DNS is currently a placeholder! This does nothing.");
 
 		return true;
@@ -70,13 +79,19 @@ namespace KalaKit::DNS
 		if (!isRunning)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"CUSTOM_DNS",
 				"Cannot shut down dns because it hasn't been started!");
 			return;
 		}
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
+			"CUSTOM_DNS",
 			"DNS was successfully shut down!");
 	}
 }

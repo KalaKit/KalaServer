@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include <shellapi.h>
 #include <iostream>
+#include <chrono>
 
 #include "core/core.hpp"
 #include "core/server.hpp"
@@ -16,6 +17,11 @@ using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;
 
 using std::cout;
+using std::chrono::system_clock;
+using std::chrono::milliseconds;
+using std::time_t;
+using std::tm;
+using std::snprintf;
 
 namespace KalaKit::Core
 {
@@ -53,25 +59,70 @@ namespace KalaKit::Core
 	}
 
 	void KalaServer::PrintConsoleMessage(
+		unsigned int indentationLength,
+		bool addTimeStamp,
 		ConsoleMessageType type,
+		const string& customTag,
 		const string& message)
 	{
-		string targetType{};
+		string result{};
+		string indentationContent{};
+		string customTagContent{};
+		string timeStampContent{};
+		string targetTypeContent{};
+
+#ifndef _DEBUG
+		if (type == ConsoleMessageType::Type_Debug) return;
+#endif
+
+		if (indentationLength > 0)
+		{
+			indentationContent = string(indentationLength, ' ');
+		}
+
+		if (addTimeStamp)
+		{
+			auto now = system_clock::now();
+			auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+			time_t now_c = system_clock::to_time_t(now);
+			tm localTime{};
+			localtime_s(&localTime, &now_c);
+
+			char timeBuffer[16]{};
+			snprintf(
+				timeBuffer,
+				sizeof(timeBuffer),
+				"[%02d:%02d:%02d:%03lld] ",
+				localTime.tm_hour,
+				localTime.tm_min,
+				localTime.tm_sec,
+				static_cast<long long>(ms.count()));
+
+			timeStampContent = timeBuffer;
+		}
+
+		if (customTag != "") customTagContent = customTag + " ";
 
 		switch (type)
 		{
 		case ConsoleMessageType::Type_Error:
-			targetType = "[ERROR] ";
+			targetTypeContent = "[ERROR] ";
 			break;
 		case ConsoleMessageType::Type_Warning:
-			targetType = "[WARNING] ";
+			targetTypeContent = "[WARNING] ";
 			break;
-		case ConsoleMessageType::Type_Message:
-			targetType = "";
+		case ConsoleMessageType::Type_Debug:
+			targetTypeContent = "[DEBUG] ";
 			break;
 		}
 
-		string result = targetType + message;
+		result = 
+			indentationContent
+			+ timeStampContent
+			+ customTagContent
+			+ targetTypeContent
+			+ message;
+
 		cout << result + "\n";
 	}
 

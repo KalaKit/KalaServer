@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <thread>
+#include <chrono>
 
 #include "core/core.hpp"
 #include "core/server.hpp"
@@ -24,6 +26,8 @@ using std::string;
 using std::vector;
 using std::filesystem::current_path;
 using std::filesystem::path;
+using std::this_thread::sleep_for;
+using std::chrono::milliseconds;
 
 int main()
 {
@@ -89,7 +93,10 @@ int main()
 	//DNS::RunDNS();
 		
 	KalaServer::PrintConsoleMessage(
+		0,
+		true,
 		ConsoleMessageType::Type_Message,
+		"SERVER",
 		"Reached render loop successfully!");
 
 	Server::server->Start();
@@ -97,6 +104,7 @@ int main()
 	while (KalaServer::isRunning)
 	{
 		KalaServer::Run();
+		sleep_for(milliseconds(10));
 	}
 
 	KalaServer::Quit();

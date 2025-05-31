@@ -15,7 +15,8 @@ namespace KalaKit::Core
 	{
 		Type_Error,
 		Type_Warning,
-		Type_Message
+		Type_Message,
+		Type_Debug
 	};
 
 	enum class PopupReason
@@ -37,8 +38,19 @@ namespace KalaKit::Core
 		/// </summary>
 		static void Run();
 
+		/// <summary>
+		/// Prints a message to the server console
+		/// </summary>
+		/// <param name="indentationLength">How big of an indentation, if any, should be added?</param>
+		/// <param name="addTimeStamp">Should a timestamp be added?</param>
+		/// <param name="type">What type of a message is this?</param>
+		/// <param name="customTag">An additional custom tag for extra logging.</param>
+		/// <param name="message">The contents of the message.</param>
 		static void PrintConsoleMessage(
-			ConsoleMessageType type, 
+			unsigned int indentationLength,
+			bool addTimeStamp,
+			ConsoleMessageType type,
+			const string& customTag,
 			const string& message);
 
 		static void CreatePopup(

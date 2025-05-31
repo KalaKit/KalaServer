@@ -85,6 +85,8 @@ namespace KalaKit::Core
 		/// </summary>
 		void HandleClient(uintptr_t);
 
+		void SocketCleanup(uintptr_t clientSocket);
+
 		/// <summary>
 		/// Closes the server. Use Core::Quit instead of this.
 		/// </summary>

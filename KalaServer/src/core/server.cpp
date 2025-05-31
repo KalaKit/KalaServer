@@ -55,6 +55,8 @@ using std::unique_ptr;
 using std::istringstream;
 using std::thread;
 using std::lock_guard;
+using std::chrono::seconds;
+using std::this_thread::sleep_for;
 
 namespace KalaKit::Core
 {
@@ -100,7 +102,10 @@ namespace KalaKit::Core
 			extensions);
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			false,
 			ConsoleMessageType::Type_Message,
+			"",
 			"Initializing " + Server::server->GetServerName() + " ..."
 			"\n\n"
 			"=============================="
@@ -125,14 +130,20 @@ namespace KalaKit::Core
 			log.close();
 
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Message,
+				"SERVER",
 				"Created 'banned-bots.txt' at root directory.");
 		}
 
 		server->AddInitialWhitelistedRoutes();
 		
 		KalaServer::PrintConsoleMessage(
+			0,
+			false,
 			ConsoleMessageType::Type_Message,
+			"",
 			"\n"
 			"=============================="
 			"\n"
@@ -186,7 +197,10 @@ namespace KalaKit::Core
 		KalaServer::isRunning = true;
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			false,
 			ConsoleMessageType::Type_Message,
+			"",
 			"\n"
 			"=============================="
 			"\n"
@@ -224,7 +238,10 @@ namespace KalaKit::Core
 		if (!file)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"SERVER",
 				"Failed to open 'banned-bots.txt' to check if IP is banned or not!");
 			return false;
 		}
@@ -258,7 +275,10 @@ namespace KalaKit::Core
 		if (!readFile)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"SERVER",
 				"Failed to read 'banned-bots.txt' to ban IP!");
 			return;
 		}
@@ -281,7 +301,10 @@ namespace KalaKit::Core
 		if (!writeFile)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"SERVER",
 				"Failed to write into 'banned-bots.txt' to ban IP!");
 			return;
 		}
@@ -291,7 +314,10 @@ namespace KalaKit::Core
 		writeFile.close();
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			false,
 			ConsoleMessageType::Type_Message,
+			"",
 			"\n"
 			"=============== BANNED IP ===============\n"
 			" IP     : " + target.IP + "\n"
@@ -320,11 +346,17 @@ namespace KalaKit::Core
 		{
 			string cleanedRoute = path(route).generic_string();
 
-			if (!is_regular_file(route)
-				|| path(route).extension() != ".html")
+			bool isBlacklistedRoute = true;
+			for (const auto& ext : Server::server->whitelistedExtensions)
 			{
-				continue;
+				if (!path(route).has_extension()
+					|| path(route).extension() == ext)
+				{
+					isBlacklistedRoute = false;
+					break;
+				}
 			}
+			if (isBlacklistedRoute) continue;
 
 			//get clean route
 			path relativePath = relative(route.path(), server->whitelistedRoutesFolder);
@@ -346,7 +378,10 @@ namespace KalaKit::Core
 		if (server->whitelistedRoutes.contains(rootPath))
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Warning,
+				"SERVER",
 				"Route '" + rootPath + "' has already been whitelisted!");
 			return;
 		}
@@ -355,7 +390,10 @@ namespace KalaKit::Core
 		if (!exists(fullPath))
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"SERVER",
 				"Page path '" + filePath + "' does not exist!.");
 
 			return;
@@ -364,7 +402,10 @@ namespace KalaKit::Core
 		server->whitelistedRoutes[rootPath] = filePath;
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
+			"SERVER",
 			"Added new route '" + rootPath + "'");
 	}
 	void Server::AddNewWhitelistedExtension(const string& newExtension) const
@@ -374,7 +415,10 @@ namespace KalaKit::Core
 			if (extension == newExtension)
 			{
 				KalaServer::PrintConsoleMessage(
+					0,
+					true,
 					ConsoleMessageType::Type_Warning,
+					"SERVER",
 					"Extension '" + extension + "' has already been whitelisted!");
 				return;
 			}
@@ -382,7 +426,10 @@ namespace KalaKit::Core
 
 		server->whitelistedExtensions.push_back(newExtension);
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
+			"SERVER",
 			"Added new extension '" + newExtension + "'");
 	}
 
@@ -397,7 +444,10 @@ namespace KalaKit::Core
 		if (foundRoute == "")
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Warning,
+				"SERVER",
 				"Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!");
 		}
 	}
@@ -416,7 +466,10 @@ namespace KalaKit::Core
 		if (foundExtension == "")
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Warning,
+				"SERVER",
 				"Extension '" + thisExtension + "' cannot be removed because it hasn't been whitelisted!");
 		}
 	}
@@ -459,7 +512,10 @@ namespace KalaKit::Core
 				if (clientSocket == INVALID_SOCKET)
 				{
 					KalaServer::PrintConsoleMessage(
+						2,
+						true,
 						ConsoleMessageType::Type_Error,
+						"CLIENT",
 						"Accept failed: " + to_string(WSAGetLastError()));
 					return;
 				}
@@ -478,9 +534,12 @@ namespace KalaKit::Core
 			while (KalaServer::isRunning)
 			{
 				KalaServer::PrintConsoleMessage(
+					0,
+					true,
 					ConsoleMessageType::Type_Message,
+					"SERVER",
 					"Server is still alive...");
-				Sleep(5000);
+				sleep_for(seconds(10));
 			}
 		}).detach();
 	}
@@ -488,20 +547,13 @@ namespace KalaKit::Core
 	void Server::HandleClient(uintptr_t socket)
 	{
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"Entered handle client thread...");
+			"CLIENT",
+			"Socket [" + to_string(socket) + "] entered handle client thread...");
 
 		SOCKET rawSocket = static_cast<SOCKET>(socket);
-
-		//prevent timeout - wait 5 seconds then exit
-
-		DWORD timeout = 5000; //5 seconds
-		setsockopt(
-			rawSocket, 
-			SOL_SOCKET,
-			SO_RCVTIMEO, 
-			(char*)&timeout, 
-			sizeof(timeout));
 
 		{
 			lock_guard lock(server->clientSocketsMutex);
@@ -510,16 +562,43 @@ namespace KalaKit::Core
 
 		char buffer[2048] = {};
 		int bytesReceived = recv(rawSocket, buffer, sizeof(buffer) - 1, 0);
-		if (bytesReceived == 0)
+
+		if (bytesReceived == SOCKET_ERROR)
+		{
+			DWORD err = WSAGetLastError();
+			if (err == WSAETIMEDOUT)
+			{
+				KalaServer::PrintConsoleMessage(
+					2,
+					true,
+					ConsoleMessageType::Type_Warning,
+					"CLIENT",
+					"Socket [" + to_string(socket) + "] timed out after 5 seconds without sending any data.");
+			}
+			else
+			{
+				KalaServer::PrintConsoleMessage(
+					2,
+					true,
+					ConsoleMessageType::Type_Warning,
+					"CLIENT",
+					"Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err));
+			}
+
+			Server::server->SocketCleanup(socket);
+			closesocket(rawSocket);
+			return;
+		}
+		else if (bytesReceived == 0)
 		{
 			KalaServer::PrintConsoleMessage(
+				2,
+				true,
 				ConsoleMessageType::Type_Warning,
-				"Client timed out or disconnected before sending request.");
+				"CLIENT",
+				"Socket [" + to_string(socket) + "] disconnected without sending any data.");
 
-			{
-				std::lock_guard lock(server->clientSocketsMutex);
-				server->activeClientSockets.erase(socket);
-			}
+			Server::server->SocketCleanup(socket);
 			closesocket(rawSocket);
 			return;
 		}
@@ -528,11 +607,12 @@ namespace KalaKit::Core
 			string request(buffer);
 			string filePath = "/";
 
-#ifdef _DEBUG
 			KalaServer::PrintConsoleMessage(
-				ConsoleMessageType::Type_Message,
-				"Raw HTTP request:\n" + request);
-#endif
+				2,
+				true,
+				ConsoleMessageType::Type_Debug,
+				"CLIENT",
+				"Socket [" + to_string(socket) + "] raw HTTP request:\n" + request);
 
 			if (request.starts_with("GET "))
 			{
@@ -560,8 +640,11 @@ namespace KalaKit::Core
 			}
 
 			KalaServer::PrintConsoleMessage(
+				2,
+				true,
 				ConsoleMessageType::Type_Message,
-				"Created new thread for user '" + clientIP + "'!");
+				"CLIENT",
+				"Created new thread for client [" + to_string(socket) + " - '" + clientIP + "']!");
 
 			BannedIP banned{};
 			banned.IP = clientIP;
@@ -573,10 +656,7 @@ namespace KalaKit::Core
 					&& !server->IsBannedIP(clientIP))
 				{
 					server->BanIP(banned, static_cast<uintptr_t>(rawSocket));
-					{
-						std::lock_guard lock(server->clientSocketsMutex);
-						server->activeClientSockets.erase(socket);
-					}
+					Server::server->SocketCleanup(socket);
 					return;
 				}
 
@@ -587,10 +667,7 @@ namespace KalaKit::Core
 						filePath,
 						clientIP,
 						rawSocket);
-					{
-						std::lock_guard lock(server->clientSocketsMutex);
-						server->activeClientSockets.erase(socket);
-					}
+					Server::server->SocketCleanup(socket);
 					return;
 				}
 			}
@@ -601,18 +678,20 @@ namespace KalaKit::Core
 			if (!server->RouteExists(filePath))
 			{
 				KalaServer::PrintConsoleMessage(
+					2,
+					true,
 					ConsoleMessageType::Type_Message,
-					"User tried to access non-existing route '" + filePath + "'!");
+					"CLIENT",
+					"Client [" 
+					+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '" 
+					+ filePath + "'!");
 
 				auto resp404 = make_unique<Response_404>();
 				resp404->Init(
 					filePath,
 					clientIP,
 					rawSocket);
-				{
-					std::lock_guard lock(server->clientSocketsMutex);
-					server->activeClientSockets.erase(socket);
-				}
+				Server::server->SocketCleanup(socket);
 				return;
 			}
 			else
@@ -624,18 +703,20 @@ namespace KalaKit::Core
 				if (!isAllowedFile)
 				{
 					KalaServer::PrintConsoleMessage(
+						2,
+						true,
 						ConsoleMessageType::Type_Warning,
-						"User tried to access forbidden route '" + filePath + "' from path '" + server->whitelistedRoutes[filePath] + "'.");
+						"CLIENT",
+						"Client [" 
+						+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + filePath 
+						+ "' from path '" + server->whitelistedRoutes[filePath] + "'.");
 
 					auto resp403 = make_unique<Response_403>();
 					resp403->Init(
 						filePath,
 						clientIP,
 						rawSocket);
-					{
-						std::lock_guard lock(server->clientSocketsMutex);
-						server->activeClientSockets.erase(socket);
-					}
+					Server::server->SocketCleanup(socket);
 					return;
 				}
 				else
@@ -645,15 +726,21 @@ namespace KalaKit::Core
 						string result = server->ServeFile(filePath);
 						if (result == "")
 						{
+							KalaServer::PrintConsoleMessage(
+								2,
+								true,
+								ConsoleMessageType::Type_Error,
+								"CLIENT",
+								"Client ["
+								+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+								+ filePath + "'.");
+
 							auto resp500 = make_unique<Response_500>();
 							resp500->Init(
 								filePath,
 								clientIP,
 								rawSocket);
-							{
-								std::lock_guard lock(server->clientSocketsMutex);
-								server->activeClientSockets.erase(socket);
-							}
+							Server::server->SocketCleanup(socket);
 							return;
 						}
 						else body = result;
@@ -661,11 +748,13 @@ namespace KalaKit::Core
 					catch (const exception& e)
 					{
 						KalaServer::PrintConsoleMessage(
+							2,
+							true,
 							ConsoleMessageType::Type_Error,
-							"Error 500 when requesting page ("
-							+ filePath
-							+ ").\nError:\n"
-							+ e.what());
+							"CLIENT",
+							"Client ["
+							+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+							+ filePath + "'.\nError:\n" + e.what());
 
 						auto resp500 = make_unique<Response_500>();
 						resp500->Init(
@@ -673,14 +762,17 @@ namespace KalaKit::Core
 							clientIP,
 							rawSocket);
 
-						{
-							std::lock_guard lock(server->clientSocketsMutex);
-							server->activeClientSockets.erase(socket);
-						}
+						Server::server->SocketCleanup(socket);
 					}
 				}
 			}
 		}
+	}
+
+	void Server::SocketCleanup(uintptr_t clientSocket)
+	{
+		lock_guard lock(server->clientSocketsMutex);
+		server->activeClientSockets.erase(clientSocket);
 	}
 
 	void Server::Quit() const

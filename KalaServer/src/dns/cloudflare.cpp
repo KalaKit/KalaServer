@@ -49,7 +49,10 @@ namespace KalaKit::DNS
 		if (Server::server == nullptr)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"CLOUDFLARE",
 				"Cannot initialize cloudflared if server has not yet been initialized!");
 			return false;
 		}
@@ -57,8 +60,11 @@ namespace KalaKit::DNS
 		if (isInitializing)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
-				"Cannot initialize cloudflared while it is already being initialized!");
+				"CLOUDFLARE",
+				"[CLOUDFLARE] Cannot initialize cloudflared while it is already being initialized!");
 			return false;
 		}
 		
@@ -107,8 +113,11 @@ namespace KalaKit::DNS
 		else
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
+				"CLOUDFLARE",
+				"Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
 		}
 
 		if (tunnelID == "") CreateTunnelCredentials();
@@ -122,8 +131,11 @@ namespace KalaKit::DNS
 			else
 			{
 				KalaServer::PrintConsoleMessage(
+					0,
+					true,
 					ConsoleMessageType::Type_Message,
-					"  [CLOUDFLARE_MESSAGE] Cloudflared json file already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
+					"CLOUDFLARE",
+					"Cloudflared json file already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
 			}	
 		}
 		
@@ -133,7 +145,10 @@ namespace KalaKit::DNS
 		isRunning = true;
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
+			"CLOUDFLARE",
 			"Cloudflared initialization completed.");
 
 		return true;
@@ -288,13 +303,19 @@ namespace KalaKit::DNS
 		if (exists(certPath))
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
+				"CLOUDFLARE",
+				"Cloudflared cert file already exists at '" + certPath + "'. Skipping creation.");
 			return;
 		}
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
+			"CLOUDFLARE",
 			"Creating new tunnel cert file at '" + certPath + "'.");
 
 		string currentPath = current_path().string();
@@ -309,8 +330,11 @@ namespace KalaKit::DNS
 
 		string command = "cloudflared tunnel login";
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command);
+			"CLOUDFLARE_COMMAND",
+			command);
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
@@ -342,7 +366,10 @@ namespace KalaKit::DNS
 		CloseHandle(pi.hThread);
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
+			"CLOUDFLARE",
 			"Launched browser to authorize with CloudFlare. PID: " + to_string(pi.dwProcessId));
 
 		CloseHandle(pi.hProcess);
@@ -359,8 +386,11 @@ namespace KalaKit::DNS
 		}
 		
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Created new cloudflared cert file for tunnel '" + tunnelName + "'.");
+			"CLOUDFLARE",
+			"Sucessfully created new cloudflared cert file for tunnel '" + tunnelName + "'.");
 	}
 
 	void CloudFlare::CreateTunnelCredentials()
@@ -371,8 +401,11 @@ namespace KalaKit::DNS
 			&& path(tunnelIDFilePath).extension().string() == ".json")
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_MESSAGE] Cloudflared credentials json file for tunnel '" + tunnelName + "' already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
+				"CLOUDFLARE",
+				"Cloudflared credentials json file for tunnel '" + tunnelName + "' already exists at '" + tunnelIDFilePath + "'. Skipping creation.");
 			return;
 		}
 		
@@ -392,8 +425,11 @@ namespace KalaKit::DNS
 
 		string command1 = "cloudflared tunnel delete " + tunnelName;
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command1);
+			"CLOUDFLARE_COMMAND",
+			command1);
 
 		wstring wideCommand1(command1.begin(), command1.end());
 		if (!CreateProcessW
@@ -438,8 +474,11 @@ namespace KalaKit::DNS
 
 		string command2 = "cloudflared tunnel create " + tunnelName;
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command2);
+			"CLOUDFLARE_COMMAND",
+			command2);
 
 		wstring wideCommand2(command2.begin(), command2.end());
 		if (!CreateProcessW
@@ -490,8 +529,11 @@ namespace KalaKit::DNS
 		}
 		
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Created new cloudflared credentials json file for tunnel '" + tunnelName + "'.");
+			"CLOUDFLARE",
+			"Created new cloudflared credentials json file for tunnel '" + tunnelName + "'.");
 			
 		KalaServer::CreatePopup(
 			PopupReason::Reason_Warning,
@@ -523,8 +565,11 @@ namespace KalaKit::DNS
 
 		string command1 = "cloudflared tunnel route dns " + Server::server->GetDomainName() + " " + tunnelName;
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command1);
+			"CLOUDFLARE_COMMAND",
+			command1);
 
 		wstring wideCommand1(command1.begin(), command1.end());
 		if (!CreateProcessW
@@ -569,8 +614,11 @@ namespace KalaKit::DNS
 
 		string command2 = "cloudflared tunnel route dns www." + Server::server->GetDomainName() + " " + tunnelName;
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command2);
+			"CLOUDFLARE_COMMAND",
+			command2);
 
 		wstring wideCommand2(command2.begin(), command2.end());
 		if (!CreateProcessW
@@ -603,8 +651,11 @@ namespace KalaKit::DNS
 		CloseHandle(pi2.hProcess);
 		
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Routed cloudflared dns for tunnel '" + tunnelName + "'.");
+			"CLOUDFLARE",
+			"Successfully routed cloudflared dns for tunnel '" + tunnelName + "'.");
 	}
 
 	void CloudFlare::RunTunnel()
@@ -636,8 +687,11 @@ namespace KalaKit::DNS
 			+ " tunnel run " + tunnelName;
 #endif
 		KalaServer::PrintConsoleMessage(
+			2,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_COMMAND] " + command);
+			"CLOUDFLARE_COMMAND",
+			command);
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
@@ -669,8 +723,11 @@ namespace KalaKit::DNS
 		tunnelRunHandle = pi.hProcess;
 		
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
-			"  [CLOUDFLARE_SUCCESS] Running cloudflared tunnel.");
+			"CLOUDFLARE",
+			"Running cloudflared tunnel.");
 	}
 
 	void CloudFlare::Quit()
@@ -678,7 +735,10 @@ namespace KalaKit::DNS
 		if (!isRunning)
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Error,
+				"CLOUDFLARE",
 				"Cannot shut down cloudflared because it hasn't been started!");
 			return;
 		}
@@ -693,14 +753,20 @@ namespace KalaKit::DNS
 		else
 		{
 			KalaServer::PrintConsoleMessage(
+				0,
+				true,
 				ConsoleMessageType::Type_Message,
-				"  [CLOUDFLARE_SUCCESS] Cloudflared was shut down.");
+				"CLOUDFLARE",
+				"Cloudflared was shut down.");
 		}
 		
 		isRunning = false;
 
 		KalaServer::PrintConsoleMessage(
+			0,
+			true,
 			ConsoleMessageType::Type_Message,
+			"CLOUDFLARE",
 			"Cloudflared was successfully shut down!");
 	}
 }
