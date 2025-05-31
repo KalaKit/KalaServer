@@ -31,7 +31,7 @@ using std::chrono::milliseconds;
 
 int main()
 {
-	unsigned int port = 80;
+	unsigned int port = 30000;
 
 	unsigned int healthTimer = 60;
 
@@ -59,21 +59,44 @@ int main()
 		".webp", ".webm", ".mp4", ".gif"
 	};
 
-	static const std::vector<std::string> blacklistedKeywords = 
+	static const vector<string> blacklistedKeywords =
 	{
-		//CMS / WordPress
-		"wp", "wp1", "wordpress", "includes",
-		"blog", "cms", "xml", "php",
+		//CMS / WordPress / Frameworks (exploitable or fingerprintable targets)
+		"wp", "wordpress", "includes", "cms", "joomla", "drupal",
+		"magento", "prestashop", "template", "theme", "skins",
 
-		//admin / Control Panels
-		"admin", "sito", "login", "register",
+		//admin panels / auth / user management
+		"admin", "sito", "login", "register", "panel", "cpanel",
+		"dashboard", "user", "auth", "setup", "adminer", "controlpanel",
 
-		//shop / Web presence
-		"shop", "web",
+		//malware / scam kits / crypto
+		"twint", "lkk", "btc", "eth", "monero", "wallet", "crypto", "stealer",
+		"inject", "skimmer", "grabber", "phish", "scam", "cryptojack", "ransom",
 
-		//years (common archive or crawl targets)
-		"2026", "2025", "2024", "2023",
-		"2022", "2021", "2020", "2019"
+		//e-commerce / payment attack targets
+		"shop", "store", "cart", "checkout", "pay", "payment",
+		"invoice", "order", "billing", "paypal", "stripe",
+
+		//common bot/archive years (mass site crawlers, scraping archives)
+		"2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019",
+
+		//known exploit routes / system probing
+		"cgi-bin", "shell", "backdoor", "cmd", "exploit", "passwd",
+		"proc", "env", "id_rsa", "etc", "vuln", "sqlmap",
+
+		//configs / DB / dump / backups
+		"config", "database", "sql", "dump", "backup", "dbdump", 
+		"admin_db", "mysql", "sqlite", "phpinfo",
+
+		//static file probes (dangerous files only)
+		".git", ".svn", ".hg", "index.php~",
+
+		//web API abuse probes / exploit kits
+		"swagger", "graphql", "api", "v1", "v2", "actuator", "metrics", "debug",
+		"status", "monitor", "monitoring", "info", "logs",
+
+		//suspicious extensions / archives
+		".sql", ".tar", ".zip", ".gz", ".7z", ".rar", ".log"
 	};
 
 	Server::Initialize(

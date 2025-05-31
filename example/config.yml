@@ -3,16 +3,16 @@ credentials-file: your-cloudflared-json-file-full-path
 
 ingress:
   - hostname: your-domain-name.your-domain-extension
-    service: http://localhost:80
+    service: http://localhost:30000
     originRequest:
-      httpHostHeader: your-domain-name.your-domain-extension
+      httpHostHeader: yourdomain.yourextension
       ipHeaders:
         - CF-Connecting-IP
 
   - hostname: www.your-domain-name.your-domain-extension
-    service: http://localhost:80
+    service: http://localhost:30000
     originRequest:
-      httpHostHeader: your-domain-name.your-domain-extension
+      httpHostHeader: yourdomain.yourextension
       ipHeaders:
         - CF-Connecting-IP
 

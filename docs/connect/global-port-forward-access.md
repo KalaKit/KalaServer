@@ -1,19 +1,19 @@
 # How to get access globally with port forwarding
 
-- allow port '80' through firewall
+- allow port '30000' through firewall
 	- add inbound rule
 	- choose port
 	- choose tcp
-	- set specific local port to 80
+	- set specific local port to 30000
 	- allow connection
 	- profile: All
 	- name: yourservername
 - log in to your router admin page (usually 192.168.1.1)
 - go to the port forwarding section 
-	- port: 80
+	- port: 30000
 	- protocol: tcp
 	- internal ip: your ipv4
-	- internal port: 80
+	- internal port: 30000
 	- name: yourservername
 - add a root domain record to cloudflare (or other domain provider)
 	- go to your cloudflare domain
@@ -31,5 +31,5 @@
 	- Name: www
 	- Target: yourdomain.yourextension
 	- Proxy status: on
-- run the server as admin (which listens on port 80)
+- run the server as admin (which listens on port 30000)
 - open your browser and go to 'http://yourdomain.yourextension'
