@@ -58,42 +58,39 @@ int main()
 
 	static const vector<string> blacklistedKeywords =
 	{
-		//CMS / WordPress / Frameworks (exploitable or fingerprintable targets)
-		"wp", "wordpress", "includes", "cms", "joomla", "drupal",
-		"magento", "prestashop", "template", "theme", "skins",
+		//CMS / Framework probes
+		"wp", "joomla", "drupal", "magento", "prestashop", "template", "theme", "skins",
 
-		//admin panels / auth / user management
-		"admin", "sito", "login", "register", "panel", "cpanel",
-		"dashboard", "user", "auth", "setup", "adminer", "controlpanel",
+		//admin panels / privileged access points
+		"admin", "cpanel", "panel", "adminer", "controlpanel", "sito",
 
-		//malware / scam kits / crypto
-		"twint", "lkk", "btc", "eth", "monero", "wallet", "crypto", "stealer",
-		"inject", "skimmer", "grabber", "phish", "scam", "cryptojack", "ransom",
+		//malware kits / scams / crypto abuse
+		"twint", "lkk", "btc", "eth", "monero", "wallet", "crypto",
+		"stealer", "inject", "skimmer", "grabber", "phish", "scam",
+		"cryptojack", "ransom",
 
-		//e-commerce / payment attack targets
-		"shop", "store", "cart", "checkout", "pay", "payment",
-		"invoice", "order", "billing", "paypal", "stripe",
+		//e-commerce abuse / payment hijack
+		"cart", "checkout", "pay", "invoice", "order", "billing",
+		"paypal", "stripe",
 
-		//common bot/archive years (mass site crawlers, scraping archives)
-		"2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019",
-
-		//known exploit routes / system probing
+		//exploit routes / system file probes
 		"cgi-bin", "shell", "backdoor", "cmd", "exploit", "passwd",
-		"proc", "env", "id_rsa", "etc", "vuln", "sqlmap",
+		"proc", "env", "id_rsa", "vuln", "sqlmap",
 
-		//configs / DB / dump / backups
-		"config", "database", "sql", "dump", "backup", "dbdump", 
-		"admin_db", "mysql", "sqlite", "phpinfo",
+		//configs / database / dump / backups
+		"config.php", "database", "dump", "db", "mysql", "sqlite", ".env", "phpinfo",
 
-		//static file probes (dangerous files only)
+		//static file exposure
 		".git", ".svn", ".hg", "index.php~",
 
-		//web API abuse probes / exploit kits
-		"swagger", "graphql", "api", "v1", "v2", "actuator", "metrics", "debug",
-		"status", "monitor", "monitoring", "info", "logs",
+		//web API abuse / dev endpoints
+		"swagger", "graphql", "actuator", "metrics", "debug", "logs", "monitoring",
 
-		//suspicious extensions / archives
-		".sql", ".tar", ".zip", ".gz", ".7z", ".rar", ".log"
+		//archive/fallback scan attempts
+		"old", "archive", "test", "dev", "staging",
+
+		//suspicious extensions / file types
+		".tar", ".zip", ".gz", ".7z", ".rar", ".log"
 	};
 
 	Server::Initialize(
