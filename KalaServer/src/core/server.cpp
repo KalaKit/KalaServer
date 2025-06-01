@@ -665,7 +665,7 @@ namespace KalaKit::Core
 						ConsoleMessageType::Type_Error,
 						"CLIENT",
 						"Accept failed: " + to_string(WSAGetLastError()));
-					return;
+					continue;
 				}
 				else
 				{
@@ -923,6 +923,14 @@ namespace KalaKit::Core
 
 		SOCKET rawSocket = static_cast<SOCKET>(socket);
 
+		DWORD timeout = 1000;
+		setsockopt(
+			rawSocket,
+			SOL_SOCKET,
+			SO_RCVTIMEO,
+			(char*)&timeout,
+			sizeof(timeout));
+
 		{
 			lock_guard lock(server->clientSocketsMutex);
 			server->activeClientSockets.insert(socket);
@@ -1049,6 +1057,7 @@ namespace KalaKit::Core
 
 				if (server->IsBannedIP(clientIP))
 				{
+					sleep_for(milliseconds(200));
 					auto respBanned = make_unique<Response_Banned>();
 					respBanned->Init(
 						filePath,
