@@ -44,10 +44,7 @@ namespace KalaKit::ResponseSystem
 			ConsoleMessageType::Type_Message,
 			"RESPONSE",
 			"[" + to_string(clientSocket) + " - '" + clientIP + "']"
-			+ " -> " 
-			+ route
-			+ " ["
-			+ statusLine
-			+ "]");
+			+ " -> " + route + " [" + statusLine + "]\n\n"
+			"------------------------------\n");
 	}
 }

@@ -64,7 +64,10 @@ using std::atomic_bool;
 
 namespace KalaKit::Core
 {
-	atomic<bool> canUpdateIPsVector{ false };
+	atomic<bool> canUpdateBannedIPs{ false };
+	vector<pair<string, string>> bannedIPs{};
+
+	atomic<bool> canUpdateMachineIPs{ false };
 	vector<string> machineIPs{};
 
 	void Server::Initialize(
@@ -122,7 +125,7 @@ namespace KalaKit::Core
 			"=============================="
 			"\n");
 
-		server->bannedBotsFile = (path(current_path() / "banned-bots.txt")).string();
+		server->bannedBotsFile = (path(current_path() / "banned-ips.txt")).string();
 		string bannedBotsFile = server->GetBannedBotsFilePath();
 		if (!exists(bannedBotsFile))
 		{
@@ -131,7 +134,7 @@ namespace KalaKit::Core
 			{
 				KalaServer::CreatePopup(
 					PopupReason::Reason_Error,
-					"Failed to create banned-bots.txt!");
+					"Failed to create banned-ips.txt!");
 				return;
 			}
 			log.close();
@@ -141,7 +144,7 @@ namespace KalaKit::Core
 				true,
 				ConsoleMessageType::Type_Message,
 				"SERVER",
-				"Created 'banned-bots.txt' at root directory.");
+				"Created 'banned-ips.txt' at root directory.\n");
 		}
 
 		server->AddInitialWhitelistedRoutes();
@@ -234,50 +237,25 @@ namespace KalaKit::Core
 		return false;
 	}
 
-	bool Server::IsBannedIP(const string& targetIP) const
+	bool Server::IsBannedClient(const string& targetIP) const
 	{
-		string bannedBotsFile = server->GetBannedBotsFilePath();
-
-		bool result = false;
-
-		ifstream file(bannedBotsFile);
-		if (!file)
+		if (bannedIPs.size() == 0)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to open 'banned-bots.txt' to check if IP is banned or not!");
-			return false;
+			canUpdateBannedIPs = true;
+			Server::server->GetBannedIPs();
 		}
 
-		string line;
-		while (getline(file, line))
+		if (canUpdateBannedIPs) Server::server->GetBannedIPs();
+
+		for (const pair<string, string>& bannedClient : bannedIPs)
 		{
-			auto delimiterPos = line.find('|');
-			if (delimiterPos != string::npos)
-			{
-				string ip = line.substr(0, delimiterPos);
-				string reason = line.substr(delimiterPos + 1);
-
-				erase_if(ip, ::isspace);
-				erase_if(reason, ::isspace);
-
-				if (ip == targetIP)
-				{
-					result = true;
-					break;
-				}
-			}
+			if (bannedClient.first == targetIP) return true;
 		}
 
-		file.close();
-
-		return result;
+		return false;
 	}
 
-	bool Server::BanIP(const BannedIP& target) const
+	bool Server::BanIP(const pair<string, string>& target) const
 	{
 		string bannedBotsPath = server->GetBannedBotsFilePath();
 
@@ -289,7 +267,7 @@ namespace KalaKit::Core
 				true,
 				ConsoleMessageType::Type_Error,
 				"SERVER",
-				"Failed to read 'banned-bots.txt' to ban IP!");
+				"Failed to read 'banned-ips.txt' to ban IP!");
 			return false;
 		}
 
@@ -302,7 +280,7 @@ namespace KalaKit::Core
 				string ip = line.substr(0, delimiterPos);
 				string cleanedIP = ip.substr(0, ip.find_last_not_of(" \t") + 1);
 
-				if (cleanedIP == target.IP) return false; //user is already banned
+				if (cleanedIP == target.first) return false; //user is already banned
 			}
 		}
 
@@ -316,11 +294,12 @@ namespace KalaKit::Core
 				true,
 				ConsoleMessageType::Type_Error,
 				"SERVER",
-				"Failed to write into 'banned-bots.txt' to ban IP!");
+				"Failed to write into 'banned-ips.txt' to ban IP!");
 			return false;
 		}
 
-		writeFile << target.IP << " | " << target.reason << "\n";
+		writeFile << target.first << " | " << target.second << "\n";
+		bannedIPs.push_back(target);
 
 		writeFile.close();
 
@@ -719,17 +698,26 @@ namespace KalaKit::Core
 		{
 			while (KalaServer::isRunning)
 			{
-				if (!canUpdateIPsVector) 
-				canUpdateIPsVector = true;
+				if (!canUpdateMachineIPs) canUpdateMachineIPs = true;
+
+				sleep_for(seconds(300));
+			}
+		}).detach();
+
+		thread([]
+		{
+			while (KalaServer::isRunning)
+			{
+				if (!canUpdateBannedIPs) canUpdateBannedIPs = true;
 
 				sleep_for(seconds(300));
 			}
 		}).detach();
 	}
 
-	void Server::UpdateIPs()
+	void Server::GetMachineIPs()
 	{
-		if (!canUpdateIPsVector) return;
+		if (!canUpdateMachineIPs) return;
 
 		machineIPs.clear();
 
@@ -857,18 +845,81 @@ namespace KalaKit::Core
 			"SERVER",
 			"Refreshed machine IPs vector");
 
-		canUpdateIPsVector = false;
+		canUpdateMachineIPs = false;
+	}
+
+	void Server::GetBannedIPs()
+	{
+		if (!canUpdateBannedIPs) return;
+
+		bannedIPs.clear();
+
+		string bannedBotsFile = server->GetBannedBotsFilePath();
+
+		bool result = false;
+
+		ifstream file(bannedBotsFile);
+		if (!file)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Failed to open 'banned-ips.txt' to check if IP is banned or not!");
+			return;
+		}
+
+		string line;
+		while (getline(file, line))
+		{
+			if (line.find("#") != string::npos
+				|| line.find("=") != string::npos
+				|| line.find("|") == string::npos
+				|| line.empty())
+			{
+				continue;
+			}
+
+			auto delimiterPos = line.find('|');
+			if (delimiterPos != string::npos)
+			{
+				string ip = line.substr(0, delimiterPos);
+				string reason = line.substr(delimiterPos + 1);
+
+				erase_if(ip, ::isspace);
+				erase_if(reason, ::isspace);
+
+				pair<string, string> newBannedIPsPair{};
+
+				newBannedIPsPair.first = ip;
+				newBannedIPsPair.second = ip;
+
+				bannedIPs.push_back(newBannedIPsPair);
+			}
+		}
+
+		file.close();
+
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SERVER",
+			"Refreshed banned IPs vector");
+
+		canUpdateBannedIPs = false;
 	}
 
 	bool Server::IsHost(const string& targetIP)
 	{
 		if (machineIPs.size() == 0)
 		{
-			canUpdateIPsVector = true;
-			Server::server->UpdateIPs();
+			canUpdateMachineIPs = true;
+			Server::server->GetMachineIPs();
 		}
 
-		if (canUpdateIPsVector) Server::server->UpdateIPs();
+		if (canUpdateMachineIPs) Server::server->GetMachineIPs();
 
 		for (const auto& ip : machineIPs)
 		{
@@ -1048,15 +1099,11 @@ namespace KalaKit::Core
 				0,
 				true,
 				ConsoleMessageType::Type_Message,
-				"Server",
+				"SERVER",
 				"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
 
-			BannedIP banned{};
-			banned.IP = clientIP;
-			banned.reason = filePath;
-
-			bool isBannedIP = server->IsBannedIP(clientIP);
-			if (isBannedIP)
+			bool isBannedClient = server->IsBannedClient(clientIP);
+			if (isBannedClient)
 			{
 				KalaServer::PrintConsoleMessage(
 					0,
@@ -1080,7 +1127,7 @@ namespace KalaKit::Core
 				Server::server->SocketCleanup(socket);
 				return;
 			}
-			else if (!isBannedIP
+			else if (!isBannedClient
 					 && !server->blacklistedKeywords.empty()
 					 && server->IsBlacklistedRoute(filePath))
 			{
@@ -1097,7 +1144,12 @@ namespace KalaKit::Core
 					"====================================================\n");
 
 				sleep_for(milliseconds(5));
-				if (server->BanIP(banned))
+
+				pair<string, string> bannedClient{};
+				bannedClient.first = clientIP;
+				bannedClient.second = filePath;
+
+				if (server->BanIP(bannedClient))
 				{
 					auto respBanned = make_unique<Response_Banned>();
 					respBanned->Init(

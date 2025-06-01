@@ -6,6 +6,3 @@ build-release/
 
 # Ignore common file types not needed for distribution
 *.exe
-
-# Ignore private and secret files
-banned-bots.txt

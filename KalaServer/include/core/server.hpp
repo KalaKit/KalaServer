@@ -22,6 +22,7 @@ namespace KalaKit::Core
 	using std::atomic;
 	using std::mutex;
 	using std::unordered_set;
+	using std::pair;
 
 	struct ErrorMessage
 	{
@@ -29,12 +30,6 @@ namespace KalaKit::Core
 		string error404;
 		string error418;
 		string error500;
-	};
-
-	struct BannedIP
-	{
-		string IP;
-		string reason;
 	};
 	
 	class Server
@@ -108,12 +103,12 @@ namespace KalaKit::Core
 		/// <summary>
 		/// Returns banned ip + reason if IP address is banned and shouldnt be allowed to access any routes.
 		/// </summary>
-		bool IsBannedIP(const string& ip) const;
+		bool IsBannedClient(const string& ip) const;
 
 		/// <summary>
-		/// Add info about banned ip to banned-bots.txt.
+		/// Add info about banned ip to banned-ips.txt.
 		/// </summary>
-		bool BanIP(const BannedIP& target) const;
+		bool BanIP(const pair<string, string>& target) const;
 
 		/// <summary>
 		/// Returns true if given IP matches any host local ipv4 or ipv6.
@@ -171,7 +166,12 @@ namespace KalaKit::Core
 		/// <summary>
 		/// Calls 'ipconfig' and stores all host IPs in machineIPs vector.
 		/// </summary>
-		void UpdateIPs();
+		void GetMachineIPs();
+
+		/// <summary>
+		/// Reads 'banned-ips.txt' and stores all IPs and reasons in bannedIPs pair.
+		/// </summary>
+		void GetBannedIPs();
 
 		/// <summary>
 		/// Handle each client in its own thread.
