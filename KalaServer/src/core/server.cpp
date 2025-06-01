@@ -237,8 +237,10 @@ namespace KalaKit::Core
 		return false;
 	}
 
-	bool Server::IsBannedClient(const string& targetIP) const
+	pair<string, string> Server::IsBannedClient(const string& targetIP) const
 	{
+		pair<string, string> banReason{};
+
 		if (bannedIPs.size() == 0)
 		{
 			canUpdateBannedIPs = true;
@@ -249,10 +251,14 @@ namespace KalaKit::Core
 
 		for (const pair<string, string>& bannedClient : bannedIPs)
 		{
-			if (bannedClient.first == targetIP) return true;
+			if (bannedClient.first == targetIP)
+			{
+				banReason.first = bannedClient.first;
+				banReason.second = bannedClient.second;
+			}
 		}
 
-		return false;
+		return banReason;
 	}
 
 	bool Server::BanIP(const pair<string, string>& target) const
@@ -688,7 +694,7 @@ namespace KalaKit::Core
 						true,
 						ConsoleMessageType::Type_Message,
 						"SERVER",
-						fullStatus);
+						fullStatus + "\n");
 					sleep_for(seconds(healthTimer));
 				}
 			}).detach();
@@ -893,7 +899,7 @@ namespace KalaKit::Core
 				pair<string, string> newBannedIPsPair{};
 
 				newBannedIPsPair.first = ip;
-				newBannedIPsPair.second = ip;
+				newBannedIPsPair.second = reason;
 
 				bannedIPs.push_back(newBannedIPsPair);
 			}
@@ -1102,8 +1108,8 @@ namespace KalaKit::Core
 				"SERVER",
 				"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
 
-			bool isBannedClient = server->IsBannedClient(clientIP);
-			if (isBannedClient)
+			pair<string, string> bannedClient = server->IsBannedClient(clientIP);
+			if (bannedClient.first != "")
 			{
 				KalaServer::PrintConsoleMessage(
 					0,
@@ -1114,7 +1120,7 @@ namespace KalaKit::Core
 					"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
 					" IP     : " + clientIP + "\n"
 					" Socket : " + to_string(clientSocket) + "\n"
-					" Route  : " + filePath + "\n"
+					" Reason : " + bannedClient.second + "\n"
 					"====================================================\n");
 
 				sleep_for(milliseconds(5));
@@ -1127,7 +1133,7 @@ namespace KalaKit::Core
 				Server::server->SocketCleanup(socket);
 				return;
 			}
-			else if (!isBannedClient
+			else if (bannedClient.first == ""
 					 && !server->blacklistedKeywords.empty()
 					 && server->IsBlacklistedRoute(filePath))
 			{
@@ -1140,7 +1146,7 @@ namespace KalaKit::Core
 					"=============== BANNED CLIENT ======================\n"
 					" IP     : " + clientIP + "\n"
 					" Socket : " + to_string(clientSocket) + "\n"
-					" Route  : " + filePath + "\n"
+					" Reason : " + filePath + "\n"
 					"====================================================\n");
 
 				sleep_for(milliseconds(5));

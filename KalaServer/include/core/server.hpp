@@ -103,7 +103,7 @@ namespace KalaKit::Core
 		/// <summary>
 		/// Returns banned ip + reason if IP address is banned and shouldnt be allowed to access any routes.
 		/// </summary>
-		bool IsBannedClient(const string& ip) const;
+		pair<string, string> IsBannedClient(const string& ip) const;
 
 		/// <summary>
 		/// Add info about banned ip to banned-ips.txt.
