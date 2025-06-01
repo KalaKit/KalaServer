@@ -96,6 +96,7 @@
 ## Web Shells and Uploads
     45.9.20.0                 | aggressive upload attempts to detect shell access
     91.219.236.0              | RCE payloads attempting eval and system calls
+    93.123.109.105            | attempted access to /.git/config for source leak
     185.100.87.202            | confirmed PHP shell payloads uploaded
     185.225.19.240            | RFI upload path scanning (remote file inclusion)
     193.106.191.0             | local file inclusion vector to shell drop

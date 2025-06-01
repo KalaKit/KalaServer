@@ -1103,13 +1103,6 @@ namespace KalaKit::Core
 				clientIP = "host";
 			}
 
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Message,
-				"SERVER",
-				"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
-
 			pair<string, string> bannedClient = server->IsBannedClient(clientIP);
 			if (bannedClient.first != "")
 			{
@@ -1170,6 +1163,13 @@ namespace KalaKit::Core
 				Server::server->SocketCleanup(socket);
 				return;
 			}
+
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Message,
+				"SERVER",
+				"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
 
 			string body{};
 			string statusLine = "HTTP/1.1 200 OK";

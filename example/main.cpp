@@ -33,7 +33,7 @@ int main()
 {
 	unsigned int port = 30000;
 
-	unsigned int healthTimer = 60;
+	unsigned int healthTimer = 600; //600 seconds (10 minutes) until health message ping
 
 	string serverName = "KalaServer";
 	string domainName = "thekalakit.com";
