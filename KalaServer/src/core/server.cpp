@@ -895,6 +895,9 @@ namespace KalaKit::Core
 
 				erase_if(ip, ::isspace);
 
+				auto cleanedReason = find_if(reason.begin(), reason.end(), ::isspace);
+				if (cleanedReason != reason.end()) reason.erase(cleanedReason);
+
 				pair<string, string> newBannedIPsPair{};
 
 				newBannedIPsPair.first = ip;

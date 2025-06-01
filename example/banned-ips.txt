@@ -1,36 +1,36 @@
 # Web Client Exploits (HTML/CSS/JS)
 
 ## Headless Browsers & Scripted Abuse
-    185.100.87.254            | puppeteer automation used for checkout abuse
-    185.220.101.42            | headless chrome fingerprint evasion sequence
     23.94.5.110               | js canvas and audio fingerprinting probe flood
+    35.247.122.180            | JS probe targeting WordPress jquery.js (cloud bot)
+    82.102.16.18              | js-based post spammer used on contact and order forms
+    185.100.87.254            | puppeteer automation used for checkout abuse
     185.217.0.171             | slowloris.js-style keepalive abuse via JS
     185.217.0.172             | rapid xhr/fetch loop targeting form endpoints
-    82.102.16.18              | js-based post spammer used on contact and order forms
-    35.247.122.180            | JS probe targeting WordPress jquery.js (cloud bot)
+    185.220.101.42            | headless chrome fingerprint evasion sequence
 
 ## Crypto Mining, JS Injections & Wallet Hijacks
     185.100.87.80             | coinhive-style webminer injection via script tag
     185.220.100.253           | JS miner injection via hidden iframe pattern
-    213.202.216.189           | obfuscated crypto wallet hijack scripts detected
     193.34.167.21             | JS wallet probe targeting blockchain.info URLs
+    213.202.216.189           | obfuscated crypto wallet hijack scripts detected
 
 ==================================================
 
 # E-Commerce and Financial
 
 ## Cart, Checkout, and Shop Abusers
+    45.142.120.30             | abused PayPal sandbox with repeated checkout flow
     185.128.24.14             | scraped product listings with fake JS interaction
     185.205.209.142           | enumerated gift cards via injected JS
     185.209.0.68              | mass cart flooding bot targeting add-to-cart JS
     193.106.191.13            | automated Shopify and WooCommerce endpoint abuse
     217.138.197.165           | simulated fake checkouts via repeated POSTs
-    45.142.120.30             | abused PayPal sandbox with repeated checkout flow
 
 ## Cryptocurrency and Payment Injection
+    80.82.77.139              | SWIFT phishing loader targeting checkout pages
     185.191.171.41            | injected BTC payment scripts via external JS
     185.191.171.99            | redirected to Ethereum scam via malicious JS
-    80.82.77.139              | SWIFT phishing loader targeting checkout pages
 
 ==================================================
 
@@ -38,14 +38,15 @@
 
 ## Google Cloud
     34.41.58.2                | aggressive API enumeration from Google Cloud
-	35.237.4.214              | flagged for malicious activity from Google Cloud
     35.203.0.0                | botnet controller host on Google infrastructure
+    35.237.4.214              | flagged for malicious activity from Google Cloud
 
 ## DigitalOcean
-    104.248.0.0               | high-volume port scanning cluster (DigitalOcean)
+    104.248.0.0               | high-volume port scanning cluster
     134.209.0.0               | repeated exploit probes from DigitalOcean server
     137.184.0.0               | webshell upload attempts from DigitalOcean range
-    157.245.195.89            | CMS brute-force origin (DigitalOcean)
+    139.59.111.28             | WordPress ID3 license probe
+    157.245.195.89            | CMS brute-force origin
 
 ## OVH, ColoCrossing, and Rented VPS Abuse
     45.136.155.229            | automated exploit toolkit scanner (VPS node)
@@ -110,21 +111,20 @@
     185.191.33.0              | wget-based scraping of downloadable content
     185.207.107.217           | deep directory indexing and file listing pulls
     185.244.217.0             | repeated curl and wget range access on assets
-	
+
 ==================================================
 
 # Known SEO Spam / Link Injection
 
+    5.45.207.0                | buttons-for-website.com spam crawler
     46.229.168.0              | semalt SEO spam botnet
     195.154.0.0               | xtbot spam referrer
-    5.45.207.0                | buttons-for-website.com spam crawler
 
 ==================================================
 
 # Fake Search Engine Crawlers
 
     185.191.171.43            | fake Googlebot scraper using forged headers
-    66.249.0.0                | real Googlebot range (use to compare legitimate activity)
 
 ==================================================
 
@@ -135,23 +135,13 @@
 
 ==================================================
 
-# Cloudflare IP Monitoring / Proxy Abuse
-
-    66.102.8.110              | Google proxy server frequently used in abuse relays
-    162.158.0.0               | Cloudflare edge proxy range (monitor for abuse)
-    188.114.96.0              | Cloudflare global range (used for evasion in botnets)
-    104.16.0.0                | Cloudflare worker scripts sometimes abused as proxy layer
-    172.64.0.0                | Cloudflare CDN abused for relay scans (watch headers)
-
-==================================================
-
 # TOR Exit Nodes and Anonymity Networks
 
+    171.25.193.0              | TOR privacy relay used in masked attacks
+    176.10.104.0              | TOR privacy node used in credential stuffing
     185.220.100.0             | TOR anonymized request origin
     185.220.101.0             | TOR anonymized request origin
     185.220.102.0             | TOR anonymized request origin
-    171.25.193.0              | TOR privacy relay used in masked attacks
-    176.10.104.0              | TOR privacy node used in credential stuffing
     199.249.230.0             | TOR network relay linked to scraping attempts
     204.13.200.0              | TOR proxy node used in botnet distribution
     209.126.136.0             | rotating TOR exit used for bypassing IP bans
