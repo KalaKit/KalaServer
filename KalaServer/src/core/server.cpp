@@ -849,7 +849,7 @@ namespace KalaKit::Core
 			true,
 			ConsoleMessageType::Type_Message,
 			"SERVER",
-			"Refreshed machine IPs vector");
+			"Refreshed machine IPs");
 
 		canUpdateMachineIPs = false;
 	}
@@ -894,7 +894,6 @@ namespace KalaKit::Core
 				string reason = line.substr(delimiterPos + 1);
 
 				erase_if(ip, ::isspace);
-				erase_if(reason, ::isspace);
 
 				pair<string, string> newBannedIPsPair{};
 
@@ -912,7 +911,7 @@ namespace KalaKit::Core
 			true,
 			ConsoleMessageType::Type_Message,
 			"SERVER",
-			"Refreshed banned IPs vector");
+			"Refreshed banned IPs");
 
 		canUpdateBannedIPs = false;
 	}
