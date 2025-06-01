@@ -11,10 +11,6 @@ set "CLOUDFLARED_ORIGIN=%PROJECT_ROOT%\example\cloudflared.exe"
 set "CLOUDFLARED_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\cloudflared.exe"
 set "CLOUDFLARED_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\cloudflared.exe"
 
-set "BANNED_IPS_ORIGIN=%PROJECT_ROOT%\example\banned-ips.txt"
-set "BANNED_IPS_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\banned-ips.txt"
-set "BANNED_IPS_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\banned-ips.txt"
-
 if not exist "%CONTENT_ORIGIN%" (
 	echo Failed to find content folder!
 	pause
@@ -77,15 +73,6 @@ echo.
 echo ========================================
 echo.
 
-:: Delete old targets
-if exist "%PAGES_DEBUG_TARGET%" rmdir /s /q "%PAGES_DEBUG_TARGET%"
-if exist "%IMAGES_DEBUG_TARGET%" rmdir /s /q "%IMAGES_DEBUG_TARGET%"
-if exist "%VIDEOS_DEBUG_TARGET%" rmdir /s /q "%VIDEOS_DEBUG_TARGET%"
-
-if exist "%PAGES_RELEASE_TARGET%" rmdir /s /q "%PAGES_RELEASE_TARGET%"
-if exist "%IMAGES_RELEASE_TARGET%" rmdir /s /q "%IMAGES_RELEASE_TARGET%"
-if exist "%VIDEOS_RELEASE_TARGET%" rmdir /s /q "%VIDEOS_RELEASE_TARGET%"
-
 :: Copy content folder
 xcopy "%CONTENT_ORIGIN%" "%CONTENT_DEBUG_TARGET%\" /E /I /Y >nul
 echo Copied server content files to debug target.
@@ -97,12 +84,6 @@ copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_DEBUG_TARGET%"
 echo Copied cloudflared.exe to debug target.
 copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_RELEASE_TARGET%"
 echo Copied cloudflared.exe to release target.
-
-:: Copy banned-ips.txt
-copy /Y "%BANNED_IPS_ORIGIN%" "%BANNED_IPS_DEBUG_TARGET%"
-echo Copied banned-ips.txt to debug target.
-copy /Y "%BANNED_IPS_ORIGIN%" "%BANNED_IPS_RELEASE_TARGET%"
-echo Copied banned-ips.txt to release target.
 
 echo.
 echo ========================================

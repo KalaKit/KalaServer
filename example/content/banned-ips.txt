@@ -38,8 +38,6 @@
 
 ## Google Cloud
     34.41.58.2                | aggressive API enumeration from Google Cloud
-    35.203.0.0                | botnet controller host on Google infrastructure
-    35.237.4.214              | flagged for malicious activity from Google Cloud
 
 ## DigitalOcean
     104.248.0.0               | high-volume port scanning cluster
@@ -187,8 +185,6 @@
 ## North Korea
     175.45.176.0              | known DPRK-owned IP range
     210.52.109.0              | military node used in passive reconnaissance
-
-==================================================
 
 # Auto-banned by server
 

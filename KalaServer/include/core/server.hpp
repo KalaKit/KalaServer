@@ -7,7 +7,6 @@
 
 #include <string>
 #include <memory>
-#include <map>
 #include <vector>
 #include <thread>
 #include <mutex>
@@ -17,7 +16,6 @@ namespace KalaKit::Core
 {
 	using std::string;
 	using std::unique_ptr;
-	using std::map;
 	using std::vector;
 	using std::atomic;
 	using std::mutex;
@@ -31,6 +29,23 @@ namespace KalaKit::Core
 		string error418;
 		string error500;
 	};
+
+	struct DataFile
+	{
+		string whitelistedRoutesFolder;
+		string whitelistedExtensionsFile;
+		string whitelistedIPsFile;
+		string bannedIPsFile;
+		string blacklistedKeywordsFile;
+	};
+
+	enum class DataFileType
+	{
+		datafile_extension,
+		datafile_whitelistedIP,
+		datafile_bannedIP,
+		datafile_blacklistedKeyword
+	};
 	
 	class Server
 	{
@@ -41,37 +56,36 @@ namespace KalaKit::Core
 		//loads browser defaults otherwise.
 		ErrorMessage errorMessage;
 
-		Server(
-			unsigned int port,
-			unsigned int healthTimer,
-			string serverName,
-			string domainName,
-			ErrorMessage errorMessage,
-			string whitelistedRoutesFolder,
-			vector<string> blacklistedKeywords,
-			vector<string> whitelistedExtensions) :
-			port(port),
-			healthTimer(healthTimer),
-			serverName(serverName),
-			domainName(domainName),
-			errorMessage(errorMessage),
-			whitelistedRoutesFolder(whitelistedRoutesFolder),
-			blacklistedKeywords(blacklistedKeywords),
-			whitelistedExtensions(whitelistedExtensions) {
-		}
-
 		/// <summary>
-		/// Initializes the server. Must be ran first before any other components.
+		/// File paths for server admin provided data files
+		/// for ips, extensions, keywords and others.
 		/// </summary>
-		static void Initialize(
+		DataFile dataFile;
+
+		Server(
 			unsigned int port,
 			unsigned int healthTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
-			const string& whitelistedRoutesFolder,
-			const vector<string>& blacklistedKeywords,
-			const vector<string>& extensions);
+			const DataFile& dataFile) :
+			port(port),
+			healthTimer(healthTimer),
+			serverName(serverName),
+			domainName(domainName),
+			errorMessage(errorMessage),
+			dataFile(dataFile) {}
+
+		/// <summary>
+		/// Initializes the server. Must be ran first before any other components.
+		/// </summary>
+		static bool Initialize(
+			unsigned int port,
+			unsigned int healthTimer,
+			const string& serverName,
+			const string& domainName,
+			const ErrorMessage& errorMessage,
+			const DataFile& datafile);
 
 		/// <summary>
 		/// Starts up the server accept loop and health status report.
@@ -92,8 +106,6 @@ namespace KalaKit::Core
 
 		string ServeFile(const string& route);
 
-		string GetBannedBotsFilePath() { return bannedBotsFile; }
-
 		/// <summary>
 		/// Check whether this route is allowed to be accessed.
 		/// If you access it you will get banned, it is used to keep away scrapers and bots.
@@ -108,7 +120,7 @@ namespace KalaKit::Core
 		/// <summary>
 		/// Add info about banned ip to banned-ips.txt.
 		/// </summary>
-		bool BanIP(const pair<string, string>& target) const;
+		bool BanClient(const pair<string, string>& target) const;
 
 		/// <summary>
 		/// Returns true if given IP matches any host local ipv4 or ipv6.
@@ -129,32 +141,19 @@ namespace KalaKit::Core
 		void RemoveWhitelistedRoute(const string& thisRoute) const;
 		void RemoveWhitelistedExtension(const string& thisExtension) const;
 
-		bool RouteExists(const string& thisRoute) const
-		{
-			return whitelistedRoutes.contains(thisRoute);
-		}
-		bool ExtensionExists(const string& thisExtension)
-		{
-			for (const auto& extension : whitelistedExtensions)
-			{
-				if (extension == thisExtension) return true;
-			}
-			return false;
-		}
-
 		bool IsServerReady() const { return isServerReady; }
 		string GetServerName() { return serverName; }
 		string GetDomainName() { return domainName; }
 
-		map<string, string> GetWhitelistedRoutes() { return whitelistedRoutes; }
-		vector<string> GetWhitelistedExtensions() { return whitelistedExtensions; }
+		vector<pair<string, string>> GetFileData(DataFileType dataFileType) const;
+		void GetWhitelistedRoutes() const;
 
 		/// <summary>
 		/// Closes the server. Use Core::Quit instead of this.
 		/// </summary>
 		void Quit() const;
 	private:
-		void AddInitialWhitelistedRoutes() const;
+		bool PreInitializeCheck() const;
 
 		/// <summary>
 		/// Header parser for getting the results from a cloudflared header.
@@ -186,16 +185,9 @@ namespace KalaKit::Core
 		mutex clientSocketsMutex;
 		unordered_set<uintptr_t> activeClientSockets;
 
-		map<string, string> whitelistedRoutes{}; //All routes that are allowed to be accessed
-		string bannedBotsFile{}; //The path to the banned bots file.
-
 		unsigned int port; //Local server port
 		unsigned int healthTimer; //Countdown until server reports health check.
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
-
-		string whitelistedRoutesFolder; //The folder path relative to the server where all pages are inside of.
-		vector<string> blacklistedKeywords; //All keywords that will ban you if you try to access any route with one of them inside it
-		vector<string> whitelistedExtensions; //All extensions that are allowed to be accessed
 	};
 }

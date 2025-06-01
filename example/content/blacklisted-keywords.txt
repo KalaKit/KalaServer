@@ -1,0 +1,99 @@
+# Web Framework & CMS Fingerprinting
+  wp
+  joomla
+  drupal
+  magento
+  prestashop
+  template
+  theme
+  skins
+  
+==================================================
+
+# Admin & Control Panels
+  admin
+  panel
+  control
+  sito
+  
+==================================================
+
+# Malware, Crypto, & Scam Indicators
+  twint
+  lkk
+  btc
+  eth
+  monero
+  wallet
+  crypto
+  stealer
+  inject
+  skimmer
+  grabber
+  phish
+  scam
+  cryptojack
+  ransom
+  
+==================================================
+
+# System Access & Exploit Attempts
+  cgi
+  bin
+  shell
+  backdoor
+  cmd
+  exploit
+  passwd
+  proc
+  env
+  id_rsa
+  vuln
+  sqlmap
+
+==================================================
+
+# Configuration & Sensitive Info Leaks
+  config
+  database
+  dump
+  db
+  mysql
+  sqlite
+  phpinfo
+  index
+  
+==================================================
+
+# Development, API & Debug Interfaces
+  swagger
+  graphql
+  actuator
+  metrics
+  debug
+  logs
+  monitoring
+  
+==================================================
+
+# Legacy, Testing, and Unprotected Folders
+  old
+  archive
+  test
+  dev
+  staging
+  
+==================================================
+
+# Dangerous File Types & Repos
+  .php
+  .tar
+  .zip
+  .gz
+  .7z
+  .rar
+  .log
+  .git
+  .svn
+  .hg
+  .env

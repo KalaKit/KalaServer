@@ -12,6 +12,7 @@
 #include <sstream>
 #include <filesystem>
 #include <memory>
+#include <map>
 
 #pragma comment(lib, "Wininet.lib")
 
@@ -64,54 +65,38 @@ using std::atomic_bool;
 
 namespace KalaKit::Core
 {
-	atomic<bool> canUpdateBannedIPs{ false };
+	atomic<bool> canUpdateWhitelistedRoutes{ true };
+	map<string, string> whitelistedRoutes{};
+
+	vector<string> blacklistedKeywords{};
+
+	vector<string> whitelistedExtensions{};
+
+	vector<string> whitelistedIPs{};
+
+	atomic<bool> canUpdateBannedIPs{ true };
 	vector<pair<string, string>> bannedIPs{};
 
-	atomic<bool> canUpdateMachineIPs{ false };
+	atomic<bool> canUpdateMachineIPs{ true };
 	vector<string> machineIPs{};
 
-	void Server::Initialize(
+	bool Server::Initialize(
 		unsigned int port,
 		unsigned int healthTimer,
 		const string& serverName,
 		const string& domainName,
 		const ErrorMessage& errorMessage,
-		const string& whitelistedRoutesFolder,
-		const vector<string>& blacklistedKeywords,
-		const vector<string>& extensions)
+		const DataFile& dataFile)
 	{
-		if (!KalaServer::IsRunningAsAdmin())
-		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"This program must be ran with admin privileges!");
-			return;
-		}
-
-		if (serverName == "")
-		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with empty server name!");
-			return;
-		}
-		if (domainName == "")
-		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with empty domain name!");
-			return;
-		}
-		
 		server = make_unique<Server>(
 			port,
 			healthTimer,
 			serverName,
 			domainName,
 			errorMessage,
-			whitelistedRoutesFolder,
-			blacklistedKeywords,
-			extensions);
+			dataFile);
+
+		if (!server->PreInitializeCheck()) return false;
 
 		KalaServer::PrintConsoleMessage(
 			0,
@@ -120,34 +105,16 @@ namespace KalaKit::Core
 			"",
 			"=============================="
 			"\n"
-			"Initializing server '" + Server::server->GetServerName() + "'"
+			"Initializing server '" + server->GetServerName() + "'"
 			"\n"
 			"=============================="
 			"\n");
 
-		server->bannedBotsFile = (path(current_path() / "banned-ips.txt")).string();
-		string bannedBotsFile = server->GetBannedBotsFilePath();
-		if (!exists(bannedBotsFile))
-		{
-			ofstream log(bannedBotsFile);
-			if (!log)
-			{
-				KalaServer::CreatePopup(
-					PopupReason::Reason_Error,
-					"Failed to create banned-ips.txt!");
-				return;
-			}
-			log.close();
-
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Message,
-				"SERVER",
-				"Created 'banned-ips.txt' at root directory.\n");
-		}
-
-		server->AddInitialWhitelistedRoutes();
+		server->GetWhitelistedRoutes();
+		server->GetFileData(DataFileType::datafile_extension);
+		server->GetFileData(DataFileType::datafile_whitelistedIP);
+		server->GetFileData(DataFileType::datafile_bannedIP);
+		server->GetFileData(DataFileType::datafile_blacklistedKeyword);
 		
 		WSADATA wsaData{};
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
@@ -155,6 +122,7 @@ namespace KalaKit::Core
 			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"WSAStartup failed!");
+			return false;
 		}
 
 		SOCKET thisSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -165,6 +133,7 @@ namespace KalaKit::Core
 			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Socket creation failed!");
+			return false;
 		}
 
 		sockaddr_in serverAddr{};
@@ -180,6 +149,7 @@ namespace KalaKit::Core
 			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Bind failed!");
+			return false;
 		}
 
 		if (listen(thisSocket, SOMAXCONN) == SOCKET_ERROR)
@@ -187,6 +157,7 @@ namespace KalaKit::Core
 			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
 				"Listen failed!");
+			return false;
 		}
 
 		KalaServer::PrintConsoleMessage(
@@ -217,6 +188,93 @@ namespace KalaKit::Core
 			"\n"
 			"=============================="
 			"\n");
+
+		return true;
+	}
+
+	bool Server::PreInitializeCheck() const
+	{
+		if (!KalaServer::IsRunningAsAdmin())
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"This program must be ran with admin privileges!");
+			return false;
+		}
+
+		if (serverName == "")
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with empty server name!");
+			return false;
+		}
+		if (domainName == "")
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with empty domain name!");
+			return false;
+		}
+
+		string whitelistedRoutesFolderPath = (current_path() / server->dataFile.whitelistedRoutesFolder).string();
+		if (!exists(whitelistedRoutesFolderPath))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with invalid whitelisted routes folder '" + whitelistedRoutesFolderPath + "'!");
+			return false;
+		}
+
+		string whitelistedExtensionsFilePath = (
+			current_path()
+			/ server->dataFile.whitelistedRoutesFolder
+			/ server->dataFile.whitelistedExtensionsFile).string();
+		if (!exists(whitelistedExtensionsFilePath))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with invalid whitelisted extensions file '" + whitelistedExtensionsFilePath + "'!");
+			return false;
+		}
+
+		string whitelistedIPsFilePath = (
+			current_path()
+			/ server->dataFile.whitelistedRoutesFolder
+			/ server->dataFile.whitelistedIPsFile).string();
+		if (!exists(whitelistedIPsFilePath))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with invalid whitelisted IPs file '" + whitelistedIPsFilePath + "'!");
+			return false;
+		}
+
+		string bannedIPsFilePath = (
+			current_path()
+			/ server->dataFile.whitelistedRoutesFolder
+			/ server->dataFile.bannedIPsFile).string();
+		if (!exists(bannedIPsFilePath))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with invalid banned IPs file '" + bannedIPsFilePath + "'!");
+			return false;
+		}
+
+		string blacklistedKeywordsFilePath = (
+			current_path()
+			/ server->dataFile.whitelistedRoutesFolder
+			/ server->dataFile.blacklistedKeywordsFile).string();
+		if (!exists(blacklistedKeywordsFilePath))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Cannot start server with invalid blacklisted keywords file '" + blacklistedKeywordsFilePath + "'!");
+			return false;
+		}
+
+		return true;
 	}
 
 	bool Server::IsBlacklistedRoute(const string& route)
@@ -244,10 +302,10 @@ namespace KalaKit::Core
 		if (bannedIPs.size() == 0)
 		{
 			canUpdateBannedIPs = true;
-			Server::server->GetBannedIPs();
+			server->GetBannedIPs();
 		}
 
-		if (canUpdateBannedIPs) Server::server->GetBannedIPs();
+		if (canUpdateBannedIPs) server->GetBannedIPs();
 
 		for (const pair<string, string>& bannedClient : bannedIPs)
 		{
@@ -261,11 +319,9 @@ namespace KalaKit::Core
 		return banReason;
 	}
 
-	bool Server::BanIP(const pair<string, string>& target) const
+	bool Server::BanClient(const pair<string, string>& target) const
 	{
-		string bannedBotsPath = server->GetBannedBotsFilePath();
-
-		ifstream readFile(bannedBotsPath);
+		ifstream readFile(server->dataFile.bannedIPsFile);
 		if (!readFile)
 		{
 			KalaServer::PrintConsoleMessage(
@@ -292,7 +348,7 @@ namespace KalaKit::Core
 
 		readFile.close();
 
-		ofstream writeFile(bannedBotsPath, ios::app);
+		ofstream writeFile(server->dataFile.bannedIPsFile, ios::app);
 		if (!writeFile)
 		{
 			KalaServer::PrintConsoleMessage(
@@ -312,23 +368,29 @@ namespace KalaKit::Core
 		return true;
 	}
 
-	void Server::AddInitialWhitelistedRoutes() const
+	void Server::GetWhitelistedRoutes() const
 	{
-		if (server->whitelistedRoutesFolder == ""
-			|| !exists(current_path() / server->whitelistedRoutesFolder))
+		bool canContinue = 
+			whitelistedRoutes.size() == 0 
+			|| canUpdateWhitelistedRoutes;
+
+		if (!canContinue) return;
+
+		if (server->dataFile.whitelistedRoutesFolder == ""
+			|| !exists(current_path() / server->dataFile.whitelistedRoutesFolder))
 		{
 			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
-				"Whitelisted routes root folder '" + server->whitelistedRoutesFolder + "' is empty or does not exist!");
+				"Whitelisted routes root folder '" + server->dataFile.whitelistedRoutesFolder + "' is empty or does not exist!");
 			return;
 		}
 
-		for (const auto& route : recursive_directory_iterator(server->whitelistedRoutesFolder))
+		for (const auto& route : recursive_directory_iterator(server->dataFile.whitelistedRoutesFolder))
 		{
 			string cleanedRoute = path(route).generic_string();
 
 			bool isWhiteListed = false;
-			for (const auto& ext : Server::server->whitelistedExtensions)
+			for (const auto& ext : whitelistedExtensions)
 			{
 				if (path(route).extension() == ext)
 				{
@@ -342,7 +404,7 @@ namespace KalaKit::Core
 			string correctRootPath{};
 			if (path(route).extension() == ".html")
 			{
-				path relativePath = relative(route.path(), server->whitelistedRoutesFolder);
+				path relativePath = relative(route.path(), server->dataFile.whitelistedRoutesFolder);
 				relativePath.replace_extension("");
 				correctRootPath = "/" + relativePath.generic_string();
 
@@ -351,7 +413,7 @@ namespace KalaKit::Core
 			}
 			else
 			{
-				path relativePath = relative(route.path(), server->whitelistedRoutesFolder);
+				path relativePath = relative(route.path(), server->dataFile.whitelistedRoutesFolder);
 				correctRootPath = "/" + relativePath.generic_string();
 			}
 
@@ -360,11 +422,147 @@ namespace KalaKit::Core
 
 			server->AddNewWhitelistedRoute(correctRootPath, correctFilePath);
 		}
+
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SERVER",
+			"Refreshed whitelisted routes");
+
+		canUpdateWhitelistedRoutes = false;
+	}
+
+	vector<pair<string, string>> Server::GetFileData(DataFileType dataFileType) const
+	{
+		string resultType{};
+
+		vector<pair<string, string>> result{};
+		string filePath{};
+		string fullFilePath{};
+
+		switch (dataFileType)
+		{
+		case DataFileType::datafile_extension:
+			resultType = "whitelisted extensions";
+			whitelistedExtensions.clear();
+			filePath = server->dataFile.whitelistedExtensionsFile;
+			fullFilePath = path(
+				current_path() 
+				/ server->dataFile.whitelistedRoutesFolder 
+				/ server->dataFile.whitelistedExtensionsFile).string();
+			break;
+		case DataFileType::datafile_whitelistedIP:
+			resultType = "whitelisted IPs";
+			whitelistedIPs.clear();
+			filePath = server->dataFile.whitelistedIPsFile;
+			fullFilePath = path(
+				current_path()
+				/ server->dataFile.whitelistedRoutesFolder
+				/ server->dataFile.whitelistedIPsFile).string();
+			break;
+		case DataFileType::datafile_bannedIP:
+			resultType = "banned IPs";
+			filePath = server->dataFile.bannedIPsFile;
+			fullFilePath = path(
+				current_path()
+				/ server->dataFile.whitelistedRoutesFolder
+				/ server->dataFile.bannedIPsFile).string();
+			break;
+		case DataFileType::datafile_blacklistedKeyword:
+			resultType = "blacklisted keywords";
+			blacklistedKeywords.clear();
+			filePath = server->dataFile.blacklistedKeywordsFile;
+			fullFilePath = path(
+				current_path()
+				/ server->dataFile.whitelistedRoutesFolder
+				/ server->dataFile.blacklistedKeywordsFile).string();
+			break;
+		}
+
+		bool canResetBannedIPs =
+			bannedIPs.size() == 0
+			|| canUpdateBannedIPs;
+
+		if (dataFileType == DataFileType::datafile_bannedIP
+			&& !canResetBannedIPs)
+		{
+			return result;
+		}
+
+		if (dataFileType == DataFileType::datafile_bannedIP) bannedIPs.clear();
+
+		ifstream file(fullFilePath);
+		if (!file)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Failed to open '" + path(filePath).filename().string() + "'!");
+			return result;
+		}
+
+		string line;
+		while (getline(file, line))
+		{
+			if (line.find("#") != string::npos
+				|| line.find("=") != string::npos
+				|| line.empty())
+			{
+				continue;
+			}
+
+			auto delimiterPos = line.find('|');
+			if (delimiterPos != string::npos)
+			{
+				string key = line.substr(0, delimiterPos);
+				string value = line.substr(delimiterPos + 1);
+
+				erase_if(key, ::isspace);
+
+				auto cleanedReason = find_if(value.begin(), value.end(), ::isspace);
+				if (cleanedReason != value.end()) value.erase(cleanedReason);
+
+				pair<string, string> newPair{};
+
+				newPair.first = key;
+				newPair.second = value;
+
+				result.push_back(newPair);
+			}
+			else
+			{
+				string key = line.substr(0, delimiterPos);
+
+				erase_if(key, ::isspace);
+
+				pair<string, string> newPair{};
+
+				newPair.first = key;
+				newPair.second = "";
+
+				result.push_back(newPair);
+			}
+		}
+
+		file.close();
+
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SERVER",
+			"Refreshed " + resultType);
+
+		return result;
 	}
 
 	void Server::AddNewWhitelistedRoute(const string& rootPath, const string& filePath) const
 	{
-		if (server->whitelistedRoutes.contains(rootPath))
+		GetWhitelistedRoutes();
+		if (whitelistedRoutes.contains(rootPath))
 		{
 			KalaServer::PrintConsoleMessage(
 				0,
@@ -388,7 +586,7 @@ namespace KalaKit::Core
 			return;
 		}
 
-		server->whitelistedRoutes[rootPath] = filePath;
+		whitelistedRoutes[rootPath] = filePath;
 
 		KalaServer::PrintConsoleMessage(
 			0,
@@ -399,7 +597,7 @@ namespace KalaKit::Core
 	}
 	void Server::AddNewWhitelistedExtension(const string& newExtension) const
 	{
-		for (const auto& extension : server->whitelistedExtensions)
+		for (const auto& extension : whitelistedExtensions)
 		{
 			if (extension == newExtension)
 			{
@@ -413,7 +611,7 @@ namespace KalaKit::Core
 			}
 		}
 
-		server->whitelistedExtensions.push_back(newExtension);
+		whitelistedExtensions.push_back(newExtension);
 		KalaServer::PrintConsoleMessage(
 			0,
 			true,
@@ -424,8 +622,10 @@ namespace KalaKit::Core
 
 	void Server::RemoveWhitelistedRoute(const string& thisRoute) const
 	{
+		GetWhitelistedRoutes();
+
 		string foundRoute{};
-		if (server->whitelistedRoutes.contains(thisRoute))
+		if (whitelistedRoutes.contains(thisRoute))
 		{
 			foundRoute = thisRoute;
 		}
@@ -443,7 +643,7 @@ namespace KalaKit::Core
 	void Server::RemoveWhitelistedExtension(const string& thisExtension) const
 	{
 		string foundExtension{};
-		for (const auto& extension : server->whitelistedExtensions)
+		for (const auto& extension : whitelistedExtensions)
 		{
 			if (extension == thisExtension)
 			{
@@ -476,8 +676,9 @@ namespace KalaKit::Core
 			return "";
 		}
 
-		auto it = server->whitelistedRoutes.find(route);
-		if (it == server->whitelistedRoutes.end())
+		server->GetWhitelistedRoutes();
+		auto it = whitelistedRoutes.find(route);
+		if (it == whitelistedRoutes.end())
 		{
 			KalaServer::PrintConsoleMessage(
 				0,
@@ -594,14 +795,14 @@ namespace KalaKit::Core
 
 	void Server::Start() const
 	{
-		if (!Server::server->isServerReady)
+		if (!server->isServerReady)
 		{
 			KalaServer::PrintConsoleMessage(
 				0,
 				true,
 				ConsoleMessageType::Type_Error,
 				"SERVER",
-				"Server '" + Server::server->serverName + "' is not ready to start! Do not call this manually.");
+				"Server '" + server->serverName + "' is not ready to start! Do not call this manually.");
 			return;
 		}
 
@@ -640,8 +841,8 @@ namespace KalaKit::Core
 				if (!isHealthy)
 				{
 					bool isOnline =
-						Server::server->IsTunnelAlive(CloudFlare::tunnelRunHandle)
-						&& Server::server->HasInternet();
+						server->IsTunnelAlive(CloudFlare::tunnelRunHandle)
+						&& server->HasInternet();
 
 					if (isOnline) continue;
 
@@ -664,7 +865,7 @@ namespace KalaKit::Core
 				{
 					thread([clientSocket]
 						{
-							Server::server->HandleClient(static_cast<uintptr_t>(clientSocket));
+							server->HandleClient(static_cast<uintptr_t>(clientSocket));
 						}).detach();
 				}
 
@@ -672,15 +873,15 @@ namespace KalaKit::Core
 			}
 		}).detach();
 
-		unsigned int healthTimer = Server::server->healthTimer;
+		unsigned int healthTimer = server->healthTimer;
 		if (healthTimer > 0)
 		{
 			thread([healthTimer]
 			{
 				while (KalaServer::isRunning)
 				{
-					bool hasInternet = Server::server->HasInternet();
-					bool isTunnelAlive = Server::server->IsTunnelAlive(CloudFlare::tunnelRunHandle);
+					bool hasInternet = server->HasInternet();
+					bool isTunnelAlive = server->IsTunnelAlive(CloudFlare::tunnelRunHandle);
 
 					string internetStatus = hasInternet ? "[NET: OK]" : "[NET: FAIL]";
 					string tunnelStatus = isTunnelAlive ? "[TUNNEL: OK]" : "[TUNNEL: FAIL]";
@@ -716,7 +917,17 @@ namespace KalaKit::Core
 			{
 				if (!canUpdateBannedIPs) canUpdateBannedIPs = true;
 
-				sleep_for(seconds(300));
+				sleep_for(seconds(60));
+			}
+		}).detach();
+
+		thread([]
+		{
+			while (KalaServer::isRunning)
+			{
+				if (!canUpdateWhitelistedRoutes) canUpdateWhitelistedRoutes = true;
+
+				sleep_for(seconds(60));
 			}
 		}).detach();
 	}
@@ -858,63 +1069,7 @@ namespace KalaKit::Core
 	{
 		if (!canUpdateBannedIPs) return;
 
-		bannedIPs.clear();
-
-		string bannedBotsFile = server->GetBannedBotsFilePath();
-
-		bool result = false;
-
-		ifstream file(bannedBotsFile);
-		if (!file)
-		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to open 'banned-ips.txt' to check if IP is banned or not!");
-			return;
-		}
-
-		string line;
-		while (getline(file, line))
-		{
-			if (line.find("#") != string::npos
-				|| line.find("=") != string::npos
-				|| line.find("|") == string::npos
-				|| line.empty())
-			{
-				continue;
-			}
-
-			auto delimiterPos = line.find('|');
-			if (delimiterPos != string::npos)
-			{
-				string ip = line.substr(0, delimiterPos);
-				string reason = line.substr(delimiterPos + 1);
-
-				erase_if(ip, ::isspace);
-
-				auto cleanedReason = find_if(reason.begin(), reason.end(), ::isspace);
-				if (cleanedReason != reason.end()) reason.erase(cleanedReason);
-
-				pair<string, string> newBannedIPsPair{};
-
-				newBannedIPsPair.first = ip;
-				newBannedIPsPair.second = reason;
-
-				bannedIPs.push_back(newBannedIPsPair);
-			}
-		}
-
-		file.close();
-
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"Refreshed banned IPs");
+		server->GetFileData(DataFileType::datafile_bannedIP);
 
 		canUpdateBannedIPs = false;
 	}
@@ -924,10 +1079,10 @@ namespace KalaKit::Core
 		if (machineIPs.size() == 0)
 		{
 			canUpdateMachineIPs = true;
-			Server::server->GetMachineIPs();
+			server->GetMachineIPs();
 		}
 
-		if (canUpdateMachineIPs) Server::server->GetMachineIPs();
+		if (canUpdateMachineIPs) server->GetMachineIPs();
 
 		for (const auto& ip : machineIPs)
 		{
@@ -1030,7 +1185,7 @@ namespace KalaKit::Core
 					"Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err));
 			}
 
-			Server::server->SocketCleanup(socket);
+			server->SocketCleanup(socket);
 			closesocket(rawClientSocket);
 			return;
 		}
@@ -1043,7 +1198,7 @@ namespace KalaKit::Core
 				"CLIENT",
 				"Socket [" + to_string(socket) + "] disconnected without sending any data.");
 
-			Server::server->SocketCleanup(socket);
+			server->SocketCleanup(socket);
 			closesocket(rawClientSocket);
 			return;
 		}
@@ -1071,7 +1226,7 @@ namespace KalaKit::Core
 
 			//attempts to get client ip from cloudflare header
 
-			string clientIP = ExtractHeader(
+			string clientIP = server->ExtractHeader(
 				request,
 				"Cf-Connecting-Ip");
 
@@ -1111,7 +1266,6 @@ namespace KalaKit::Core
 					false,
 					ConsoleMessageType::Type_Message,
 					"",
-					"\n"
 					"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
 					" IP     : " + clientIP + "\n"
 					" Socket : " + to_string(clientSocket) + "\n"
@@ -1125,11 +1279,11 @@ namespace KalaKit::Core
 					clientIP,
 					filePath,
 					"text/html");
-				Server::server->SocketCleanup(socket);
+				server->SocketCleanup(socket);
 				return;
 			}
 			else if (bannedClient.first == ""
-					 && !server->blacklistedKeywords.empty()
+					 && !blacklistedKeywords.empty()
 					 && server->IsBlacklistedRoute(filePath))
 			{
 				KalaServer::PrintConsoleMessage(
@@ -1137,7 +1291,6 @@ namespace KalaKit::Core
 					false,
 					ConsoleMessageType::Type_Message,
 					"",
-					"\n"
 					"=============== BANNED CLIENT ======================\n"
 					" IP     : " + clientIP + "\n"
 					" Socket : " + to_string(clientSocket) + "\n"
@@ -1150,7 +1303,7 @@ namespace KalaKit::Core
 				bannedClient.first = clientIP;
 				bannedClient.second = filePath;
 
-				if (server->BanIP(bannedClient))
+				if (server->BanClient(bannedClient))
 				{
 					auto respBanned = make_unique<Response_Banned>();
 					respBanned->Init(
@@ -1160,7 +1313,7 @@ namespace KalaKit::Core
 						"text/html");
 				}
 
-				Server::server->SocketCleanup(socket);
+				server->SocketCleanup(socket);
 				return;
 			}
 
@@ -1174,7 +1327,8 @@ namespace KalaKit::Core
 			string body{};
 			string statusLine = "HTTP/1.1 200 OK";
 
-			if (!server->RouteExists(filePath))
+			GetWhitelistedRoutes();
+			if (!whitelistedRoutes.contains(filePath))
 			{
 				KalaServer::PrintConsoleMessage(
 					2,
@@ -1191,14 +1345,24 @@ namespace KalaKit::Core
 					clientIP,
 					filePath,
 					"text/html");
-				Server::server->SocketCleanup(socket);
+				server->SocketCleanup(socket);
 				return;
 			}
 			else
 			{
+				bool extentionExists = false;
+				for (const auto& ext : whitelistedExtensions)
+				{
+					if (path(filePath).extension().generic_string() == ext)
+					{
+						extentionExists = true;
+						break;
+					}
+				}
+
 				bool isAllowedFile =
 					filePath.find_last_of('.') == string::npos
-					|| server->ExtensionExists(path(filePath).extension().generic_string());
+					|| extentionExists;
 
 				if (!isAllowedFile)
 				{
@@ -1209,7 +1373,7 @@ namespace KalaKit::Core
 						"CLIENT",
 						"Client [" 
 						+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + filePath 
-						+ "' from path '" + server->whitelistedRoutes[filePath] + "'.");
+						+ "' from path '" + whitelistedRoutes[filePath] + "'.");
 
 					auto resp403 = make_unique<Response_403>();
 					resp403->Init(
@@ -1217,7 +1381,7 @@ namespace KalaKit::Core
 						clientIP,
 						filePath,
 						"text/html");
-					Server::server->SocketCleanup(socket);
+					server->SocketCleanup(socket);
 					return;
 				}
 				else
@@ -1242,7 +1406,7 @@ namespace KalaKit::Core
 								clientIP,
 								filePath,
 								"text/html");
-							Server::server->SocketCleanup(socket);
+							server->SocketCleanup(socket);
 							return;
 						}
 						else
@@ -1253,7 +1417,7 @@ namespace KalaKit::Core
 								clientIP,
 								filePath,
 								"text/html");
-							Server::server->SocketCleanup(socket);
+							server->SocketCleanup(socket);
 							return;
 						}
 					}
@@ -1274,7 +1438,7 @@ namespace KalaKit::Core
 							clientIP,
 							filePath,
 							"text/html");
-						Server::server->SocketCleanup(socket);
+						server->SocketCleanup(socket);
 					}
 				}
 			}

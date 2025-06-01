@@ -1,0 +1,29 @@
+# Text and Web Formats
+  .html
+  .css
+  .js
+  .txt
+  
+==================================================
+
+# Images and Icons
+  .png
+  .jpg
+  .jpeg
+  .ico
+  .webp
+  .gif
+  
+==================================================
+
+# Audio Formats
+  .mp3
+  .wav
+  .flac
+  .ogg
+  
+==================================================
+
+# Video Formats
+  .webm
+  .mp4
