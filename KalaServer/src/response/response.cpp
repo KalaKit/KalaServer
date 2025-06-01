@@ -15,7 +15,13 @@ using std::to_string;
 
 namespace KalaKit::ResponseSystem
 {
-	void Response::Send() const
+	void Response::Send(
+		uintptr_t clientSocket,
+		const string& clientIP,
+		const string& route,
+		const string& contentType,
+		const string& statusLine,
+		const string& body) const
 	{
 		SOCKET socket = static_cast<SOCKET>(clientSocket);
 

@@ -5,17 +5,15 @@
 
 #include "core/core.hpp"
 #include "core/server.hpp"
-#include "response/response_404.hpp"
+#include "response/response_418.hpp"
 
 using KalaKit::Core::Server;
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::ConsoleMessageType;
 
-using KalaKit::Core::Server;
-
 namespace KalaKit::ResponseSystem
 {
-	void Response_404::Init(
+	void Response_Banned::Init(
 		uintptr_t targetClientSocket,
 		const string& targetClientIP,
 		const string& targetRoute,
@@ -25,8 +23,9 @@ namespace KalaKit::ResponseSystem
 		string clientIP = targetClientIP;
 		string route = targetRoute;
 		string contentType = targetContentType;
-		string statusLine = "HTTP/1.1 404 Not Found";
-		string body = Server::server->ServeFile(Server::server->errorMessage.error404);
+		string statusLine = "HTTP/1.1 418 I'm a teapot";
+
+		string body = Server::server->ServeFile(Server::server->errorMessage.error418);
 
 		if (body.empty())
 		{
@@ -35,13 +34,13 @@ namespace KalaKit::ResponseSystem
 				false,
 				ConsoleMessageType::Type_Error,
 				"SERVER",
-				"404 response file body was empty!");
+				"418 response file body was empty!");
 
 			body =
 				"<html>"
 				"	<body>"
-				"		<h1>404 Not Found</h1>"
-				"		<p>The requested resource could not be found.</p>"
+				"		<h1>418 I'm a teapot</h1>"
+				"		<p>Your requests are so obvious and robotic, we decided to ban you with a joke status code.</p>"
 				"	</body>"
 				"</html>";
 		}

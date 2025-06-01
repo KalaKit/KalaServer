@@ -3,29 +3,40 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include "core/core.hpp"
 #include "core/server.hpp"
 #include "response/response_403.hpp"
+
+using KalaKit::Core::Server;
+using KalaKit::Core::KalaServer;
+using KalaKit::Core::ConsoleMessageType;
 
 using KalaKit::Core::Server;
 
 namespace KalaKit::ResponseSystem
 {
 	void Response_403::Init(
-		const std::string& newRoute,
-		const std::string& newClientIP,
-		uintptr_t newClientSocket)
+		uintptr_t targetClientSocket,
+		const string& targetClientIP,
+		const string& targetRoute,
+		const string& targetContentType)
 	{
-		route = newRoute;
-		clientIP = newClientIP;
-		clientSocket = newClientSocket;
-
-		statusLine = "HTTP/1.1 403 Forbidden";
-		contentType = "text/html";
-
-		body = Server::server->ServeFile(route);
+		uintptr_t clientSocket = targetClientSocket;
+		string clientIP = targetClientIP;
+		string route = targetRoute;
+		string contentType = targetContentType;
+		string statusLine = "HTTP/1.1 403 Forbidden";
+		string body = Server::server->ServeFile(Server::server->errorMessage.error403);
 
 		if (body.empty())
 		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				false,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"403 response file body was empty!");
+
 			body =
 				"<html>"
 				"	<body>"
@@ -35,6 +46,12 @@ namespace KalaKit::ResponseSystem
 				"</html>";
 		}
 
-		Send();
+		Send(
+			clientSocket,
+			clientIP,
+			route,
+			contentType,
+			statusLine,
+			body);
 	}
 }

@@ -13,8 +13,9 @@ namespace KalaKit::ResponseSystem
 	{
 	public:
 		void Init(
-			const std::string& route,
-			const std::string& clientIP,
-			uintptr_t clientSocket) override;
+			uintptr_t targetClientSocket,
+			const string& targetClientIP,
+			const string& targetRoute,
+			const string& targetContentType) override;
 	};
 }

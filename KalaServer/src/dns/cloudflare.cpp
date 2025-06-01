@@ -683,11 +683,18 @@ namespace KalaKit::DNS
 		string currentPath = current_path().string();
 		wstring wParentFolderPath(currentPath.begin(), currentPath.end());
 
+#ifdef _DEBUG
 		string command = 
 			"cloudflared --origin-ca-pool " + certPath 
 			+ " --config " + configPath 
 			+ " --loglevel debug" 
 			+ " tunnel run " + tunnelName;
+#else
+		string command =
+			"cloudflared --origin-ca-pool " + certPath
+			+ " --config " + configPath
+			+ " tunnel run " + tunnelName;
+#endif
 
 		KalaServer::PrintConsoleMessage(
 			2,
@@ -776,12 +783,15 @@ namespace KalaKit::DNS
 						else if (index == 2) isConn2Healthy = true;
 						else if (index == 3) isConn3Healthy = true;
 
-						KalaServer::PrintConsoleMessage(
-							0,
-							true,
-							ConsoleMessageType::Type_Message,
-							"CLOUDFLARE",
-							"Connection '" + to_string(index) + "' has been marked healthy!");
+						if (Server::server->IsServerReady())
+						{
+							KalaServer::PrintConsoleMessage(
+								0,
+								true,
+								ConsoleMessageType::Type_Message,
+								"CLOUDFLARE",
+								"Connection '" + to_string(index) + "' has been marked healthy!");
+						}
 
 						if (isConn0Healthy
 							&& isConn1Healthy

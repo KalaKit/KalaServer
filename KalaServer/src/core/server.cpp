@@ -19,11 +19,11 @@
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
-#include "response/response_ok.hpp"
+#include "response/response_200.hpp"
 #include "response/response_404.hpp"
 #include "response/response_403.hpp"
+#include "response/response_418.hpp"
 #include "response/response_500.hpp"
-#include "response/response_banned.hpp"
 
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::Server;
@@ -60,10 +60,11 @@ using std::chrono::seconds;
 using std::chrono::milliseconds;
 using std::this_thread::sleep_for;
 using std::wstring;
+using std::atomic_bool;
 
 namespace KalaKit::Core
 {
-	bool canUpdateIPsVector = false;
+	atomic<bool> canUpdateIPsVector{ false };
 	vector<string> machineIPs{};
 
 	void Server::Initialize(
@@ -187,10 +188,17 @@ namespace KalaKit::Core
 
 		KalaServer::PrintConsoleMessage(
 			0,
+			false,
+			ConsoleMessageType::Type_Message,
+			"",
+			"");
+
+		KalaServer::PrintConsoleMessage(
+			0,
 			true,
 			ConsoleMessageType::Type_Message,
 			"SERVER",
-			"\nServer is running on port '" + to_string(server->port) + "'.");
+			"Server is running on port '" + to_string(server->port) + "'.");
 
 		KalaServer::isRunning = true;
 
@@ -252,6 +260,10 @@ namespace KalaKit::Core
 			{
 				string ip = line.substr(0, delimiterPos);
 				string reason = line.substr(delimiterPos + 1);
+
+				erase_if(ip, ::isspace);
+				erase_if(reason, ::isspace);
+
 				if (ip == targetIP)
 				{
 					result = true;
@@ -265,7 +277,7 @@ namespace KalaKit::Core
 		return result;
 	}
 
-	void Server::BanIP(const BannedIP& target, uintptr_t clientSocket) const
+	bool Server::BanIP(const BannedIP& target) const
 	{
 		string bannedBotsPath = server->GetBannedBotsFilePath();
 
@@ -278,7 +290,7 @@ namespace KalaKit::Core
 				ConsoleMessageType::Type_Error,
 				"SERVER",
 				"Failed to read 'banned-bots.txt' to ban IP!");
-			return;
+			return false;
 		}
 
 		string line;
@@ -289,7 +301,8 @@ namespace KalaKit::Core
 			{
 				string ip = line.substr(0, delimiterPos);
 				string cleanedIP = ip.substr(0, ip.find_last_not_of(" \t") + 1);
-				if (cleanedIP == target.IP) return; //user is already banned
+
+				if (cleanedIP == target.IP) return false; //user is already banned
 			}
 		}
 
@@ -304,29 +317,14 @@ namespace KalaKit::Core
 				ConsoleMessageType::Type_Error,
 				"SERVER",
 				"Failed to write into 'banned-bots.txt' to ban IP!");
-			return;
+			return false;
 		}
 
 		writeFile << target.IP << " | " << target.reason << "\n";
 
 		writeFile.close();
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			false,
-			ConsoleMessageType::Type_Message,
-			"",
-			"\n"
-			"=============== BANNED IP ===============\n"
-			" IP     : " + target.IP + "\n"
-			" Reason : Attempted access to bot/scraper route '" + target.reason + "'\n"
-			"=========================================\n");
-
-		auto respBanned = make_unique<Response_Banned>();
-		respBanned->Init(
-			target.reason,
-			target.IP,
-			clientSocket);
+		return true;
 	}
 
 	void Server::AddInitialWhitelistedRoutes() const
@@ -482,21 +480,31 @@ namespace KalaKit::Core
 
 	string Server::ServeFile(const string& route)
 	{
+		if (route.empty())
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVE-FILE",
+				"Serve received empty route!");
+			return "";
+		}
+
+		auto it = server->whitelistedRoutes.find(route);
+		if (it == server->whitelistedRoutes.end())
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVE-FILE",
+				"Route '" + route + "' is not whitelisted!");
+			return "";
+		}
+
 		try
 		{
-			auto it = server->whitelistedRoutes.find(route);
-
-			if (it == whitelistedRoutes.end())
-			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Error,
-					"SERVE-FILE",
-					"Route '" + route + "' is not whitelisted!");
-				return "";
-			}
-			
 			path fullFilePath = it->second;
 			ifstream file(fullFilePath);
 			if (!file)
@@ -711,9 +719,10 @@ namespace KalaKit::Core
 		{
 			while (KalaServer::isRunning)
 			{
-				if (!canUpdateIPsVector) sleep_for(seconds(300));
-
+				if (!canUpdateIPsVector) 
 				canUpdateIPsVector = true;
+
+				sleep_for(seconds(300));
 			}
 		}).detach();
 	}
@@ -921,11 +930,12 @@ namespace KalaKit::Core
 			"CLIENT",
 			"Socket [" + to_string(socket) + "] entered handle client thread...");
 
-		SOCKET rawSocket = static_cast<SOCKET>(socket);
+		SOCKET rawClientSocket = static_cast<SOCKET>(socket);
+		uintptr_t clientSocket = static_cast<uintptr_t>(rawClientSocket);
 
 		DWORD timeout = 1000;
 		setsockopt(
-			rawSocket,
+			rawClientSocket,
 			SOL_SOCKET,
 			SO_RCVTIMEO,
 			(char*)&timeout,
@@ -937,7 +947,7 @@ namespace KalaKit::Core
 		}
 
 		char buffer[2048] = {};
-		int bytesReceived = recv(rawSocket, buffer, sizeof(buffer) - 1, 0);
+		int bytesReceived = recv(rawClientSocket, buffer, sizeof(buffer) - 1, 0);
 
 		if (bytesReceived == SOCKET_ERROR)
 		{
@@ -962,7 +972,7 @@ namespace KalaKit::Core
 			}
 
 			Server::server->SocketCleanup(socket);
-			closesocket(rawSocket);
+			closesocket(rawClientSocket);
 			return;
 		}
 		else if (bytesReceived == 0)
@@ -975,7 +985,7 @@ namespace KalaKit::Core
 				"Socket [" + to_string(socket) + "] disconnected without sending any data.");
 
 			Server::server->SocketCleanup(socket);
-			closesocket(rawSocket);
+			closesocket(rawClientSocket);
 			return;
 		}
 		else
@@ -1035,37 +1045,70 @@ namespace KalaKit::Core
 			}
 
 			KalaServer::PrintConsoleMessage(
-				2,
+				0,
 				true,
 				ConsoleMessageType::Type_Message,
-				"CLIENT",
-				"New client connected [" + to_string(socket) + " - '" + clientIP + "']!");
+				"Server",
+				"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
 
 			BannedIP banned{};
 			banned.IP = clientIP;
 			banned.reason = filePath;
 
-			if (!server->blacklistedKeywords.empty())
+			bool isBannedIP = server->IsBannedIP(clientIP);
+			if (isBannedIP)
 			{
-				if (server->IsBlacklistedRoute(filePath)
-					&& !server->IsBannedIP(clientIP))
-				{
-					server->BanIP(banned, static_cast<uintptr_t>(rawSocket));
-					Server::server->SocketCleanup(socket);
-					return;
-				}
+				KalaServer::PrintConsoleMessage(
+					0,
+					false,
+					ConsoleMessageType::Type_Message,
+					"",
+					"\n"
+					"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Route  : " + filePath + "\n"
+					"====================================================\n");
 
-				if (server->IsBannedIP(clientIP))
+				sleep_for(milliseconds(5));
+				auto respBanned = make_unique<Response_Banned>();
+				respBanned->Init(
+					rawClientSocket,
+					clientIP,
+					filePath,
+					"text/html");
+				Server::server->SocketCleanup(socket);
+				return;
+			}
+			else if (!isBannedIP
+					 && !server->blacklistedKeywords.empty()
+					 && server->IsBlacklistedRoute(filePath))
+			{
+				KalaServer::PrintConsoleMessage(
+					0,
+					false,
+					ConsoleMessageType::Type_Message,
+					"",
+					"\n"
+					"=============== BANNED CLIENT ======================\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Route  : " + filePath + "\n"
+					"====================================================\n");
+
+				sleep_for(milliseconds(5));
+				if (server->BanIP(banned))
 				{
-					sleep_for(milliseconds(200));
 					auto respBanned = make_unique<Response_Banned>();
 					respBanned->Init(
-						filePath,
+						clientSocket,
 						clientIP,
-						rawSocket);
-					Server::server->SocketCleanup(socket);
-					return;
+						filePath,
+						"text/html");
 				}
+
+				Server::server->SocketCleanup(socket);
+				return;
 			}
 
 			string body{};
@@ -1084,9 +1127,10 @@ namespace KalaKit::Core
 
 				auto resp404 = make_unique<Response_404>();
 				resp404->Init(
-					filePath,
+					rawClientSocket,
 					clientIP,
-					rawSocket);
+					filePath,
+					"text/html");
 				Server::server->SocketCleanup(socket);
 				return;
 			}
@@ -1109,9 +1153,10 @@ namespace KalaKit::Core
 
 					auto resp403 = make_unique<Response_403>();
 					resp403->Init(
-						filePath,
+						rawClientSocket,
 						clientIP,
-						rawSocket);
+						filePath,
+						"text/html");
 					Server::server->SocketCleanup(socket);
 					return;
 				}
@@ -1133,9 +1178,10 @@ namespace KalaKit::Core
 
 							auto resp500 = make_unique<Response_500>();
 							resp500->Init(
-								filePath,
+								rawClientSocket,
 								clientIP,
-								rawSocket);
+								filePath,
+								"text/html");
 							Server::server->SocketCleanup(socket);
 							return;
 						}
@@ -1143,9 +1189,10 @@ namespace KalaKit::Core
 						{
 							auto resp200 = make_unique<Response_OK>();
 							resp200->Init(
-								filePath,
+								rawClientSocket,
 								clientIP,
-								rawSocket);
+								filePath,
+								"text/html");
 							Server::server->SocketCleanup(socket);
 							return;
 						}
@@ -1163,9 +1210,10 @@ namespace KalaKit::Core
 
 						auto resp500 = make_unique<Response_500>();
 						resp500->Init(
-							filePath,
+							rawClientSocket,
 							clientIP,
-							rawSocket);
+							filePath,
+							"text/html");
 						Server::server->SocketCleanup(socket);
 					}
 				}

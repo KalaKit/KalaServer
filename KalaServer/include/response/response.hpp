@@ -20,28 +20,21 @@ namespace KalaKit::ResponseSystem
 		/// Prepare data to be sent to client.
 		/// </summary>
 		virtual void Init(
-			const string& route,
-			const string& clientIP,
-			uintptr_t clientSocket) = 0;
+			uintptr_t targetClientSocket,
+			const string& targetClientIP,
+			const string& targetRoute,
+			const string& targetContentType) = 0;
 
-		const string& GetStatusLine() const { return statusLine; }
-		const string& GetContentType() const { return contentType; }
-		const string& GetBody() const { return body; }
-		const string& GetRoute() const { return route; }
-		const string& GetclientIP() const { return clientIP; }
-		uintptr_t GetClientSocket() const { return clientSocket; }
 	protected:
 		/// <summary>
 		/// Send data to client.
 		/// </summary>
-		virtual void Send() const;
-
-		string statusLine{};
-		string contentType{};
-		string body{};
-
-		string route{};
-		string clientIP{};
-		uintptr_t clientSocket{};
+		virtual void Send(
+			uintptr_t clientSocket,
+			const string& clientIP,
+			const string& route,
+			const string& contentType,
+			const string& statusLine,
+			const string& body) const;
 	};
 }

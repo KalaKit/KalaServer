@@ -51,7 +51,7 @@ namespace KalaKit::Core
 			unsigned int healthTimer,
 			string serverName,
 			string domainName,
-			ErrorMessage errorMessages,
+			ErrorMessage errorMessage,
 			string whitelistedRoutesFolder,
 			vector<string> blacklistedKeywords,
 			vector<string> whitelistedExtensions) :
@@ -113,10 +113,7 @@ namespace KalaKit::Core
 		/// <summary>
 		/// Add info about banned ip to banned-bots.txt.
 		/// </summary>
-		/// <param name="target"></param>
-		void BanIP(
-			const BannedIP& target,
-			uintptr_t clientSocket) const;
+		bool BanIP(const BannedIP& target) const;
 
 		/// <summary>
 		/// Returns true if given IP matches any host local ipv4 or ipv6.
