@@ -57,11 +57,15 @@ using std::istringstream;
 using std::thread;
 using std::lock_guard;
 using std::chrono::seconds;
+using std::chrono::milliseconds;
 using std::this_thread::sleep_for;
 using std::wstring;
 
 namespace KalaKit::Core
 {
+	bool canUpdateIPsVector = false;
+	vector<string> machineIPs{};
+
 	void Server::Initialize(
 		unsigned int port,
 		unsigned int healthTimer,
@@ -646,10 +650,10 @@ namespace KalaKit::Core
 						Server::server->IsTunnelAlive(CloudFlare::tunnelRunHandle)
 						&& Server::server->HasInternet();
 
-					if (isOnline) return; //returns to ensure all connections are healthy
+					if (isOnline) continue;
 
 					sleep_for(seconds(1)); //wait a second instead of spamming full check every frame
-					return; //returns to ensure all connections are healthy
+					continue;
 				}
 
 				SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
@@ -670,6 +674,8 @@ namespace KalaKit::Core
 							Server::server->HandleClient(static_cast<uintptr_t>(clientSocket));
 						}).detach();
 				}
+
+				sleep_for(milliseconds(5));
 			}
 		}).detach();
 
@@ -700,6 +706,167 @@ namespace KalaKit::Core
 				}
 			}).detach();
 		}
+
+		thread([]
+		{
+			while (KalaServer::isRunning)
+			{
+				if (!canUpdateIPsVector) sleep_for(seconds(300));
+
+				canUpdateIPsVector = true;
+			}
+		}).detach();
+	}
+
+	void Server::UpdateIPs()
+	{
+		if (!canUpdateIPsVector) return;
+
+		machineIPs.clear();
+
+		SECURITY_ATTRIBUTES sa{};
+		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+		sa.bInheritHandle = TRUE;
+		sa.lpSecurityDescriptor = nullptr;
+
+		HANDLE hReadPipe = nullptr;
+		HANDLE hWritePipe = nullptr;
+		if (!CreatePipe(
+			&hReadPipe,
+			&hWritePipe,
+			&sa,
+			0))
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Failed to create read/write pipe for storing host IPs!");
+			return;
+		}
+		if (!SetHandleInformation(
+			hReadPipe,
+			HANDLE_FLAG_INHERIT,
+			0))
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Failed to set up pipe handle inheritance for storing host IPs!");
+			return;
+		}
+
+		STARTUPINFOW si{};
+		PROCESS_INFORMATION pi{};
+		si.cb = sizeof(si);
+		si.dwFlags = STARTF_USESTDHANDLES;
+		si.hStdOutput = hWritePipe;
+		si.hStdError = hWritePipe;
+		si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+
+		wchar_t command[] = L"ipconfig";
+
+		if (!CreateProcessW(
+			nullptr,
+			command,
+			nullptr,
+			nullptr,
+			TRUE,
+			CREATE_NO_WINDOW,
+			nullptr,
+			nullptr,
+			&si,
+			&pi))
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Failed to create process for getting host IPs for storing host IPs!");
+
+			CloseHandle(hWritePipe);
+			CloseHandle(hReadPipe);
+
+			return;
+		}
+
+		CloseHandle(hWritePipe);
+
+		stringstream output{};
+		char buffer[4096]{};
+		DWORD bytesRead = 0;
+
+		while (ReadFile(
+			hReadPipe,
+			buffer,
+			sizeof(buffer) - 1,
+			&bytesRead,
+			nullptr)
+			&& bytesRead > 0)
+		{
+			buffer[bytesRead] = '\0';
+			output << buffer;
+		}
+
+		CloseHandle(hReadPipe);
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+
+		//parse output
+
+		string line{};
+		while (getline(output, line))
+		{
+			size_t pos = line.find(": ");
+			if (pos == string::npos) continue;
+
+			string key = line.substr(0, pos);
+			string value = line.substr(pos + 2);
+			erase_if(value, ::isspace); //remove all spaces
+
+			if (key.find("IPv4") != string::npos
+				|| key.find("IPv6") != string::npos)
+			{
+				size_t zone = value.find('%');
+				if (zone != string::npos)
+				{
+					value = value.substr(0, zone);
+				}
+
+				machineIPs.push_back(value);
+			}
+		}
+
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SERVER",
+			"Refreshed machine IPs vector");
+
+		canUpdateIPsVector = false;
+	}
+
+	bool Server::IsHost(const string& targetIP)
+	{
+		if (machineIPs.size() == 0)
+		{
+			canUpdateIPsVector = true;
+			Server::server->UpdateIPs();
+		}
+
+		if (canUpdateIPsVector) Server::server->UpdateIPs();
+
+		for (const auto& ip : machineIPs)
+		{
+			if (ip == targetIP) return true;
+		}
+
+		return false;
 	}
 
 	string Server::ExtractHeader(
@@ -833,14 +1000,30 @@ namespace KalaKit::Core
 
 			if (clientIP.empty())
 			{
-				clientIP = "localhost";
+				clientIP = "unknown-ip";
 
 				KalaServer::PrintConsoleMessage(
 					0,
 					true,
 					ConsoleMessageType::Type_Warning,
 					"SERVER",
-					"Failed to get client IP for socket [" + to_string(socket) + "]! User is most likely localhost.");
+					"Failed to get client IP for socket [" + to_string(socket) + "]!"
+					"\n"
+					"Full request dump :"
+					"\n" +
+					request);
+			}
+
+			bool isHost = IsHost(clientIP);
+			if (isHost)
+			{
+				KalaServer::PrintConsoleMessage(
+					0,
+					true,
+					ConsoleMessageType::Type_Message,
+					"SERVER",
+					"Client [" + to_string(socket) + " - '" + clientIP + "'] is server host.");
+				clientIP = "host";
 			}
 
 			KalaServer::PrintConsoleMessage(

@@ -46,7 +46,7 @@ int main()
 	msg.error418 = "/errors/418";
 	msg.error500 = "/errors/500";
 	
-	static const string whitelistedRoutesFolder = "content/pages";
+	static const string whitelistedRoutesFolder = "content";
 
 	static const vector<string> whitelistedExtensions =
 	{

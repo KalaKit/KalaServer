@@ -79,6 +79,13 @@ namespace KalaKit::Core
 			const vector<string>& extensions);
 
 		/// <summary>
+		/// Starts up the server accept loop and health status report.
+		/// Run this only once, not every frame.
+		/// </summary>
+		/// <param name="healthTimer">How often should the health report be sent (seconds)?</param>
+		void Start() const;
+
+		/// <summary>
 		/// Returns true if a connection to google.com can be made.
 		/// </summary>
 		bool HasInternet();
@@ -88,17 +95,7 @@ namespace KalaKit::Core
 		/// </summary>
 		bool IsTunnelAlive(uintptr_t tunnelHandle);
 
-		/// <summary>
-		/// Starts up the server accept loop and health status report.
-		/// Run this only once, not every frame.
-		/// </summary>
-		/// <param name="healthTimer">How often should the health report be sent (seconds)?</param>
-		void Start() const;
-
-		/// <summary>
-		/// Closes the server. Use Core::Quit instead of this.
-		/// </summary>
-		void Quit() const;
+		string ServeFile(const string& route);
 
 		string GetBannedBotsFilePath() { return bannedBotsFile; }
 
@@ -120,6 +117,11 @@ namespace KalaKit::Core
 		void BanIP(
 			const BannedIP& target,
 			uintptr_t clientSocket) const;
+
+		/// <summary>
+		/// Returns true if given IP matches any host local ipv4 or ipv6.
+		/// </summary>
+		bool IsHost(const string& targetIP);
 
 		/// <summary>
 		/// Allows server to start accepting connections. Do not call manually.
@@ -155,7 +157,10 @@ namespace KalaKit::Core
 		map<string, string> GetWhitelistedRoutes() { return whitelistedRoutes; }
 		vector<string> GetWhitelistedExtensions() { return whitelistedExtensions; }
 
-		string ServeFile(const string& route);
+		/// <summary>
+		/// Closes the server. Use Core::Quit instead of this.
+		/// </summary>
+		void Quit() const;
 	private:
 		void AddInitialWhitelistedRoutes() const;
 
@@ -165,6 +170,11 @@ namespace KalaKit::Core
 		string ExtractHeader(
 			const string& request,
 			const string& headerName);
+
+		/// <summary>
+		/// Calls 'ipconfig' and stores all host IPs in machineIPs vector.
+		/// </summary>
+		void UpdateIPs();
 
 		/// <summary>
 		/// Handle each client in its own thread.
