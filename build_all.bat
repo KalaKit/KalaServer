@@ -11,6 +11,22 @@ set "CLOUDFLARED_ORIGIN=%PROJECT_ROOT%\example\cloudflared.exe"
 set "CLOUDFLARED_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\cloudflared.exe"
 set "CLOUDFLARED_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\cloudflared.exe"
 
+set "EXT_ORIGIN=%PROJECT_ROOT%\example\whitelisted-extensions.txt"
+set "EXT_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\whitelisted-extensions.txt"
+set "EXT_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\whitelisted-extensions.txt"
+
+set "WIP_ORIGIN=%PROJECT_ROOT%\example\whitelisted-ips.txt"
+set "WIP_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\whitelisted-ips.txt"
+set "WIP_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\whitelisted-ips.txt"
+
+set "BIP_ORIGIN=%PROJECT_ROOT%\example\banned-ips.txt"
+set "BIP_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\banned-ips.txt"
+set "BIP_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\banned-ips.txt"
+
+set "BKW_ORIGIN=%PROJECT_ROOT%\example\blacklisted-keywords.txt"
+set "BKW_DEBUG_TARGET=%PROJECT_ROOT%\build-debug\example\blacklisted-keywords.txt"
+set "BKW_RELEASE_TARGET=%PROJECT_ROOT%\build-release\example\blacklisted-keywords.txt"
+
 if not exist "%CONTENT_ORIGIN%" (
 	echo Failed to find content folder!
 	pause
@@ -75,15 +91,33 @@ echo.
 
 :: Copy content folder
 xcopy "%CONTENT_ORIGIN%" "%CONTENT_DEBUG_TARGET%\" /E /I /Y >nul
-echo Copied server content files to debug target.
 xcopy "%CONTENT_ORIGIN%" "%CONTENT_RELEASE_TARGET%\" /E /I /Y >nul
-echo Copied server content files to release target.
+echo Copied server content files to targets.
 
-:: Copy cloudflared.exe
+:: Copy cloudflared
 copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_DEBUG_TARGET%"
-echo Copied cloudflared.exe to debug target.
 copy /Y "%CLOUDFLARED_ORIGIN%" "%CLOUDFLARED_RELEASE_TARGET%"
-echo Copied cloudflared.exe to release target.
+echo Copied cloudflared.exe to targets.
+
+:: Copy whitelisted extensions
+copy /Y "%EXT_ORIGIN%" "%EXT_DEBUG_TARGET%"
+copy /Y "%EXT_ORIGIN%" "%EXT_RELEASE_TARGET%"
+echo Copied whitelisted-extensions.txt to targets.
+
+:: Copy whitelisted ips
+copy /Y "%WIP_ORIGIN%" "%WIP_DEBUG_TARGET%"
+copy /Y "%WIP_ORIGIN%" "%WIP_RELEASE_TARGET%"
+echo Copied whitelisted-ips.txt to targets.
+
+:: Copy banned ips
+copy /Y "%BIP_ORIGIN%" "%BIP_DEBUG_TARGET%"
+copy /Y "%BIP_ORIGIN%" "%BIP_RELEASE_TARGET%"
+echo Copied banned-ips.txt to targets.
+
+:: Copy blacklisted keywords
+copy /Y "%BKW_ORIGIN%" "%BKW_DEBUG_TARGET%"
+copy /Y "%BKW_ORIGIN%" "%BKW_RELEASE_TARGET%"
+echo Copied blacklisted-keywords.txt to targets.
 
 echo.
 echo ========================================

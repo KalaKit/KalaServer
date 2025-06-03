@@ -112,6 +112,7 @@ namespace KalaKit::Core
 
 		server->GetWhitelistedRoutes();
 		server->GetFileData(DataFileType::datafile_extension);
+		server->GetWhitelistedRoutes();
 		server->GetFileData(DataFileType::datafile_whitelistedIP);
 		server->GetFileData(DataFileType::datafile_bannedIP);
 		server->GetFileData(DataFileType::datafile_blacklistedKeyword);
@@ -227,9 +228,7 @@ namespace KalaKit::Core
 		}
 
 		string whitelistedExtensionsFilePath = (
-			current_path()
-			/ server->dataFile.whitelistedRoutesFolder
-			/ server->dataFile.whitelistedExtensionsFile).string();
+			current_path() / server->dataFile.whitelistedExtensionsFile).string();
 		if (!exists(whitelistedExtensionsFilePath))
 		{
 			KalaServer::CreatePopup(
@@ -239,9 +238,7 @@ namespace KalaKit::Core
 		}
 
 		string whitelistedIPsFilePath = (
-			current_path()
-			/ server->dataFile.whitelistedRoutesFolder
-			/ server->dataFile.whitelistedIPsFile).string();
+			current_path() / server->dataFile.whitelistedIPsFile).string();
 		if (!exists(whitelistedIPsFilePath))
 		{
 			KalaServer::CreatePopup(
@@ -251,9 +248,7 @@ namespace KalaKit::Core
 		}
 
 		string bannedIPsFilePath = (
-			current_path()
-			/ server->dataFile.whitelistedRoutesFolder
-			/ server->dataFile.bannedIPsFile).string();
+			current_path() / server->dataFile.bannedIPsFile).string();
 		if (!exists(bannedIPsFilePath))
 		{
 			KalaServer::CreatePopup(
@@ -263,9 +258,7 @@ namespace KalaKit::Core
 		}
 
 		string blacklistedKeywordsFilePath = (
-			current_path()
-			/ server->dataFile.whitelistedRoutesFolder
-			/ server->dataFile.blacklistedKeywordsFile).string();
+			current_path() / server->dataFile.blacklistedKeywordsFile).string();
 		if (!exists(blacklistedKeywordsFilePath))
 		{
 			KalaServer::CreatePopup(
@@ -447,36 +440,24 @@ namespace KalaKit::Core
 			resultType = "whitelisted extensions";
 			whitelistedExtensions.clear();
 			filePath = server->dataFile.whitelistedExtensionsFile;
-			fullFilePath = path(
-				current_path() 
-				/ server->dataFile.whitelistedRoutesFolder 
-				/ server->dataFile.whitelistedExtensionsFile).string();
+			fullFilePath = path(current_path() / server->dataFile.whitelistedExtensionsFile).string();
 			break;
 		case DataFileType::datafile_whitelistedIP:
 			resultType = "whitelisted IPs";
 			whitelistedIPs.clear();
 			filePath = server->dataFile.whitelistedIPsFile;
-			fullFilePath = path(
-				current_path()
-				/ server->dataFile.whitelistedRoutesFolder
-				/ server->dataFile.whitelistedIPsFile).string();
+			fullFilePath = path(current_path() / server->dataFile.whitelistedIPsFile).string();
 			break;
 		case DataFileType::datafile_bannedIP:
 			resultType = "banned IPs";
 			filePath = server->dataFile.bannedIPsFile;
-			fullFilePath = path(
-				current_path()
-				/ server->dataFile.whitelistedRoutesFolder
-				/ server->dataFile.bannedIPsFile).string();
+			fullFilePath = path(current_path() / server->dataFile.bannedIPsFile).string();
 			break;
 		case DataFileType::datafile_blacklistedKeyword:
 			resultType = "blacklisted keywords";
 			blacklistedKeywords.clear();
 			filePath = server->dataFile.blacklistedKeywordsFile;
-			fullFilePath = path(
-				current_path()
-				/ server->dataFile.whitelistedRoutesFolder
-				/ server->dataFile.blacklistedKeywordsFile).string();
+			fullFilePath = path(current_path() / server->dataFile.blacklistedKeywordsFile).string();
 			break;
 		}
 
