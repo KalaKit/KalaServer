@@ -17,6 +17,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <iostream>
+#include <atomic>
 
 namespace KalaKit::KalaCrash
 {
@@ -26,33 +27,24 @@ namespace KalaKit::KalaCrash
 	using std::ios;
 	using std::terminate;
 	using std::cerr;
+	using std::atomic;
+	using std::memory_order_relaxed;
 	using std::filesystem::path;
 	using std::filesystem::current_path;
-	using std::filesystem::directory_iterator;
 	
 	// ======================================================================
-	// Creates a crash log to executable path and terminates immediately after being called.
+	// Creates a thread-safe crash log to executable path. 
+	// The crash log always starts at 1, so old ones are overwritten.
+	// Terminates executable immediately right after crash log is created.
 	// 
 	// Usage:
 	//   Crash("crash reason");
 	// ======================================================================
 	
+	static inline atomic<int> crashIndexCounter{0};
 	static void Crash(const string& reason)
 	{
-		int fileCount = 0;
-		
-		for (const auto& file : directory_iterator(current_path()))
-		{
-			path thisFile = file.path();
-			if (is_regular_file(thisFile)
-				&& thisFile.extension() == ".txt"
-				&& thisFile.filename().string().starts_with("kalacrash_"))
-			{
-				++fileCount;
-			}
-		}
-		
-		int index = ++fileCount;
+		int index = crashIndexCounter.fetch_add(1, memory_order_relaxed) + 1;
 		string newCrashName = "kalacrash_" + to_string(index) + ".txt";
 		path logPath = current_path() / newCrashName;
 		
@@ -64,7 +56,12 @@ namespace KalaKit::KalaCrash
 			
 			logFile << "Crash reason: " << reason;
 		}
-		
+		else
+		{
+			cerr << "[FATAL_ERROR]: " << reason << " (failed to write crash log)\n";
+			terminate();
+		}
+
 		cerr << "[FATAL_ERROR]: " << reason << "\n";
 		logFile.close();
 		
