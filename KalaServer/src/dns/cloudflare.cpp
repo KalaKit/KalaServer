@@ -212,8 +212,8 @@ namespace KalaKit::DNS
 
 	string CloudFlare::GetTextFileValue(
 		const string& textFilePath,
-		int minLength,
-		int maxLength)
+		i16 minLength,
+		i16 maxLength)
 	{
 		string fileResult{};
 

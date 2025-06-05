@@ -12,9 +12,11 @@
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
+#include "external/kalacrash.hpp"
 
 using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;
+using KalaKit::KalaCrash::Crash;
 
 using std::cout;
 using std::chrono::system_clock;
@@ -142,14 +144,16 @@ namespace KalaKit::Core
 		{
 			popupTitle = serverName + " error";
 
+			/*
 			MessageBoxA(
 				nullptr,
 				message.c_str(),
 				popupTitle.c_str(),
 				MB_ICONERROR
 				| MB_OK);
+			*/
 
-			isRunning = false;
+			Crash(message);
 		}
 		else if (reason == PopupReason::Reason_Warning)
 		{

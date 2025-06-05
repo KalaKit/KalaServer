@@ -67,7 +67,10 @@
     45.141.215.55             | WordPress probe followed by fallback scan on /old/
     104.131.0.0               | wp-json enumeration to discover user data
     142.93.0.0                | xmlrpc abuse for brute-force amplification
+    152.42.241.137            | wp-includes and xmlrpc probe via repeated GETs
+    159.65.5.61               | wlwmanifest.xml probe for WordPress discovery
     178.128.0.0               | WordPress plugin vulnerability scanner
+    188.166.176.210           | wlwmanifest.xml probe for WordPress discovery
     188.166.215.111           | direct POST exploit attempts on wp-login
     206.189.0.0               | credential stuffing attack on WP login
 

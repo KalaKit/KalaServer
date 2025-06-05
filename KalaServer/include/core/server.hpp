@@ -12,6 +12,9 @@
 #include <mutex>
 #include <unordered_set>
 
+#include "external/kalatypes.hpp"
+#include "core/mimetype.hpp"
+
 namespace KalaKit::Core
 {
 	using std::string;
@@ -21,6 +24,14 @@ namespace KalaKit::Core
 	using std::mutex;
 	using std::unordered_set;
 	using std::pair;
+	using KalaKit::KalaTypes::u16;
+
+	struct Route
+	{
+		string rootPath;
+		string filePath;
+		string mimeType;
+	};
 
 	struct ErrorMessage
 	{
@@ -63,8 +74,8 @@ namespace KalaKit::Core
 		DataFile dataFile;
 
 		Server(
-			unsigned int port,
-			unsigned int healthTimer,
+			u16 port,
+			u16 healthTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
@@ -80,8 +91,8 @@ namespace KalaKit::Core
 		/// Initializes the server. Must be ran first before any other components.
 		/// </summary>
 		static bool Initialize(
-			unsigned int port,
-			unsigned int healthTimer,
+			u16 port,
+			u16 healthTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
@@ -145,7 +156,7 @@ namespace KalaKit::Core
 		string GetServerName() { return serverName; }
 		string GetDomainName() { return domainName; }
 
-		vector<pair<string, string>> GetFileData(DataFileType dataFileType) const;
+		void GetFileData(DataFileType dataFileType) const;
 		void GetWhitelistedRoutes() const;
 
 		/// <summary>
@@ -185,8 +196,8 @@ namespace KalaKit::Core
 		mutex clientSocketsMutex;
 		unordered_set<uintptr_t> activeClientSockets;
 
-		unsigned int port; //Local server port
-		unsigned int healthTimer; //Countdown until server reports health check.
+		u16 port; //Local server port
+		u16 healthTimer; //Countdown until server reports health check.
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
 	};

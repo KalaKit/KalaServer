@@ -12,7 +12,6 @@
 #include <sstream>
 #include <filesystem>
 #include <memory>
-#include <map>
 
 #pragma comment(lib, "Wininet.lib")
 
@@ -38,7 +37,7 @@ using KalaKit::ResponseSystem::Response_403;
 using KalaKit::ResponseSystem::Response_500;
 using KalaKit::ResponseSystem::Response_Banned;
 
-using std::map;
+using std::unordered_map;
 using std::exit;
 using std::to_string;
 using std::ifstream;
@@ -66,7 +65,7 @@ using std::atomic_bool;
 namespace KalaKit::Core
 {	
 	atomic<bool> canUpdateWhitelistedRoutes{ true };
-	map<string, string> whitelistedRoutes{};
+	unordered_map<string, Route> whitelistedRoutes{};
 
 	vector<string> blacklistedKeywords{};
 
@@ -81,8 +80,8 @@ namespace KalaKit::Core
 	vector<string> machineIPs{};
 
 	bool Server::Initialize(
-		unsigned int port,
-		unsigned int healthTimer,
+		u16 port,
+		u16 healthTimer,
 		const string& serverName,
 		const string& domainName,
 		const ErrorMessage& errorMessage,
@@ -110,7 +109,6 @@ namespace KalaKit::Core
 			"=============================="
 			"\n");
 
-		server->GetWhitelistedRoutes();
 		server->GetFileData(DataFileType::datafile_extension);
 		server->GetWhitelistedRoutes();
 		server->GetFileData(DataFileType::datafile_whitelistedIP);
@@ -281,7 +279,10 @@ namespace KalaKit::Core
 
 			for (const auto& keyword : blacklistedKeywords)
 			{
-				if (segment.find(keyword) != string::npos) return true;
+				if (segment.find(keyword) != string::npos)
+				{
+					return true;
+				}
 			}
 		}
 
@@ -369,20 +370,30 @@ namespace KalaKit::Core
 
 		if (!canContinue) return;
 
-		if (server->dataFile.whitelistedRoutesFolder == ""
-			|| !exists(current_path() / server->dataFile.whitelistedRoutesFolder))
+		string routeFolder = server->dataFile.whitelistedRoutesFolder;
+		if (routeFolder.empty())
 		{
 			KalaServer::CreatePopup(
 				PopupReason::Reason_Error,
-				"Whitelisted routes root folder '" + server->dataFile.whitelistedRoutesFolder + "' is empty or does not exist!");
+				"Whitelisted routes root folder has not been assigned!");
 			return;
 		}
 
-		for (const auto& route : recursive_directory_iterator(server->dataFile.whitelistedRoutesFolder))
+		path routePath = current_path() / routeFolder;
+		if (!exists(routePath))
+		{
+			KalaServer::CreatePopup(
+				PopupReason::Reason_Error,
+				"Whitelisted routes root folder '" + server->dataFile.whitelistedRoutesFolder + "' does not exist!");
+			return;
+		}
+
+		for (const auto& route : recursive_directory_iterator(routeFolder))
 		{
 			string cleanedRoute = path(route).generic_string();
 
 			bool isWhiteListed = false;
+
 			for (const auto& ext : whitelistedExtensions)
 			{
 				if (path(route).extension() == ext)
@@ -426,7 +437,7 @@ namespace KalaKit::Core
 		canUpdateWhitelistedRoutes = false;
 	}
 
-	vector<pair<string, string>> Server::GetFileData(DataFileType dataFileType) const
+	void Server::GetFileData(DataFileType dataFileType) const
 	{
 		string resultType{};
 
@@ -468,7 +479,7 @@ namespace KalaKit::Core
 		if (dataFileType == DataFileType::datafile_bannedIP
 			&& !canResetBannedIPs)
 		{
-			return result;
+			return;
 		}
 
 		if (dataFileType == DataFileType::datafile_bannedIP) bannedIPs.clear();
@@ -482,15 +493,18 @@ namespace KalaKit::Core
 				ConsoleMessageType::Type_Error,
 				"SERVER",
 				"Failed to open '" + path(filePath).filename().string() + "'!");
-			return result;
+			return;
 		}
 
 		string line;
 		while (getline(file, line))
 		{
-			if (line.find("#") != string::npos
-				|| line.find("=") != string::npos
-				|| line.empty())
+			line.erase(0, line.find_first_not_of(" \t\r\n"));
+			line.erase(line.find_last_not_of(" \t\r\n") + 1);
+
+			if (line.empty()
+				|| line.find("#") != string::npos
+				|| line.find("=") != string::npos)
 			{
 				continue;
 			}
@@ -530,28 +544,47 @@ namespace KalaKit::Core
 
 		file.close();
 
+		switch (dataFileType)
+		{
+		case DataFileType::datafile_extension:
+			for (const pair<string, string> resultValue : result)
+			{
+				whitelistedExtensions.push_back(resultValue.first);
+			}
+			break;
+		case DataFileType::datafile_whitelistedIP:
+			for (const pair<string, string> resultValue : result)
+			{
+				whitelistedIPs.push_back(resultValue.first);
+			}
+			break;
+		case DataFileType::datafile_bannedIP:
+			for (const pair<string, string> resultValue : result)
+			{
+				bannedIPs.push_back(resultValue);
+			}
+			break;
+		case DataFileType::datafile_blacklistedKeyword:
+			for (const pair<string, string> resultValue : result)
+			{
+				blacklistedKeywords.push_back(resultValue.first);
+			}
+			break;
+		}
+
 		KalaServer::PrintConsoleMessage(
 			0,
 			true,
 			ConsoleMessageType::Type_Message,
 			"SERVER",
 			"Refreshed " + resultType);
-
-		return result;
 	}
 
 	void Server::AddNewWhitelistedRoute(const string& rootPath, const string& filePath) const
 	{
-		GetWhitelistedRoutes();
-		if (whitelistedRoutes.contains(rootPath))
+		for (const auto& r : whitelistedRoutes)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"SERVER",
-				"Route '" + rootPath + "' has already been whitelisted!");
-			return;
+			if (r.rootPath == rootPath) return;
 		}
 
 		path fullPath = path(filePath);
@@ -567,7 +600,20 @@ namespace KalaKit::Core
 			return;
 		}
 
-		whitelistedRoutes[rootPath] = filePath;
+		string s_mimeType = path(filePath).extension().string();
+		string_view sv_mimeType(s_mimeType);
+
+		string_view sv_newMimeType = GetMimeType(sv_mimeType);
+		string s_newMimeType(sv_newMimeType);
+
+		Route newRoute =
+		{
+			.rootPath = rootPath,
+			.filePath = filePath,
+			.mimeType = s_newMimeType
+		};
+
+		whitelistedRoutes.push_back(newRoute);
 
 		KalaServer::PrintConsoleMessage(
 			0,
@@ -580,16 +626,7 @@ namespace KalaKit::Core
 	{
 		for (const auto& extension : whitelistedExtensions)
 		{
-			if (extension == newExtension)
-			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Warning,
-					"SERVER",
-					"Extension '" + extension + "' has already been whitelisted!");
-				return;
-			}
+			if (extension == newExtension) return;
 		}
 
 		whitelistedExtensions.push_back(newExtension);
@@ -606,9 +643,13 @@ namespace KalaKit::Core
 		GetWhitelistedRoutes();
 
 		string foundRoute{};
-		if (whitelistedRoutes.contains(thisRoute))
+		for (const auto& r : whitelistedRoutes)
 		{
-			foundRoute = thisRoute;
+			if (r.rootPath == thisRoute)
+			{
+				foundRoute = thisRoute;
+				break;
+			}
 		}
 
 		if (foundRoute == "")
@@ -658,8 +699,17 @@ namespace KalaKit::Core
 		}
 
 		server->GetWhitelistedRoutes();
-		auto it = whitelistedRoutes.find(route);
-		if (it == whitelistedRoutes.end())
+
+		Route foundRoute{};
+		for (const auto& r : whitelistedRoutes)
+		{
+			if (r.rootPath == route)
+			{
+				foundRoute = r;
+				break;
+			}
+		}
+		if (foundRoute.rootPath.empty())
 		{
 			KalaServer::PrintConsoleMessage(
 				0,
@@ -672,7 +722,7 @@ namespace KalaKit::Core
 
 		try
 		{
-			path fullFilePath = it->second;
+			path fullFilePath = foundRoute.filePath;
 			ifstream file(fullFilePath);
 			if (!file)
 			{
@@ -1309,7 +1359,17 @@ namespace KalaKit::Core
 			string statusLine = "HTTP/1.1 200 OK";
 
 			GetWhitelistedRoutes();
-			if (!whitelistedRoutes.contains(filePath))
+
+			Route foundRoute{};
+			for (const auto& r : whitelistedRoutes)
+			{
+				if (r.filePath == filePath)
+				{
+					foundRoute = r;
+					break;
+				}
+			}
+			if (foundRoute.rootPath.empty())
 			{
 				KalaServer::PrintConsoleMessage(
 					2,
@@ -1354,7 +1414,7 @@ namespace KalaKit::Core
 						"CLIENT",
 						"Client [" 
 						+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + filePath 
-						+ "' from path '" + whitelistedRoutes[filePath] + "'.");
+						+ "' from path '" + foundRoute.filePath + "'.");
 
 					auto resp403 = make_unique<Response_403>();
 					resp403->Init(
