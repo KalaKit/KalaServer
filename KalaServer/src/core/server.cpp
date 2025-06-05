@@ -25,7 +25,6 @@
 #include "response/response_403.hpp"
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
-#include "external/kalatypes.hpp"
 
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::Server;
@@ -63,7 +62,6 @@ using std::chrono::milliseconds;
 using std::this_thread::sleep_for;
 using std::wstring;
 using std::atomic_bool;
-using KalaKit::KalaTypes::s8;
 
 namespace KalaKit::Core
 {	
