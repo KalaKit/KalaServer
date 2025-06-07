@@ -14,22 +14,27 @@ namespace KalaKit::Core
 {
 	enum class MimeType
 	{
-		//SCRIPTS
+		// SCRIPTS
 		type_html, type_css, type_js,
 
-		//IMAGES
+		// IMAGES
 		type_png, type_jpeg, type_svg_xml, type_gif, type_webp, type_ico,
 
-		//AUDIO AND VIDEO
-		type_mp3, type_mp4, type_ogg, type_webm,
+		// AUDIO
 
-		//FONT
+		type_mp3, type_m4a, type_aac, type_ogg, type_opus, type_flac, type_wav,
+
+		// VIDEO
+
+		type_mp4, type_webm, type_mkv, type_mov, type_avi,
+
+		// FONTS
 		type_woff, type_woff2, type_ttf, type_otf,
 
-		//DOCUMENTS AND TEXT
+		// DOCUMENTS AND TEXT
 		type_plain, type_json, type_xml, type_csv, type_markdown,
 
-		//ARCHIVES AND BINARIES
+		// ARCHIVES AND BINARIES
 		type_zip, type_gz, type_pdf, type_wasm
 	};
 }
@@ -60,35 +65,58 @@ namespace KalaKit::Core
 		string_view mime;
 	};
 
-	static inline const array<MimeEntry, 27> mimeTable = 
+	static inline const array<MimeEntry, 35> mimeTable = 
 	{ {
+		// SCRIPTS
+
 		{ MimeType::type_html,     ".html", "text/html" },
 		{ MimeType::type_css,      ".css",  "text/css" },
 		{ MimeType::type_js,       ".js",   "application/javascript" },
 
-		{ MimeType::type_png,      ".png",  "image/png" },
-		{ MimeType::type_jpeg,     ".jpeg", "image/jpeg" },
-		{ MimeType::type_jpeg,     ".jpg",  "image/jpeg" },
-		{ MimeType::type_gif,      ".gif",  "image/gif" },
-		{ MimeType::type_webp,     ".webp", "image/webp" },
-		{ MimeType::type_ico,      ".ico",  "image/x-icon" },
-		{ MimeType::type_svg_xml,  ".svg",  "image/svg+xml" },
+		// IMAGES
 
-		{ MimeType::type_mp3,      ".mp3",  "audio/mpeg" },
-		{ MimeType::type_mp4,      ".mp4",  "video/mp4" },
-		{ MimeType::type_ogg,      ".ogg",  "audio/ogg" },
-		{ MimeType::type_webm,     ".webm", "video/webm" },
+		{ MimeType::type_png,       ".png",   "image/png" },
+		{ MimeType::type_jpeg,      ".jpeg",  "image/jpeg" },
+		{ MimeType::type_jpeg,      ".jpg",   "image/jpeg" },
+		{ MimeType::type_gif,       ".gif",   "image/gif" },
+		{ MimeType::type_webp,      ".webp",  "image/webp" },
+		{ MimeType::type_ico,       ".ico",   "image/x-icon" },
+		{ MimeType::type_svg_xml,   ".svg",   "image/svg+xml" },
+
+		// AUDIO
+
+		{ MimeType::type_mp3,   ".mp3",   "audio/mpeg" },
+		{ MimeType::type_m4a,   ".m4a",   "audio/mp4" },
+		{ MimeType::type_aac,   ".aac",   "audio/aac" },
+		{ MimeType::type_ogg,   ".ogg",   "audio/ogg" },
+		{ MimeType::type_opus,  ".opus",  "audio/opus" },
+		{ MimeType::type_flac,  ".flac",  "audio/flac" },
+		{ MimeType::type_wav,   ".wav",   "audio/wav" },
+
+		// VIDEO
+
+		{ MimeType::type_mp4,    ".mp4",   "video/mp4" },
+		{ MimeType::type_webm,   ".webm",  "video/webm" },
+		{ MimeType::type_mkv,    ".mkv",   "video/x-matroska" },
+		{ MimeType::type_mov,    ".mov",   "video/quicktime" },
+		{ MimeType::type_avi,    ".avi",   "video/x-msvideo" },
+
+		// FONTS
 
 		{ MimeType::type_woff,     ".woff", "font/woff" },
 		{ MimeType::type_woff2,    ".woff2","font/woff2" },
 		{ MimeType::type_ttf,      ".ttf",  "font/ttf" },
 		{ MimeType::type_otf,      ".otf",  "font/otf" },
 
+		// DOCUMENTS AND TEXT
+
 		{ MimeType::type_plain,    ".txt",  "text/plain" },
 		{ MimeType::type_json,     ".json", "application/json" },
 		{ MimeType::type_xml,      ".xml",  "application/xml" },
 		{ MimeType::type_csv,      ".csv",  "text/csv" },
 		{ MimeType::type_markdown, ".md",   "text/markdown" },
+
+		// ARCHIVES AND BINARIES
 
 		{ MimeType::type_zip,      ".zip",  "application/zip" },
 		{ MimeType::type_gz,       ".gz",   "application/gzip" },
