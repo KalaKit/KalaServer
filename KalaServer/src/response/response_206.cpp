@@ -65,13 +65,15 @@ namespace KalaKit::ResponseSystem
 		{
 			this->hasRange = true;
 			this->rangeStart = rangeStart;
-			this->rangeEnd = rangeStart + body.size() - 1;
+			this->rangeEnd = rangeEnd == 0
+				? rangeStart + body.size() - 1
+				: rangeEnd;
 			this->totalSize = totalSize;
 			this->contentRange =
-				"bytes "
-				+ to_string(rangeStart) + "-"
-				+ to_string(this->rangeEnd)
-				+ to_string(totalSize);
+				"bytes " + to_string(rangeStart) + "-" +
+				to_string(this->rangeEnd) + "/" +
+				to_string(totalSize);
+
 		}
 
 		Send(

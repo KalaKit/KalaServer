@@ -65,6 +65,7 @@ using std::wstring;
 using std::atomic_bool;
 using std::streamsize;
 using std::streamoff;
+using std::min;
 
 namespace KalaKit::Core
 {	
@@ -753,6 +754,18 @@ namespace KalaKit::Core
 			file.seekg(0, ios::beg);
 			outTotalSize = static_cast<size_t>(fileSize);
 
+			if (rangeStart >= outTotalSize)
+			{
+				KalaServer::PrintConsoleMessage(
+					0,
+					true,
+					ConsoleMessageType::Type_Error,
+					"SERVE-FILE",
+					"Range start (" + to_string(rangeStart) +
+					") is beyond total size (" + to_string(outTotalSize) + ")!");
+				return {};
+			}
+
 			//extract extension
 			string ext = fullFilePath.extension().string();
 			transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
@@ -777,7 +790,7 @@ namespace KalaKit::Core
 					rangeEnd = outTotalSize - 1;
 				}
 
-				size_t sliceSize = rangeEnd - rangeStart + 1;
+				size_t sliceSize = min(rangeEnd - rangeStart + 1, outTotalSize - rangeStart);
 				file.seekg(static_cast<streamoff>(rangeStart), ios::beg);
 
 				vector<char> buffer(sliceSize);
@@ -843,8 +856,37 @@ namespace KalaKit::Core
 		string startStr = rangePart.substr(0, dash);
 		string endStr = rangePart.substr(dash + 1);
 
+		size_t startFirst = startStr.find_first_not_of(" \r\n\t");
+		size_t startLast = startStr.find_last_not_of(" \r\n\t");
+		if (startFirst != string::npos
+			&& startLast != string::npos)
+		{
+			startStr = startStr.substr(startFirst, startLast - startFirst + 1);
+		}
+		else startStr.clear();
+
+		size_t endFirst = endStr.find_first_not_of(" \r\n\t");
+		size_t endLast = endStr.find_last_not_of(" \r\n\t");
+		if (endFirst != string::npos
+			&& endLast != string::npos)
+		{
+			endStr = endStr.substr(endFirst, endLast - endFirst + 1);
+		}
+		else endStr.clear();
+
 		try
 		{
+			if (startStr.empty())
+			{
+				KalaServer::PrintConsoleMessage(
+					0,
+					true,
+					ConsoleMessageType::Type_Error,
+					"SERVER",
+					"Start byte in ParseByeRange is missing for header '" + header + "'!");
+				return;
+			}
+			
 			outStart = static_cast<size_t>(stoull(startStr));
 			outEnd = endStr.empty() ? 0 : static_cast<size_t>(stoull(endStr));
 			return;
