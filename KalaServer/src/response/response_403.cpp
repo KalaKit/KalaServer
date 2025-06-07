@@ -27,7 +27,14 @@ namespace KalaKit::ResponseSystem
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 403 Forbidden";
 
-		vector<char> body = Server::server->ServeFile(Server::server->errorMessage.error403);
+		size_t totalSize = 0;
+		bool sliced = false;
+		vector<char> body = Server::server->ServeFile(
+			Server::server->errorMessage.error403,
+			0,
+			0,
+			totalSize,
+			sliced);
 
 		if (body.empty())
 		{

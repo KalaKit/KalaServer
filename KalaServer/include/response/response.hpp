@@ -16,6 +16,12 @@ namespace KalaKit::ResponseSystem
 	class Response
 	{
 	public:
+		bool hasRange = false;
+		size_t rangeStart = 0;
+		size_t rangeEnd = 0;
+		size_t totalSize = 0;
+		string contentRange{};
+
 		virtual ~Response() = default;
 
 		/// <summary>

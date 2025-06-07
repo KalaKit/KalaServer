@@ -31,7 +31,15 @@ namespace KalaKit::ResponseSystem
 			statusLine + "\r\n"
 			"Content-Type: " + contentType + "\r\n"
 			"Content-Length: " + to_string(data.size()) + "\r\n"
-			"Connection: close\r\n\r\n";
+			"Connection: close\r\n";
+
+		if (hasRange)
+		{
+			fullResponse += "Accept-Ranges: bytes\r\n";
+			fullResponse += "Content-Range: " + contentRange + "\r\n";
+		}
+
+		fullResponse += "\r\n";
 
 		//send headers
 		send(

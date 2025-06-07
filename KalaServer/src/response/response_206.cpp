@@ -10,8 +10,9 @@
 using KalaKit::Core::Server;
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::ConsoleMessageType;
-
 using KalaKit::Core::Server;
+
+using std::to_string;
 
 namespace KalaKit::ResponseSystem
 {
@@ -27,7 +28,17 @@ namespace KalaKit::ResponseSystem
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 206 Partial Content";
 
-		vector<char> body = Server::server->ServeFile(targetRoute);
+		size_t rangeStart = this->rangeStart;
+		size_t rangeEnd = this->rangeEnd;
+		size_t totalSize = 0;
+		bool sliced = false;
+
+		vector<char> body = Server::server->ServeFile(
+			targetRoute,
+			rangeStart,
+			rangeEnd,
+			totalSize,
+			sliced);
 
 		if (body.empty())
 		{
@@ -46,6 +57,21 @@ namespace KalaKit::ResponseSystem
 				"	</body>"
 				"</html>";
 			body = vector(newBody.begin(), newBody.end());
+			sliced = false;
+			statusLine = "HTTP/1.1 404 Not Found";
+		}
+
+		if (sliced)
+		{
+			this->hasRange = true;
+			this->rangeStart = rangeStart;
+			this->rangeEnd = rangeStart + body.size() - 1;
+			this->totalSize = totalSize;
+			this->contentRange =
+				"bytes "
+				+ to_string(rangeStart) + "-"
+				+ to_string(this->rangeEnd)
+				+ to_string(totalSize);
 		}
 
 		Send(

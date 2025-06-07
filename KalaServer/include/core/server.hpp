@@ -115,7 +115,30 @@ namespace KalaKit::Core
 		/// </summary>
 		bool IsTunnelAlive(uintptr_t tunnelHandle);
 
-		vector<char> ServeFile(const string& route);
+		/// <summary>
+		/// Send binary data to client.
+		/// </summary>
+		vector<char> ServeFile(
+			const string& route,
+			size_t rangeStart,
+			size_t rangeEnd,
+			size_t& outTotalSize,
+			bool& outSliced);
+
+		/// <summary>
+		/// Parse headers from raw HTTP string.
+		/// </summary>
+		string ExtractHeaderValue(
+			const string& request,
+			const string& headerName);
+
+		/// <summary>
+		/// Parse byte range from header.
+		/// </summary>
+		void ParseByteRange(
+			const string& header,
+			size_t& outStart,
+			size_t& outEnd);
 
 		/// <summary>
 		/// Check whether this route is allowed to be accessed.

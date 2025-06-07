@@ -27,7 +27,14 @@ namespace KalaKit::ResponseSystem
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 500 Internal Server Error";
 
-		vector<char> body = Server::server->ServeFile(Server::server->errorMessage.error500);
+		size_t totalSize = 0;
+		bool sliced = false;
+		vector<char> body = Server::server->ServeFile(
+			Server::server->errorMessage.error500,
+			0,
+			0,
+			totalSize,
+			sliced);
 
 		if (body.empty())
 		{

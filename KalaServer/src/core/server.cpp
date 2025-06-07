@@ -20,6 +20,7 @@
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
 #include "response/response_200.hpp"
+#include "response/response_206.hpp"
 #include "response/response_404.hpp"
 #include "response/response_403.hpp"
 #include "response/response_418.hpp"
@@ -32,6 +33,7 @@ using KalaKit::Core::PopupReason;
 using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;
 using KalaKit::ResponseSystem::Response_200;
+using KalaKit::ResponseSystem::Response_206;
 using KalaKit::ResponseSystem::Response_404;
 using KalaKit::ResponseSystem::Response_403;
 using KalaKit::ResponseSystem::Response_500;
@@ -62,6 +64,7 @@ using std::this_thread::sleep_for;
 using std::wstring;
 using std::atomic_bool;
 using std::streamsize;
+using std::streamoff;
 
 namespace KalaKit::Core
 {	
@@ -686,8 +689,16 @@ namespace KalaKit::Core
 		}
 	}
 
-	vector<char> Server::ServeFile(const string& route)
+	vector<char> Server::ServeFile(
+		const string& route,
+		size_t rangeStart,
+		size_t rangeEnd,
+		size_t& outTotalSize,
+		bool& outSliced)
 	{
+		outSliced = false;
+		outTotalSize = 0;
+
 		if (route.empty())
 		{
 			KalaServer::PrintConsoleMessage(
@@ -736,14 +747,50 @@ namespace KalaKit::Core
 				return {};
 			}
 
+			//get size
 			file.seekg(0, ios::end);
-			streamsize size = file.tellg();
+			streamsize fileSize = file.tellg();
 			file.seekg(0, ios::beg);
+			outTotalSize = static_cast<size_t>(fileSize);
 
-			vector<char> buffer(static_cast<size_t>(size));
-			file.read(buffer.data(), size);
+			//extract extension
+			string ext = fullFilePath.extension().string();
+			transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-			return buffer;
+			const unordered_set<string> alwaysFull
+			{
+				".html", ".css", ".js", ".txt"
+			};
+
+			bool hasExtension = !ext.empty();
+			bool isAlwaysFull =
+				!hasExtension
+				|| alwaysFull.count(ext) > 0;
+			bool isLarge = fileSize > static_cast<long long>(10 * 1024) * 1024; //> 10MB
+
+			if (!isAlwaysFull
+				&& isLarge)
+			{
+				if (rangeEnd == 0
+					|| rangeEnd >= outTotalSize)
+				{
+					rangeEnd = outTotalSize - 1;
+				}
+
+				size_t sliceSize = rangeEnd - rangeStart + 1;
+				file.seekg(static_cast<streamoff>(rangeStart), ios::beg);
+
+				vector<char> buffer(sliceSize);
+				file.read(buffer.data(), static_cast<streamsize>(sliceSize));
+				outSliced = true;
+				return buffer;
+			}
+			else
+			{
+				vector<char> buffer(static_cast<size_t>(fileSize));
+				file.read(buffer.data(), fileSize);
+				return buffer;
+			}
 		}
 		catch (const exception& e)
 		{
@@ -757,6 +804,62 @@ namespace KalaKit::Core
 		}
 
 		return {};
+	}
+
+	string Server::ExtractHeaderValue(
+		const string& request,
+		const string& headerName)
+	{
+		istringstream stream(request);
+		string line;
+		string prefix = headerName + ": ";
+
+		while (getline(stream, line))
+		{
+			if (line.substr(0, prefix.size()) == prefix)
+			{
+				return line.substr(prefix.size());
+			}
+		}
+		return "";
+	}
+
+	void Server::ParseByteRange(
+		const string& header,
+		size_t& outStart,
+		size_t& outEnd)
+	{
+		if (header.empty()
+			|| header.find("bytes=") != 0)
+		{
+			return;
+		}
+
+		//skip "bytes="
+		string rangePart = header.substr(6);
+		size_t dash = rangePart.find('-');
+		if (dash == string::npos) return;
+
+		string startStr = rangePart.substr(0, dash);
+		string endStr = rangePart.substr(dash + 1);
+
+		try
+		{
+			outStart = static_cast<size_t>(stoull(startStr));
+			outEnd = endStr.empty() ? 0 : static_cast<size_t>(stoull(endStr));
+			return;
+		}
+		catch (const exception& e)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Error,
+				"SERVER",
+				"Failed to parse header byte range for header '" + header
+				+ "'!\nReason: " + e.what());
+			return;
+		}
 	}
 
 	bool Server::HasInternet()
@@ -1443,7 +1546,26 @@ namespace KalaKit::Core
 				{
 					try
 					{
-						vector<char> result = server->ServeFile(cleanRoute);
+						size_t rangeStart = 0;
+						size_t rangeEnd = 0;
+
+						string rangeHeader = server->ExtractHeaderValue(
+							request, 
+							"Range");
+						server->ParseByteRange(
+							rangeHeader, 
+							rangeStart, 
+							rangeEnd);
+
+						size_t totalSize = 0;
+						bool sliced = false;
+						vector<char> result = server->ServeFile(
+							cleanRoute,
+							rangeStart,
+							rangeEnd,
+							totalSize,
+							sliced);
+
 						if (result.empty())
 						{
 							KalaServer::PrintConsoleMessage(
@@ -1466,14 +1588,39 @@ namespace KalaKit::Core
 						}
 						else
 						{
-							auto resp200 = make_unique<Response_200>();
-							resp200->Init(
-								rawClientSocket,
-								clientIP,
-								cleanRoute,
-								foundRoute.mimeType);
-							server->SocketCleanup(socket);
-							return;
+							if (sliced)
+							{
+								auto resp206 = make_unique<Response_206>();
+
+								resp206->hasRange = true;
+								resp206->rangeStart = rangeStart;
+								resp206->rangeEnd = rangeStart + result.size() - 1;
+								resp206->totalSize = totalSize;
+								resp206->contentRange = 
+									"bytes 0-" 
+									+ to_string(result.size() - 1)
+									+ "/"
+									+ to_string(totalSize);
+
+								resp206->Init(
+									rawClientSocket,
+									clientIP,
+									cleanRoute,
+									foundRoute.mimeType);
+								server->SocketCleanup(socket);
+								return;
+							}
+							else
+							{
+								auto resp200 = make_unique<Response_200>();
+								resp200->Init(
+									rawClientSocket,
+									clientIP,
+									cleanRoute,
+									foundRoute.mimeType);
+								server->SocketCleanup(socket);
+								return;
+							}
 						}
 					}
 					catch (const exception& e)

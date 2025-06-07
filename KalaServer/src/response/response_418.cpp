@@ -25,7 +25,14 @@ namespace KalaKit::ResponseSystem
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 418 I'm a teapot";
 
-		vector<char> body = Server::server->ServeFile(Server::server->errorMessage.error418);
+		size_t totalSize = 0;
+		bool sliced = false;
+		vector<char> body = Server::server->ServeFile(
+			Server::server->errorMessage.error418,
+			0,
+			0,
+			totalSize,
+			sliced);
 
 		if (body.empty())
 		{
