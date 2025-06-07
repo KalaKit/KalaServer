@@ -64,6 +64,7 @@
 
 ## WordPress and Plugin Exploits
     2a06:98c0:3600::103       | persistent dictionary attack targeting WP sites
+    45.76.197.27              | dumb bot tried /wp-login.php
     45.141.215.55             | WordPress probe followed by fallback scan on /old/
     104.131.0.0               | wp-json enumeration to discover user data
     129.146.7.215             | aggressive WordPress scanner probing xmlrpc, feeds, and legacy paths
