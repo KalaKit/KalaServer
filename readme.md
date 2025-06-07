@@ -23,7 +23,9 @@ To compile from source code simply run 'build_all.bat' or 'build_debug.bat' or '
 
 # How to use
 
-Compile the project from source using the existing CMakeLists.txt at root by running 'build_all.bat' and then open 'KalaServer_example.exe' inside 'build-release/example' or 'build-debug/example' to start the example server made with KalaServer.
+First create content folder inside example folder. Then make index.html inside it with your preferred homepage content. And then add remaining stuff you want to show on your website.
+
+Then after those - compile the project from source using the existing CMakeLists.txt at root by running 'build_all.bat' and then open 'KalaServer_example.exe' inside 'build-release/example' or 'build-debug/example' to start the example server made with KalaServer.
 
 Documentation for connecting via url/ip:
 - [How to get access locally without a domain](docs/connect/local-access.md)
