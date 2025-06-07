@@ -7,9 +7,11 @@
 
 #include "core/core.hpp"
 #include "response/response.hpp"
+#include "external/kcrash.hpp"
 
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::ConsoleMessageType;
+using KalaKit::KalaCrash::Crash;
 
 using std::to_string;
 
@@ -21,21 +23,33 @@ namespace KalaKit::ResponseSystem
 		const string& route,
 		const string& contentType,
 		const string& statusLine,
-		const string& body) const
+		const vector<char> data) const
 	{
 		SOCKET socket = static_cast<SOCKET>(clientSocket);
 
 		string fullResponse =
 			statusLine + "\r\n"
 			"Content-Type: " + contentType + "\r\n"
-			"Content-Length: " + to_string(body.size()) + "\r\n"
-			"Connection: close\r\n\r\n" + body;
+			"Content-Length: " + to_string(data.size()) + "\r\n"
+			"Connection: close\r\n\r\n";
 
+		//send headers
 		send(
 			socket,
 			fullResponse.c_str(),
 			static_cast<int>(fullResponse.size()),
 			0);
+
+		//send binary body
+		if (!data.empty())
+		{
+			send(
+				socket,
+				data.data(),
+				static_cast<int>(data.size()),
+				0);
+		}
+
 		closesocket(socket);
 
 		KalaServer::PrintConsoleMessage(

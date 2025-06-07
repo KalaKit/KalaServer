@@ -25,7 +25,7 @@ namespace KalaKit::ResponseSystem
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 418 I'm a teapot";
 
-		string body = Server::server->ServeFile(Server::server->errorMessage.error418);
+		vector<char> body = Server::server->ServeFile(Server::server->errorMessage.error418);
 
 		if (body.empty())
 		{
@@ -36,13 +36,14 @@ namespace KalaKit::ResponseSystem
 				"SERVER",
 				"418 response file body was empty!");
 
-			body =
+			string newBody =
 				"<html>"
 				"	<body>"
 				"		<h1>418 I'm a teapot</h1>"
 				"		<p>Your requests are so obvious and robotic, we decided to ban you with a joke status code.</p>"
 				"	</body>"
 				"</html>";
+			body = vector(newBody.begin(), newBody.end());
 		}
 
 		Send(

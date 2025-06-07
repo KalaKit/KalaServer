@@ -61,6 +61,7 @@ using std::chrono::milliseconds;
 using std::this_thread::sleep_for;
 using std::wstring;
 using std::atomic_bool;
+using std::streamsize;
 
 namespace KalaKit::Core
 {	
@@ -685,7 +686,7 @@ namespace KalaKit::Core
 		}
 	}
 
-	string Server::ServeFile(const string& route)
+	vector<char> Server::ServeFile(const string& route)
 	{
 		if (route.empty())
 		{
@@ -695,7 +696,7 @@ namespace KalaKit::Core
 				ConsoleMessageType::Type_Error,
 				"SERVE-FILE",
 				"Serve received empty route!");
-			return "";
+			return {};
 		}
 
 		server->GetWhitelistedRoutes();
@@ -717,13 +718,13 @@ namespace KalaKit::Core
 				ConsoleMessageType::Type_Error,
 				"SERVE-FILE",
 				"Route '" + route + "' is not whitelisted!");
-			return "";
+			return {};
 		}
 
 		try
 		{
 			path fullFilePath = foundRoute.filePath;
-			ifstream file(fullFilePath);
+			ifstream file(fullFilePath, ios::binary);
 			if (!file)
 			{
 				KalaServer::PrintConsoleMessage(
@@ -732,12 +733,17 @@ namespace KalaKit::Core
 					ConsoleMessageType::Type_Error,
 					"SERVE-FILE",
 					"Failed to open file '" + fullFilePath.generic_string() + "'!");
-				return "";
+				return {};
 			}
 
-			stringstream buffer{};
-			buffer << file.rdbuf();
-			return buffer.str();
+			file.seekg(0, ios::end);
+			streamsize size = file.tellg();
+			file.seekg(0, ios::beg);
+
+			vector<char> buffer(static_cast<size_t>(size));
+			file.read(buffer.data(), size);
+
+			return buffer;
 		}
 		catch (const exception& e)
 		{
@@ -747,10 +753,10 @@ namespace KalaKit::Core
 				ConsoleMessageType::Type_Error,
 				"SERVE-FILE",
 				"Exception while serving route '" + route + "':\n" + e.what());
-			return "";
+			return {};
 		}
 
-		return "";
+		return {};
 	}
 
 	bool Server::HasInternet()
@@ -1430,8 +1436,8 @@ namespace KalaKit::Core
 				{
 					try
 					{
-						string result = server->ServeFile(route);
-						if (result == "")
+						vector<char> result = server->ServeFile(route);
+						if (result.empty())
 						{
 							KalaServer::PrintConsoleMessage(
 								2,

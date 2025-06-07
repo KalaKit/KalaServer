@@ -26,7 +26,8 @@ namespace KalaKit::ResponseSystem
 		string route = targetRoute;
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 500 Internal Server Error";
-		string body = Server::server->ServeFile(Server::server->errorMessage.error500);
+
+		vector<char> body = Server::server->ServeFile(Server::server->errorMessage.error500);
 
 		if (body.empty())
 		{
@@ -37,13 +38,14 @@ namespace KalaKit::ResponseSystem
 				"SERVER",
 				"500 response file body was empty!");
 
-			body =
+			string newBody =
 				"<html>"
 				"	<body>"
 				"		<h1>500 Internal Server Error</h1>"
 				"		<p>An unexpected error occurred on the server.</p>"
 				"	</body>"
 				"</html>";
+			body = vector(newBody.begin(), newBody.end());
 		}
 
 		Send(

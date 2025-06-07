@@ -26,7 +26,8 @@ namespace KalaKit::ResponseSystem
 		string route = targetRoute;
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 403 Forbidden";
-		string body = Server::server->ServeFile(Server::server->errorMessage.error403);
+
+		vector<char> body = Server::server->ServeFile(Server::server->errorMessage.error403);
 
 		if (body.empty())
 		{
@@ -37,13 +38,14 @@ namespace KalaKit::ResponseSystem
 				"SERVER",
 				"403 response file body was empty!");
 
-			body =
+			string newBody =
 				"<html>"
 				"	<body>"
 				"		<h1>403 Forbidden</h1>"
 				"		<p>You do not have permission to access this resource.</p>"
 				"	</body>"
 				"</html>";
+			body = vector(newBody.begin(), newBody.end());
 		}
 
 		Send(

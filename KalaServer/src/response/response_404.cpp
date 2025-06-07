@@ -26,7 +26,8 @@ namespace KalaKit::ResponseSystem
 		string route = targetRoute;
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 404 Not Found";
-		string body = Server::server->ServeFile(Server::server->errorMessage.error404);
+
+		vector<char> body = Server::server->ServeFile(Server::server->errorMessage.error404);
 
 		if (body.empty())
 		{
@@ -37,13 +38,14 @@ namespace KalaKit::ResponseSystem
 				"SERVER",
 				"404 response file body was empty!");
 
-			body =
+			string newBody =
 				"<html>"
 				"	<body>"
 				"		<h1>404 Not Found</h1>"
 				"		<p>The requested resource could not be found.</p>"
 				"	</body>"
 				"</html>";
+			body = vector(newBody.begin(), newBody.end());
 		}
 
 		Send(

@@ -6,10 +6,12 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace KalaKit::ResponseSystem
 {
 	using std::string;
+	using std::vector;
 
 	class Response
 	{
@@ -35,6 +37,6 @@ namespace KalaKit::ResponseSystem
 			const string& route,
 			const string& contentType,
 			const string& statusLine,
-			const string& body) const;
+			const vector<char> data) const;
 	};
 }

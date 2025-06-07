@@ -26,7 +26,8 @@ namespace KalaKit::ResponseSystem
 		string route = targetRoute;
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 200 OK";
-		string body = Server::server->ServeFile(targetRoute);
+
+		vector<char> body = Server::server->ServeFile(targetRoute);
 
 		if (body.empty())
 		{
@@ -37,13 +38,14 @@ namespace KalaKit::ResponseSystem
 				"SERVER",
 				"200 response file body was empty!");
 
-			body =
+			string newBody =
 				"<html>"
 				"	<body>"
 				"		<h1>200 OK</h1>"
 				"		<p>File not found or empty.</p>"
 				"	</body>"
 				"</html>";
+			body = vector(newBody.begin(), newBody.end());
 		}
 
 		Send(

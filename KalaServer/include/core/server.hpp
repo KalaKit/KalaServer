@@ -115,7 +115,7 @@ namespace KalaKit::Core
 		/// </summary>
 		bool IsTunnelAlive(uintptr_t tunnelHandle);
 
-		string ServeFile(const string& route);
+		vector<char> ServeFile(const string& route);
 
 		/// <summary>
 		/// Check whether this route is allowed to be accessed.
