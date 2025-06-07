@@ -7,12 +7,12 @@
 
 #include <string>
 
-#include "external/kalatypes.hpp"
+//#include "external/ktypes.hpp"
 
 namespace KalaKit::DNS
 {
 	using std::string;
-	using KalaKit::KalaTypes::i16;
+	//using KalaKit::KalaTypes::i16;
 
 	class CloudFlare
 	{
@@ -77,8 +77,8 @@ namespace KalaKit::DNS
 		/// </summary>
 		static string GetTextFileValue(
 			const string& textPath,
-			i16 minLength = 32, 
-			i16 maxLength = 300);
+			unsigned int minLength = 32, 
+			unsigned int maxLength = 300);
 
 		/// <summary>
 		/// Runs 'cloudflared tunnel login'

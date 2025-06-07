@@ -13,7 +13,7 @@
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
-#include "external/kalatypes.hpp"
+//#include "external/ktypes.hpp"
 
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::Server;
@@ -30,13 +30,13 @@ using std::filesystem::current_path;
 using std::filesystem::path;
 using std::this_thread::sleep_for;
 using std::chrono::milliseconds;
-using KalaKit::KalaTypes::u16;
+//using KalaKit::KalaTypes::u16;
 
 int main()
 {
-	u16 port = 30000;
+	unsigned int port = 30000;
 
-	u16 healthTimer = 600; //600 seconds (10 minutes) until health message ping
+	unsigned int healthTimer = 600; //600 seconds (10 minutes) until health message ping
 
 	string serverName = "KalaServer";
 	string domainName = "thekalakit.com";

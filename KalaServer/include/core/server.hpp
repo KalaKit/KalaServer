@@ -12,7 +12,7 @@
 #include <mutex>
 #include <unordered_set>
 
-#include "external/kalatypes.hpp"
+//#include "external/ktypes.hpp"
 #include "core/mimetype.hpp"
 
 namespace KalaKit::Core
@@ -24,11 +24,11 @@ namespace KalaKit::Core
 	using std::mutex;
 	using std::unordered_set;
 	using std::pair;
-	using KalaKit::KalaTypes::u16;
+	//using KalaKit::KalaTypes::u16;
 
 	struct Route
 	{
-		string rootPath;
+		string route;
 		string filePath;
 		string mimeType;
 	};
@@ -74,8 +74,8 @@ namespace KalaKit::Core
 		DataFile dataFile;
 
 		Server(
-			u16 port,
-			u16 healthTimer,
+			unsigned int port,
+			unsigned int healthTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
@@ -91,8 +91,8 @@ namespace KalaKit::Core
 		/// Initializes the server. Must be ran first before any other components.
 		/// </summary>
 		static bool Initialize(
-			u16 port,
-			u16 healthTimer,
+			unsigned int port,
+			unsigned int healthTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
@@ -196,8 +196,8 @@ namespace KalaKit::Core
 		mutex clientSocketsMutex;
 		unordered_set<uintptr_t> activeClientSockets;
 
-		u16 port; //Local server port
-		u16 healthTimer; //Countdown until server reports health check.
+		unsigned int port; //Local server port
+		unsigned int healthTimer; //Countdown until server reports health check.
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
 	};

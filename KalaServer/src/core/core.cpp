@@ -12,7 +12,7 @@
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
-#include "external/kalacrash.hpp"
+#include "external/kcrash.hpp"
 
 using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;

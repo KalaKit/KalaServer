@@ -65,7 +65,7 @@ using std::atomic_bool;
 namespace KalaKit::Core
 {	
 	atomic<bool> canUpdateWhitelistedRoutes{ true };
-	unordered_map<string, Route> whitelistedRoutes{};
+	vector<Route> whitelistedRoutes{};
 
 	vector<string> blacklistedKeywords{};
 
@@ -80,8 +80,8 @@ namespace KalaKit::Core
 	vector<string> machineIPs{};
 
 	bool Server::Initialize(
-		u16 port,
-		u16 healthTimer,
+		unsigned int port,
+		unsigned int healthTimer,
 		const string& serverName,
 		const string& domainName,
 		const ErrorMessage& errorMessage,
@@ -405,26 +405,26 @@ namespace KalaKit::Core
 			if (!isWhiteListed) continue;
 
 			//get clean route for html files
-			string correctRootPath{};
+			string correctRoute{};
 			if (path(route).extension() == ".html")
 			{
 				path relativePath = relative(route.path(), server->dataFile.whitelistedRoutesFolder);
 				relativePath.replace_extension("");
-				correctRootPath = "/" + relativePath.generic_string();
+				correctRoute = "/" + relativePath.generic_string();
 
-				//fix index.html root path
-				if (correctRootPath == "/index") correctRootPath = "/";
+				//fix index.html route
+				if (correctRoute == "/index") correctRoute = "/";
 			}
 			else
 			{
 				path relativePath = relative(route.path(), server->dataFile.whitelistedRoutesFolder);
-				correctRootPath = "/" + relativePath.generic_string();
+				correctRoute = "/" + relativePath.generic_string();
 			}
 
-			//use actual file path directly
+			//use actual route directly
 			string correctFilePath = route.path().generic_string();
 
-			server->AddNewWhitelistedRoute(correctRootPath, correctFilePath);
+			server->AddNewWhitelistedRoute(correctRoute, correctFilePath);
 		}
 
 		KalaServer::PrintConsoleMessage(
@@ -580,11 +580,11 @@ namespace KalaKit::Core
 			"Refreshed " + resultType);
 	}
 
-	void Server::AddNewWhitelistedRoute(const string& rootPath, const string& filePath) const
+	void Server::AddNewWhitelistedRoute(const string& route, const string& filePath) const
 	{
 		for (const auto& r : whitelistedRoutes)
 		{
-			if (r.rootPath == rootPath) return;
+			if (r.route == route) return;
 		}
 
 		path fullPath = path(filePath);
@@ -608,7 +608,7 @@ namespace KalaKit::Core
 
 		Route newRoute =
 		{
-			.rootPath = rootPath,
+			.route = route,
 			.filePath = filePath,
 			.mimeType = s_newMimeType
 		};
@@ -620,7 +620,7 @@ namespace KalaKit::Core
 			true,
 			ConsoleMessageType::Type_Message,
 			"SERVER",
-			"Added new route '" + rootPath + "'");
+			"\n  Added route '" + route + "'\n  file path   '" + filePath + "'\n  mime type   '" + s_newMimeType + "'!");
 	}
 	void Server::AddNewWhitelistedExtension(const string& newExtension) const
 	{
@@ -645,7 +645,7 @@ namespace KalaKit::Core
 		string foundRoute{};
 		for (const auto& r : whitelistedRoutes)
 		{
-			if (r.rootPath == thisRoute)
+			if (r.route == thisRoute)
 			{
 				foundRoute = thisRoute;
 				break;
@@ -703,13 +703,13 @@ namespace KalaKit::Core
 		Route foundRoute{};
 		for (const auto& r : whitelistedRoutes)
 		{
-			if (r.rootPath == route)
+			if (r.route == route)
 			{
 				foundRoute = r;
 				break;
 			}
 		}
-		if (foundRoute.rootPath.empty())
+		if (foundRoute.route.empty())
 		{
 			KalaServer::PrintConsoleMessage(
 				0,
@@ -1236,7 +1236,7 @@ namespace KalaKit::Core
 		else
 		{
 			string request(buffer);
-			string filePath = "/";
+			string route = "/";
 
 			KalaServer::PrintConsoleMessage(
 				2,
@@ -1251,7 +1251,7 @@ namespace KalaKit::Core
 				size_t pathEnd = request.find(' ', pathStart);
 				if (pathEnd != string::npos)
 				{
-					filePath = request.substr(pathStart, pathEnd - pathStart);
+					route = request.substr(pathStart, pathEnd - pathStart);
 				}
 			}
 
@@ -1308,14 +1308,14 @@ namespace KalaKit::Core
 				respBanned->Init(
 					rawClientSocket,
 					clientIP,
-					filePath,
+					route,
 					"text/html");
 				server->SocketCleanup(socket);
 				return;
 			}
 			else if (bannedClient.first == ""
 					 && !blacklistedKeywords.empty()
-					 && server->IsBlacklistedRoute(filePath))
+					 && server->IsBlacklistedRoute(route))
 			{
 				KalaServer::PrintConsoleMessage(
 					0,
@@ -1325,14 +1325,14 @@ namespace KalaKit::Core
 					"=============== BANNED CLIENT ======================\n"
 					" IP     : " + clientIP + "\n"
 					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + filePath + "\n"
+					" Reason : " + route + "\n"
 					"====================================================\n");
 
 				sleep_for(milliseconds(5));
 
 				pair<string, string> bannedClient{};
 				bannedClient.first = clientIP;
-				bannedClient.second = filePath;
+				bannedClient.second = route;
 
 				if (server->BanClient(bannedClient))
 				{
@@ -1340,7 +1340,7 @@ namespace KalaKit::Core
 					respBanned->Init(
 						clientSocket,
 						clientIP,
-						filePath,
+						route,
 						"text/html");
 				}
 
@@ -1363,13 +1363,14 @@ namespace KalaKit::Core
 			Route foundRoute{};
 			for (const auto& r : whitelistedRoutes)
 			{
-				if (r.filePath == filePath)
+				if (r.route == route)
 				{
 					foundRoute = r;
 					break;
 				}
 			}
-			if (foundRoute.rootPath.empty())
+
+			if (foundRoute.route.empty())
 			{
 				KalaServer::PrintConsoleMessage(
 					2,
@@ -1378,13 +1379,13 @@ namespace KalaKit::Core
 					"CLIENT",
 					"Client [" 
 					+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '" 
-					+ filePath + "'!");
+					+ route + "'!");
 
 				auto resp404 = make_unique<Response_404>();
 				resp404->Init(
 					rawClientSocket,
 					clientIP,
-					filePath,
+					route,
 					"text/html");
 				server->SocketCleanup(socket);
 				return;
@@ -1394,7 +1395,7 @@ namespace KalaKit::Core
 				bool extentionExists = false;
 				for (const auto& ext : whitelistedExtensions)
 				{
-					if (path(filePath).extension().generic_string() == ext)
+					if (path(route).extension().generic_string() == ext)
 					{
 						extentionExists = true;
 						break;
@@ -1402,7 +1403,7 @@ namespace KalaKit::Core
 				}
 
 				bool isAllowedFile =
-					filePath.find_last_of('.') == string::npos
+					route.find_last_of('.') == string::npos
 					|| extentionExists;
 
 				if (!isAllowedFile)
@@ -1413,14 +1414,14 @@ namespace KalaKit::Core
 						ConsoleMessageType::Type_Warning,
 						"CLIENT",
 						"Client [" 
-						+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + filePath 
-						+ "' from path '" + foundRoute.filePath + "'.");
+						+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + route 
+						+ "' from path '" + foundRoute.route + "'.");
 
 					auto resp403 = make_unique<Response_403>();
 					resp403->Init(
 						rawClientSocket,
 						clientIP,
-						filePath,
+						route,
 						"text/html");
 					server->SocketCleanup(socket);
 					return;
@@ -1429,7 +1430,7 @@ namespace KalaKit::Core
 				{
 					try
 					{
-						string result = server->ServeFile(filePath);
+						string result = server->ServeFile(route);
 						if (result == "")
 						{
 							KalaServer::PrintConsoleMessage(
@@ -1439,13 +1440,13 @@ namespace KalaKit::Core
 								"CLIENT",
 								"Client ["
 								+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-								+ filePath + "'.");
+								+ route + "'.");
 
 							auto resp500 = make_unique<Response_500>();
 							resp500->Init(
 								rawClientSocket,
 								clientIP,
-								filePath,
+								route,
 								"text/html");
 							server->SocketCleanup(socket);
 							return;
@@ -1456,8 +1457,8 @@ namespace KalaKit::Core
 							resp200->Init(
 								rawClientSocket,
 								clientIP,
-								filePath,
-								"text/html");
+								route,
+								foundRoute.mimeType);
 							server->SocketCleanup(socket);
 							return;
 						}
@@ -1471,13 +1472,13 @@ namespace KalaKit::Core
 							"CLIENT",
 							"Client ["
 							+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-							+ filePath + "'.\nError:\n" + e.what());
+							+ route + "'.\nError:\n" + e.what());
 
 						auto resp500 = make_unique<Response_500>();
 						resp500->Init(
 							rawClientSocket,
 							clientIP,
-							filePath,
+							route,
 							"text/html");
 						server->SocketCleanup(socket);
 					}
