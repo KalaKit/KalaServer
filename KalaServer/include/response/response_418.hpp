@@ -9,7 +9,7 @@
 
 namespace KalaKit::ResponseSystem
 {
-	class Response_Banned : public Response
+	class Response_418 : public Response
 	{
 	public:
 		void Init(

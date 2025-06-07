@@ -9,7 +9,7 @@
 
 namespace KalaKit::ResponseSystem
 {
-	class Response_200 : public Response
+	class Response_206 : public Response
 	{
 	public:
 		void Init(

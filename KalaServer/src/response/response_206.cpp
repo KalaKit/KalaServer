@@ -5,7 +5,7 @@
 
 #include "core/core.hpp"
 #include "core/server.hpp"
-#include "response/response_200.hpp"
+#include "response/response_206.hpp"
 
 using KalaKit::Core::Server;
 using KalaKit::Core::KalaServer;
@@ -15,7 +15,7 @@ using KalaKit::Core::Server;
 
 namespace KalaKit::ResponseSystem
 {
-	void Response_200::Init(
+	void Response_206::Init(
 		uintptr_t targetClientSocket,
 		const string& targetClientIP,
 		const string& targetRoute,
@@ -25,7 +25,7 @@ namespace KalaKit::ResponseSystem
 		string clientIP = targetClientIP;
 		string route = targetRoute;
 		string contentType = targetContentType;
-		string statusLine = "HTTP/1.1 200 OK";
+		string statusLine = "HTTP/1.1 206 Partial Content";
 
 		vector<char> body = Server::server->ServeFile(targetRoute);
 
@@ -36,12 +36,12 @@ namespace KalaKit::ResponseSystem
 				false,
 				ConsoleMessageType::Type_Error,
 				"SERVER",
-				"200 response file body was empty!");
+				"206 response file body was empty!");
 
 			string newBody =
 				"<html>"
 				"	<body>"
-				"		<h1>200 OK</h1>"
+				"		<h1>206 Partial Content</h1>"
 				"		<p>File not found or empty.</p>"
 				"	</body>"
 				"</html>";

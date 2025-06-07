@@ -13,7 +13,7 @@ using KalaKit::Core::ConsoleMessageType;
 
 namespace KalaKit::ResponseSystem
 {
-	void Response_Banned::Init(
+	void Response_418::Init(
 		uintptr_t targetClientSocket,
 		const string& targetClientIP,
 		const string& targetRoute,
