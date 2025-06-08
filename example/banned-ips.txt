@@ -69,7 +69,9 @@
     104.131.0.0               | wp-json enumeration to discover user data
     129.146.7.215             | aggressive WordPress scanner probing xmlrpc, feeds, and legacy paths
     142.93.0.0                | xmlrpc abuse for brute-force amplification
+    143.198.197.183           | wp-includes bruteforce scan
     152.42.241.137            | wp-includes and xmlrpc probe via repeated GETs
+    157.245.195.89            | CMS brute-force - DigitalOcean host
     159.65.5.61               | wlwmanifest.xml probe for WordPress discovery
     178.128.0.0               | WordPress plugin vulnerability scanner
     188.166.176.210           | wlwmanifest.xml probe for WordPress discovery
@@ -87,11 +89,13 @@
 
 ## Port Scanners and Enumeration Bots
     54.36.148.0               | continuous port scanning across multiple protocols
+    101.198.0.151             | frontend recon bot fishing for exposed configs
     155.4.131.116             | Russian IP scanning for unsecured web assets
     156.146.41.8              | known fingerprinting pattern across admin routes
     159.89.98.186             | stealthy API and asset path enumeration
     167.71.13.196             | checking for unauthorized internal service access
     185.244.25.0              | botnet node attempting fingerprinting payloads
+    196.119.139.16            | /.git-rewrite repeated bot hits
 
 ==================================================
 
@@ -122,6 +126,7 @@
 # Known SEO Spam / Link Injection
 
     5.45.207.0                | buttons-for-website.com spam crawler
+    23.111.114.116            | odd access to /gazzar/thanks/index.html
     46.229.168.0              | semalt SEO spam botnet
     195.154.0.0               | xtbot spam referrer
 
