@@ -1496,7 +1496,8 @@ namespace KalaKit::Core
 			pair<string, string> whitelistedClient = server->IsWhitelistedClient(clientIP);
 			pair<string, string> bannedClient = server->IsBannedClient(clientIP);
 
-			if (whitelistedClient.first != "")
+			if (isHost
+				|| whitelistedClient.first != "")
 			{
 				KalaServer::PrintConsoleMessage(
 					0,

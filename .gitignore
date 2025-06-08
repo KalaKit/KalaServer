@@ -6,5 +6,3 @@ build-release/
 
 # Ignore common file types not needed for distribution
 *.exe
-
-example/content/

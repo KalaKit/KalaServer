@@ -1,0 +1,118 @@
+###############
+# SEARCH ENGINES
+###############
+
+User-agent: Googlebot              # Google Search
+Allow: /
+
+User-agent: bingbot                # Bing Search
+Allow: /
+
+User-agent: DuckDuckBot            # DuckDuckGo Search
+Allow: /
+
+User-agent: Baiduspider            # Baidu (China)
+Allow: /
+
+User-agent: Yandex                 # Yandex (Russia)
+Allow: /
+
+User-agent: Qwantify               # Qwant (France)
+Allow: /
+
+User-agent: MojeekBot              # Mojeek (UK-based alt search engine)
+Allow: /
+
+User-agent: Sogou                  # Sogou (China)
+Allow: /
+
+User-agent: PetalBot               # Huawei Petal Search
+Allow: /
+
+User-agent: Applebot               # Apple Spotlight & Siri Search
+Allow: /
+
+User-agent: Exabot                 # Exalead search engine (France)
+Allow: /
+
+User-agent: SeznamBot              # Seznam.cz search engine (Czech Republic)
+Allow: /
+
+##########################
+# SEO & WEB ARCHIVING TOOLS
+##########################
+
+User-agent: ia_archiver            # Internet Archive (Wayback Machine)
+Allow: /
+
+User-agent: archive.org_bot        # Alternate Wayback Machine crawler
+Allow: /
+
+User-agent: AhrefsBot              # Ahrefs SEO tool
+Allow: /
+
+User-agent: SemrushBot             # Semrush SEO tool
+Allow: /
+
+User-agent: Mediapartners-Google   # Google AdSense crawler
+Allow: /
+
+User-agent: DotBot                 # Moz SEO crawler
+Allow: /
+
+##########################
+# LINK PREVIEW BOTS (SOCIAL MEDIA / EMBEDS)
+##########################
+
+User-agent: Facebot                # Facebook link preview
+Allow: /
+
+User-agent: Twitterbot             # Twitter link cards
+Allow: /
+
+User-agent: LinkedInBot            # LinkedIn preview cards
+Allow: /
+
+User-agent: Embedly                # Embed service used by Medium, Reddit, etc.
+Allow: /
+
+User-agent: Slackbot               # Slack link previews
+Allow: /
+
+User-agent: BingPreview            # Bing link previews
+Allow: /
+
+User-agent: Discordbot             # Discord link previews
+Allow: /
+
+User-agent: WhatsApp               # WhatsApp link previews
+Allow: /
+
+User-agent: TelegramBot            # Telegram link previews
+Allow: /
+
+User-agent: Pinterestbot           # Pinterest preview and indexing
+Allow: /
+
+##########################
+# AI / LLM CRAWLERS (TRUSTED)
+##########################
+
+User-agent: GPTBot                 # OpenAI's web crawler
+Allow: /
+
+User-agent: CCBot                  # Common Crawl (used in many LLMs)
+Allow: /
+
+User-agent: ClaudeBot              # Anthropic (Claude LLM)
+Allow: /
+
+User-agent: Amazonbot              # Amazon AI-related and web crawling
+Allow: /
+
+##########################
+# DEFAULT: BLOCK ALL OTHERS
+##########################
+
+User-agent: *
+Disallow: /
