@@ -1718,6 +1718,10 @@ namespace KalaKit::Core
 				"SERVER",
 				"Client [" + to_string(socket) + " - '" + clientIP + "'] is server host.");
 			clientIP = "host";
+
+			//always update routes and their access levels if host joins any route
+			canUpdateWhitelistedRoutes = true;
+			canUpdateRouteAccess = true;
 		}
 
 		pair<string, string> whitelistedClient = server->IsWhitelistedClient(clientIP);
