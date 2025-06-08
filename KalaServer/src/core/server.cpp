@@ -76,7 +76,8 @@ namespace KalaKit::Core
 
 	vector<string> whitelistedExtensions{};
 
-	vector<string> whitelistedIPs{};
+	atomic<bool> canUpdateWhitelistedIPs{ true };
+	vector<pair<string, string>> whitelistedIPs{};
 
 	atomic<bool> canUpdateBannedIPs{ true };
 	vector<pair<string, string>> bannedIPs{};
@@ -308,7 +309,8 @@ namespace KalaKit::Core
 
 		for (const pair<string, string>& bannedClient : bannedIPs)
 		{
-			if (bannedClient.first == targetIP)
+			if (bannedClient.first == targetIP
+				|| targetIP.rfind(bannedClient.first, 0) == 0)
 			{
 				banReason.first = bannedClient.first;
 				banReason.second = bannedClient.second;
@@ -560,7 +562,7 @@ namespace KalaKit::Core
 		case DataFileType::datafile_whitelistedIP:
 			for (const pair<string, string> resultValue : result)
 			{
-				whitelistedIPs.push_back(resultValue.first);
+				whitelistedIPs.push_back(resultValue);
 			}
 			break;
 		case DataFileType::datafile_bannedIP:
@@ -1097,6 +1099,16 @@ namespace KalaKit::Core
 		{
 			while (KalaServer::isRunning)
 			{
+				if (!canUpdateWhitelistedIPs) canUpdateWhitelistedIPs = true;
+
+				sleep_for(seconds(60));
+			}
+		}).detach();
+
+		thread([]
+		{
+			while (KalaServer::isRunning)
+			{
 				if (!canUpdateBannedIPs) canUpdateBannedIPs = true;
 
 				sleep_for(seconds(60));
@@ -1274,6 +1286,40 @@ namespace KalaKit::Core
 		return false;
 	}
 
+	pair<string, string> Server::IsWhitelistedClient(const string& targetIP) const
+	{
+		pair<string, string> whitelistedReason{};
+
+		if (whitelistedIPs.size() == 0)
+		{
+			canUpdateWhitelistedIPs = true;
+			server->GetWhitelistedIPs();
+		}
+
+		if (canUpdateWhitelistedIPs) server->GetWhitelistedIPs();
+
+		for (const pair<string, string>& whitelistedClient : whitelistedIPs)
+		{
+			if (whitelistedClient.first == targetIP
+				|| targetIP.rfind(whitelistedClient.first, 0) == 0)
+			{
+				whitelistedReason.first = whitelistedClient.first;
+				whitelistedReason.second = whitelistedClient.second;
+			}
+		}
+
+		return whitelistedReason;
+	}
+
+	void Server::GetWhitelistedIPs()
+	{
+		if (!canUpdateWhitelistedIPs) return;
+
+		server->GetFileData(DataFileType::datafile_whitelistedIP);
+
+		canUpdateWhitelistedIPs = false;
+	}
+
 	string Server::ExtractHeader(
 		const string& request, 
 		const string& headerName)
@@ -1447,63 +1493,81 @@ namespace KalaKit::Core
 				clientIP = "host";
 			}
 
+			pair<string, string> whitelistedClient = server->IsWhitelistedClient(clientIP);
 			pair<string, string> bannedClient = server->IsBannedClient(clientIP);
-			if (bannedClient.first != "")
+
+			if (whitelistedClient.first != "")
 			{
 				KalaServer::PrintConsoleMessage(
 					0,
 					false,
 					ConsoleMessageType::Type_Message,
 					"",
-					"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
+					"=============== WHITELISTED CLIENT =================\n"
 					" IP     : " + clientIP + "\n"
 					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + bannedClient.second + "\n"
+					" Reason : " + whitelistedClient.second + "\n"
 					"====================================================\n");
-
-				sleep_for(seconds(30));
-				auto respBanned = make_unique<Response_418>();
-				respBanned->Init(
-					rawClientSocket,
-					clientIP,
-					cleanRoute,
-					"text/html");
-				server->SocketCleanup(socket);
-				return;
 			}
-			else if (bannedClient.first == ""
-					 && !blacklistedKeywords.empty()
-					 && server->IsBlacklistedRoute(cleanRoute))
+			else
 			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					false,
-					ConsoleMessageType::Type_Message,
-					"",
-					"=============== BANNED CLIENT ======================\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + cleanRoute + "\n"
-					"====================================================\n");
-
-				sleep_for(milliseconds(5));
-
-				pair<string, string> bannedClient{};
-				bannedClient.first = clientIP;
-				bannedClient.second = cleanRoute;
-
-				if (server->BanClient(bannedClient))
+				if (bannedClient.first != "")
 				{
+					KalaServer::PrintConsoleMessage(
+						0,
+						false,
+						ConsoleMessageType::Type_Message,
+						"",
+						"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
+						" IP     : " + clientIP + "\n"
+						" Socket : " + to_string(clientSocket) + "\n"
+						" Reason : " + bannedClient.second + "\n"
+						"====================================================\n");
+
+					sleep_for(seconds(30));
 					auto respBanned = make_unique<Response_418>();
 					respBanned->Init(
-						clientSocket,
+						rawClientSocket,
 						clientIP,
 						cleanRoute,
 						"text/html");
+					server->SocketCleanup(socket);
+					return;
 				}
+				else if (bannedClient.first == ""
+					&& !blacklistedKeywords.empty()
+					&& server->IsBlacklistedRoute(cleanRoute))
+				{
+					KalaServer::PrintConsoleMessage(
+						0,
+						false,
+						ConsoleMessageType::Type_Message,
+						"",
+						"=============== BANNED CLIENT ======================\n"
+						" IP     : " + clientIP + "\n"
+						" Socket : " + to_string(clientSocket) + "\n"
+						" Reason : " + cleanRoute + "\n"
+						"====================================================\n");
 
-				server->SocketCleanup(socket);
-				return;
+					sleep_for(milliseconds(5));
+
+					pair<string, string> bannedClient{};
+					bannedClient.first = clientIP;
+					bannedClient.second = cleanRoute;
+
+					if (server->BanClient(bannedClient))
+					{
+						auto respBanned = make_unique<Response_418>();
+						respBanned->Init(
+							clientSocket,
+							clientIP,
+							cleanRoute,
+							"text/html");
+					}
+
+					server->SocketCleanup(socket);
+					return;
+				}
 			}
 
 			KalaServer::PrintConsoleMessage(

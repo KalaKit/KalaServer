@@ -1,117 +1,113 @@
 # Microsoft / Azure / Discord / Link preview infrastructure
   4.                   | Discord and Microsoft bot relays (e.g. 4.227.*)
-  13.                  | Microsoft legacy ranges (used by Teams / Defender)
+  13.                  | Microsoft legacy + preview infra (Teams / Defender / SharePoint)
   20.                  | Microsoft Azure (safe preview / proxy)
   35.196.132.85        | Verified safe Discord/Microsoft preview click IP
   40.                  | Microsoft (cloud services, bot relays)
   52.                  | Azure, Bing, Microsoft security services
-  13.107.0.0/16        | Microsoft Teams, Outlook preview, SharePoint
-  104.146.0.0/16       | Discord infrastructure and CDN edge (entire prefix)
-  204.79.197.0/24      | Microsoft SmartScreen, Bingbot, Defender Cloud
-  104.244.42.0/24      | Twitter proxy / URL preview fetcher
+  104.146.             | Discord infrastructure and CDN edge
+  204.79.197.          | Microsoft SmartScreen, Bingbot, Defender Cloud
+  23.100.              | Microsoft Skype & preview infra
+  2603:                | Microsoft Azure IPv6 block
+  2620:                | Microsoft, Defender SmartScreen, Teams
 
 ==================================================
 
 # CDN Providers / Legitimate Proxy Fronts
-  23.21.0.0/16         | AWS/Cloudflare (used by Discord relays, API edge)
+  23.21.               | AWS/Cloudflare (used by Discord relays, API edge)
   23.95.89.90          | DiscordBot preview fetcher (observed safe)
-  34.102.0.0/16        | Google Safe Browsing and preview link fetchers
-  34.120.0.0/16        | Google Cloud (safe crawler & preview infra)
-  35.190.0.0/16        | Google Frontend / load balancer IPs
-  104.18.0.0/15        | Cloudflare core proxy infrastructure
-  104.146.128.0/18     | Discord CDN / media proxy
-  151.101.0.0/16       | Fastly (used by GitHub, Reddit, npm, etc.)
-  151.101.1.69         | Fastly node used by Reddit and GitHub
-  151.101.65.69        | Fastly alt node (redundant)
+  34.102.              | Google Safe Browsing and preview link fetchers
+  34.120.              | Google Cloud (safe crawler & preview infra)
+  35.190.              | Google Frontend / load balancer IPs
+  35.237.              | Google Cloud instance (Discord prefetch)
+  104.18.              | Cloudflare core proxy infrastructure (used by Krita, Inkscape)
+  104.146.128.         | Discord CDN / media proxy
+  198.41.128.          | Cloudflare backplane / global datacenter IPs
+  103.21.244.          | Cloudflare preview edge (Asia/Singapore)
+  103.22.200.          | Cloudflare preview edge (APAC)
+  103.31.4.            | Cloudflare preview edge (Europe)
+  2a03:e600::          | Cloudflare IPv6 CDN and preview network
+  2606:4700:           | Cloudflare IPv6 edge network
 
 ==================================================
 
 # Search Engine and Preview Bots (Safe)
-  66.249.64.0/19       | Googlebot (search engine crawler)
-  64.233.160.0/19      | Google services / search infra
-  74.125.0.0/16        | Google frontend & search
-  172.217.0.0/16       | Google frontend & search
-  216.239.32.0/19      | Google backend & mail / drive / preview
-  17.0.0.0/8           | Applebot (Apple search, iCloud preview)
-  157.55.0.0/16        | Bingbot, Microsoft services
-  157.56.0.0/14        | Bing / MSN / Microsoft crawler and preview
-  31.13.0.0/16         | Facebook / Meta link preview system
-  69.63.0.0/16         | Facebook legacy infra
-  108.174.0.0/16       | LinkedIn bots and marketing previews
-  199.255.192.0/22     | LinkedIn preview & scraping bots
-  207.241.224.0/19     | Internet Archive (Wayback Machine)
+  66.249.64.           | Googlebot (search engine crawler)
+  64.233.160.          | Google services / search infra
+  74.125.              | Google frontend & search
+  172.217.             | Google frontend & search
+  216.239.32.          | Google backend & mail / drive / preview
+  17.                  | Applebot (Apple search, iCloud preview)
+  157.55.              | Bingbot, Microsoft services
+  157.56.              | Bing / MSN / Microsoft crawler and preview
+  40.114.191.          | DuckDuckGo crawler and preview bot
+  31.13.               | Facebook / Meta link preview system
+  69.63.               | Facebook legacy infra
+  108.174.             | LinkedIn bots and marketing previews
+  199.255.192.         | LinkedIn preview & scraping bots
+  207.241.224.         | Internet Archive (Wayback Machine)
 
 ==================================================
 
 # Major Social / Media Platforms
-  91.108.4.0/22        | Telegram media CDN / core MTProto infra
-  149.154.160.0/20     | Telegram global services / CDN
-  161.117.0.0/16       | TikTok / ByteDance CDN (Singapore/global)
-  47.246.0.0/16        | ByteDance cloud/CDN infrastructure (global)
-  54.236.0.0/15        | Pinterest preview fetcher via AWS EC2
+  91.108.4.            | Telegram media CDN / core MTProto infra
+  149.154.160.         | Telegram global services / CDN
+  161.117.             | TikTok / ByteDance CDN (Singapore/global)
+  47.246.              | ByteDance cloud/CDN infrastructure (global)
+  54.236.              | Pinterest preview fetcher via AWS EC2
+  69.171.250.          | Instagram preview system
+  157.240.             | Meta (Facebook/WhatsApp/Messenger link previews)
+  2803:f800:           | WhatsApp link preview system
+  2a03:2880:           | Facebook/Meta preview system (shared with WhatsApp/Instagram)
 
 ==================================================
 
 # Gaming / Game Development Infrastructure
-  208.64.200.0/21      | Valve / Steam (game services, CDN, backend)
-  162.254.192.0/18     | Valve / Steamworks (Matchmaking, APIs)
-  185.25.180.0/22      | Epic Games (store, launcher, CDN)
-  185.25.181.0/24      | Epic Games fallback node
-  34.194.0.0/16        | Amazon GameLift / AWS game services / Inkscape updates and media mirrors
-  34.192.0.0/10        | Amazon Studios & general AWS game backend
-  104.198.0.0/16       | Unity Cloud Build / Services / Ads
-  35.232.0.0/16        | Unity Cloud CDN (Google-hosted)
-  195.201.0.0/16       | Godot game engine infra (Germany – Hetzner)
-  104.155.0.0/16       | Riot Games (LoL, Valorant infra, hosted on GCP)
-  192.207.0.0/16       | Roblox Corporation (games, CDN)
+  208.64.200.          | Valve / Steam (game services, CDN, backend)
+  162.254.192.         | Valve / Steamworks (Matchmaking, APIs)
+  185.25.180.          | Epic Games (store, launcher, CDN)
+  185.25.181.          | Epic Games fallback node
+  34.194.              | Amazon GameLift / AWS game services / Inkscape updates
+  34.192.              | Amazon Studios & general AWS game backend
+  104.198.             | Unity Cloud Build / Services / Ads
+  35.232.              | Unity Cloud CDN (Google-hosted)
+  195.201.             | Godot game engine infra (Germany – Hetzner)
+  104.155.             | Riot Games (LoL, Valorant infra, hosted on GCP)
+  192.207.             | Roblox Corporation (games, CDN)
 
 ==================================================
 
 # Safe Browser-Based Link Preview and Unfurl Bots
-  23.100.232.0/21      | Skype link previews and Microsoft SmartScreen
-  20.191.45.0/24       | Microsoft Defender URL analysis
-  103.21.244.0/22      | Cloudflare preview edge (Asia/Singapore)
-  103.22.200.0/22      | Cloudflare preview edge (APAC)
-  103.31.4.0/22        | Cloudflare preview edge (Europe)
-  2a03:e600::/29       | Cloudflare IPv6 CDN and preview network
-  69.171.250.0/24      | Instagram preview system
-  157.240.0.0/16       | Meta (Facebook/WhatsApp/Messenger link previews)
-  185.89.218.0/24      | Viber preview fetcher
-  91.132.136.0/24      | Viber CDN and unfurl infrastructure
-  185.191.171.0/24     | Brave browser and Bravebot (privacy-safe)
-  185.199.108.0/22     | GitHub Pages + raw content preview CDN (Fastly)
-  64.62.202.0/24       | Tutanota secure email preview service
+  185.89.218.          | Viber preview fetcher
+  91.132.136.          | Viber CDN and unfurl infrastructure
+  185.191.171.         | Brave browser and Bravebot (privacy-safe)
+  185.199.108.         | GitHub Pages + raw content preview CDN (Fastly)
+  185.199.109.         | GitHub Pages alt zone (used by Foundry docs)
+  64.62.202.           | Tutanota secure email preview service
 
 ==================================================
 
 # Creative / Media / Design Software Infrastructure
-  185.199.110.0/24     | Blender CDN and updates (hosted on GitHub/Fastly)
-  185.199.108.0/22     | GitHub Pages and raw.blender.org (used by Blender, Inkscape)
-  185.60.84.0/22       | Adobe Creative Cloud (all Adobe cloud services)
-  192.150.0.0/16       | Adobe Systems (licenses, telemetry, updates)
-  130.211.0.0/22       | Google Cloud - Adobe backend infrastructure
-  35.190.0.0/16        | Google frontend - Adobe/AIR/Fonts CDN
-  34.120.0.0/16        | Google Cloud (Inkscape telemetry, fonts.google.com)
-  13.107.6.0/24        | Microsoft/Adobe collaboration zone
-  143.204.0.0/16       | AWS CloudFront used by Pixiv, Canva, Adobe Express
-  104.18.0.0/15        | Cloudflare CDN used by Krita and Inkscape forums
-  35.244.0.0/16        | Autodesk Cloud / Maya / Fusion 360 licensing and updates
-  45.60.0.0/14         | Corel (PaintShop Pro, CorelDRAW update infrastructure)
-  104.17.0.0/16        | CDN for Affinity / Serif (Affinity Designer, Photo)
-  185.199.109.0/24     | Foundry (Nuke, Modo) GitHub-hosted documentation/CDNs
-  35.203.0.0/16        | Canva backend services (Google-hosted)
-  52.84.0.0/14         | Amazon CloudFront (used by Adobe, Autodesk, Canva)
+  185.199.110.         | Blender CDN and updates (hosted on GitHub/Fastly)
+  185.60.84.           | Adobe Creative Cloud (all Adobe cloud services)
+  192.150.             | Adobe Systems (licenses, telemetry, updates)
+  192.147.             | Adobe secondary AEM/Typekit services
+  130.211.             | Google Cloud - Adobe backend infrastructure
+  35.244.              | Autodesk Cloud / Maya / Fusion 360 licensing
+  35.190.              | Google frontend - Adobe/AIR/Fonts CDN
+  34.120.              | Google Cloud (Inkscape telemetry, fonts.google.com)
+  143.204.             | AWS CloudFront used by Pixiv, Canva, Adobe Express
+  45.60.               | Corel (PaintShop Pro, CorelDRAW update infra)
+  104.17.              | CDN for Affinity / Serif (Affinity Designer, Photo)
+  35.203.              | Canva backend services (Google-hosted)
+  52.84.               | Amazon CloudFront (used by Adobe, Autodesk, Canva)
 
 ==================================================
 
 # IPv6 - Discord, Microsoft, Cloudflare, Fastly, Google, Meta
   2001:                | General safe IPv6 space (Cloudflare, Fastly, Discord)
   2404:6800:           | Google link scanning / safe browsing IPv6
-  2603:                | Microsoft Azure IPv6 block
   2606:4700:           | Cloudflare IPv6 edge network
-  2620:                | Microsoft, Defender SmartScreen, Teams
   2620:fe::            | Cloudflare preview and protection network
   2a00:1450:           | Google frontend + search/preview crawlers
-  2a03:2880:           | Facebook/Meta preview system (shared with WhatsApp/Instagram)
   2a04:4e40:           | Fastly CDN global presence
-  2803:f800:           | WhatsApp link preview system

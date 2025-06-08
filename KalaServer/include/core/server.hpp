@@ -162,6 +162,11 @@ namespace KalaKit::Core
 		bool IsHost(const string& targetIP);
 
 		/// <summary>
+		/// Returns whitelisted ip + reason if IP address is whitelisted and should always be allowed to access any existing routes.
+		/// </summary>
+		pair<string, string> IsWhitelistedClient(const string& ip) const;
+
+		/// <summary>
 		/// Allows server to start accepting connections. Do not call manually.
 		/// </summary>
 		void SetServerReadyState(bool newReadyState) { isServerReady = newReadyState; };
@@ -205,6 +210,11 @@ namespace KalaKit::Core
 		/// Reads 'banned-ips.txt' and stores all IPs and reasons in bannedIPs pair.
 		/// </summary>
 		void GetBannedIPs();
+
+		/// <summary>
+		/// Reads 'whitelisted-ips.txt' and stores all IPs and reasons in whitelistedIPs pair.
+		/// </summary>
+		void GetWhitelistedIPs();
 
 		/// <summary>
 		/// Handle each client in its own thread.
