@@ -59,13 +59,21 @@ int main()
 		.blacklistedKeywordsFile = "blacklisted-keywords.txt"
 	};
 
+	vector<string> registeredRoutes{};
+	vector<string> adminRoutes
+	{
+		"/admin"
+	};
+
 	bool success = Server::Initialize(
 		port,
 		healthTimer,
 		serverName,
 		domainName,
 		msg,
-		dataFile);
+		dataFile,
+		registeredRoutes,
+		adminRoutes);
 
 	if (!success) return 0;
 

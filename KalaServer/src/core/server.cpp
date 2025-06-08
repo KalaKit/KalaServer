@@ -69,20 +69,33 @@ using std::min;
 
 namespace KalaKit::Core
 {	
+	atomic<bool> canUpdateRouteAccess{ true };
+	//Routes only registered users can access
+	vector<string> registeredRoutes{};
+	//Routes only admins and host can access
+	vector<string> adminRoutes{};
+
 	atomic<bool> canUpdateWhitelistedRoutes{ true };
+	//All routes that exist on disk
 	vector<Route> whitelistedRoutes{};
 
+	//All keywords that trigger a ban
 	vector<string> blacklistedKeywords{};
 
+	//All extensions whose files are allowed to be opened
 	vector<string> whitelistedExtensions{};
 
 	atomic<bool> canUpdateWhitelistedIPs{ true };
+	//All IPs that will always bypass ban filter
 	vector<pair<string, string>> whitelistedIPs{};
 
 	atomic<bool> canUpdateBannedIPs{ true };
+	//All IPs banned permanently from server unless manually removed
 	vector<pair<string, string>> bannedIPs{};
 
 	atomic<bool> canUpdateMachineIPs{ true };
+	//All host IPs to check which one host currently uses
+	//to confirm if IP really belongs to host or not
 	vector<string> machineIPs{};
 
 	bool Server::Initialize(
@@ -91,7 +104,9 @@ namespace KalaKit::Core
 		const string& serverName,
 		const string& domainName,
 		const ErrorMessage& errorMessage,
-		const DataFile& dataFile)
+		const DataFile& dataFile,
+		const vector<string>& submittedRegisteredRoutes,
+		const vector<string>& submittedAdminRoutes)
 	{
 		server = make_unique<Server>(
 			port,
@@ -120,6 +135,10 @@ namespace KalaKit::Core
 		server->GetFileData(DataFileType::datafile_whitelistedIP);
 		server->GetFileData(DataFileType::datafile_bannedIP);
 		server->GetFileData(DataFileType::datafile_blacklistedKeyword);
+
+		registeredRoutes = submittedRegisteredRoutes;
+		adminRoutes = submittedAdminRoutes;
+		server->SetRouteAccessLevels();
 		
 		WSADATA wsaData{};
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
@@ -1124,6 +1143,16 @@ namespace KalaKit::Core
 				sleep_for(seconds(60));
 			}
 		}).detach();
+
+		thread([]
+		{
+			while (KalaServer::isRunning)
+			{
+				if (!canUpdateRouteAccess) canUpdateRouteAccess = true;
+
+				sleep_for(seconds(60));
+			}
+		}).detach();
 	}
 
 	void Server::GetMachineIPs()
@@ -1320,6 +1349,195 @@ namespace KalaKit::Core
 		canUpdateWhitelistedIPs = false;
 	}
 
+	bool Server::IsRegisteredRoute(const string& route)
+	{
+		if (canUpdateRouteAccess)
+		{
+			server->SetRouteAccessLevels();
+			canUpdateRouteAccess = false;
+		}
+
+		for (const auto& registeredRoute : registeredRoutes)
+		{
+			if (route == registeredRoute) return true;
+		}
+
+		return false;
+	}
+
+	bool Server::IsAdminRoute(const string& route)
+	{
+		if (canUpdateRouteAccess)
+		{
+			server->SetRouteAccessLevels();
+			canUpdateRouteAccess = false;
+		}
+
+		for (const auto& adminRoute : adminRoutes)
+		{
+			if (route == adminRoute) return true;
+		}
+
+		return false;
+	}
+
+	void Server::SetRouteAccessLevels()
+	{
+		if (!canUpdateRouteAccess) return;
+
+		vector<string> currentRegisteredRoutes = registeredRoutes;
+		vector<string> currentAdminRoutes = adminRoutes;
+
+		//remove invalid registered routes
+		if (!currentRegisteredRoutes.empty())
+		{
+			vector<string> cleanedRegisteredRoutes{};
+			vector<string> invalidRegisteredRoutes{};
+			for (const auto& registeredRoute : currentRegisteredRoutes)
+			{
+				bool validRoute = false;
+				for (const auto& r : whitelistedRoutes)
+				{
+					if (r.route == registeredRoute)
+					{
+						validRoute = true;
+						break;
+					}
+				}
+
+				if (!validRoute)
+				{
+					invalidRegisteredRoutes.push_back(registeredRoute);
+				}
+				else
+				{
+					cleanedRegisteredRoutes.push_back(registeredRoute);
+				}
+			}
+			if (!invalidRegisteredRoutes.empty())
+			{
+				for (const auto& invalidRegisteredRoute : invalidRegisteredRoutes)
+				{
+					KalaServer::PrintConsoleMessage(
+						0,
+						true,
+						ConsoleMessageType::Type_Error,
+						"SERVER",
+						"Registered route '" + invalidRegisteredRoute + "' is not whitelisted! Cannot add to allowed registered routes...");
+				}
+			}
+
+			registeredRoutes = cleanedRegisteredRoutes;
+		}
+
+		//remove invalid admin routes
+		if (!currentAdminRoutes.empty())
+		{
+			vector<string> cleanedAdminRoutes{};
+			vector<string> invalidAdminRoutes{};
+			for (const auto& adminRoute : currentAdminRoutes)
+			{
+				bool validRoute = false;
+				for (const auto& r : whitelistedRoutes)
+				{
+					if (r.route == adminRoute)
+					{
+						validRoute = true;
+						break;
+					}
+				}
+
+				if (!validRoute)
+				{
+					invalidAdminRoutes.push_back(adminRoute);
+				}
+				else
+				{
+					cleanedAdminRoutes.push_back(adminRoute);
+				}
+			}
+			if (!invalidAdminRoutes.empty())
+			{
+				for (const auto& invalidAdminRoute : invalidAdminRoutes)
+				{
+					KalaServer::PrintConsoleMessage(
+						0,
+						true,
+						ConsoleMessageType::Type_Error,
+						"SERVER",
+						"Admin route '" + invalidAdminRoute + "' is not whitelisted! Cannot add to allowed admin routes...");
+				}
+			}
+
+			adminRoutes = cleanedAdminRoutes;
+		}
+
+		//confirm admin routes dont have same routes as registered routes
+		if (!adminRoutes.empty())
+		{
+			vector<string> finalAdminRoutes{};
+			for (auto& adminRoute : adminRoutes)
+			{
+				if (find(
+					registeredRoutes.begin(),
+					registeredRoutes.end(),
+					adminRoute)
+					== registeredRoutes.end())
+				{
+					finalAdminRoutes.push_back(adminRoute);
+				}
+			}
+			adminRoutes = finalAdminRoutes;
+		}
+
+		//assign route access levels
+		for (auto& r : whitelistedRoutes)
+		{
+			r.accessLevel = AccessLevel::access_user;
+
+			for (const auto& registeredRoute : registeredRoutes)
+			{
+				if (r.route == registeredRoute)
+				{
+					r.accessLevel = AccessLevel::access_registered;
+
+					KalaServer::PrintConsoleMessage(
+						2,
+						true,
+						ConsoleMessageType::Type_Message,
+						"SERVER",
+						"Set route '" + r.route + "' access level to 'registered'");
+
+					break;
+				}
+			}
+
+			for (const auto& adminRoute : adminRoutes)
+			{
+				if (r.route == adminRoute)
+				{
+					r.accessLevel = AccessLevel::access_admin;
+
+					KalaServer::PrintConsoleMessage(
+						2,
+						true,
+						ConsoleMessageType::Type_Message,
+						"SERVER",
+						"Set route '" + r.route + "' access level to 'admin'");
+
+					break;
+				}
+			}
+		}
+
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SERVER",
+			"Refreshed route access levels");
+	}
+
 	string Server::ExtractHeader(
 		const string& request, 
 		const string& headerName)
@@ -1365,6 +1583,10 @@ namespace KalaKit::Core
 
 	void Server::HandleClient(uintptr_t socket)
 	{
+		//
+		// START CLIENT CONNECTION
+		//
+
 		KalaServer::PrintConsoleMessage(
 			2,
 			true,
@@ -1393,6 +1615,10 @@ namespace KalaKit::Core
 
 		if (bytesReceived == SOCKET_ERROR)
 		{
+			//
+			// INVALID SOCKET CONNECTION - CLOSE SOCKET
+			//
+
 			DWORD err = WSAGetLastError();
 			if (err == WSAETIMEDOUT)
 			{
@@ -1419,6 +1645,10 @@ namespace KalaKit::Core
 		}
 		else if (bytesReceived == 0)
 		{
+			//
+			// EMPTY SOCKET - CLOSE SOCKET
+			//
+
 			KalaServer::PrintConsoleMessage(
 				2,
 				true,
@@ -1430,182 +1660,361 @@ namespace KalaKit::Core
 			closesocket(rawClientSocket);
 			return;
 		}
-		else
+
+		string request(buffer);
+		string route = "/";
+
+		KalaServer::PrintConsoleMessage(
+			2,
+			true,
+			ConsoleMessageType::Type_Debug,
+			"CLIENT",
+			"Socket [" + to_string(socket) + "] raw HTTP request:\n" + request);
+
+		if (request.starts_with("GET "))
 		{
-			string request(buffer);
-			string route = "/";
+			size_t pathStart = 4;
+			size_t pathEnd = request.find(' ', pathStart);
+			if (pathEnd != string::npos)
+			{
+				route = request.substr(pathStart, pathEnd - pathStart);
+			}
+		}
+
+		string cleanRoute = route;
+		size_t q = cleanRoute.find('?');
+		if (q != string::npos)
+		{
+			cleanRoute = cleanRoute.substr(0, q);
+		}
+
+		string clientIP = server->ExtractHeader(
+			request,
+			"Cf-Connecting-Ip");
+
+		if (clientIP.empty())
+		{
+			clientIP = "unknown-ip";
 
 			KalaServer::PrintConsoleMessage(
-				2,
+				0,
 				true,
-				ConsoleMessageType::Type_Debug,
-				"CLIENT",
-				"Socket [" + to_string(socket) + "] raw HTTP request:\n" + request);
+				ConsoleMessageType::Type_Warning,
+				"SERVER",
+				"Failed to get client IP for socket [" + to_string(socket) + "]!"
+				"\n"
+				"Full request dump :"
+				"\n" +
+				request);
+		}
 
-			if (request.starts_with("GET "))
-			{
-				size_t pathStart = 4;
-				size_t pathEnd = request.find(' ', pathStart);
-				if (pathEnd != string::npos)
-				{
-					route = request.substr(pathStart, pathEnd - pathStart);
-				}
-			}
+		bool isHost = IsHost(clientIP);
+		if (isHost)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				true,
+				ConsoleMessageType::Type_Message,
+				"SERVER",
+				"Client [" + to_string(socket) + " - '" + clientIP + "'] is server host.");
+			clientIP = "host";
+		}
 
-			string cleanRoute = route;
-			size_t q = cleanRoute.find('?');
-			if (q != string::npos)
-			{
-				cleanRoute = cleanRoute.substr(0, q);
-			}
+		pair<string, string> whitelistedClient = server->IsWhitelistedClient(clientIP);
+		pair<string, string> bannedClient = server->IsBannedClient(clientIP);
 
-			//attempts to get client ip from cloudflare header
+		//
+		// CHECK IF CLIENT IS WHITELISTED OR BANNED
+		//
 
-			string clientIP = server->ExtractHeader(
-				request,
-				"Cf-Connecting-Ip");
-
-			if (clientIP.empty())
-			{
-				clientIP = "unknown-ip";
-
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Warning,
-					"SERVER",
-					"Failed to get client IP for socket [" + to_string(socket) + "]!"
-					"\n"
-					"Full request dump :"
-					"\n" +
-					request);
-			}
-
-			bool isHost = IsHost(clientIP);
-			if (isHost)
-			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Message,
-					"SERVER",
-					"Client [" + to_string(socket) + " - '" + clientIP + "'] is server host.");
-				clientIP = "host";
-			}
-
-			pair<string, string> whitelistedClient = server->IsWhitelistedClient(clientIP);
-			pair<string, string> bannedClient = server->IsBannedClient(clientIP);
-
-			if (isHost
-				|| whitelistedClient.first != "")
+		if (isHost
+			|| whitelistedClient.first != "")
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				false,
+				ConsoleMessageType::Type_Message,
+				"",
+				"=============== WHITELISTED CLIENT =================\n"
+				" IP     : " + clientIP + "\n"
+				" Socket : " + to_string(clientSocket) + "\n"
+				" Reason : " + whitelistedClient.second + "\n"
+				"====================================================\n");
+		}
+		else
+		{
+			if (bannedClient.first != "")
 			{
 				KalaServer::PrintConsoleMessage(
 					0,
 					false,
 					ConsoleMessageType::Type_Message,
 					"",
-					"=============== WHITELISTED CLIENT =================\n"
+					"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
 					" IP     : " + clientIP + "\n"
 					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + whitelistedClient.second + "\n"
+					" Reason : " + bannedClient.second + "\n"
 					"====================================================\n");
-			}
-			else
-			{
-				if (bannedClient.first != "")
-				{
-					KalaServer::PrintConsoleMessage(
-						0,
-						false,
-						ConsoleMessageType::Type_Message,
-						"",
-						"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
-						" IP     : " + clientIP + "\n"
-						" Socket : " + to_string(clientSocket) + "\n"
-						" Reason : " + bannedClient.second + "\n"
-						"====================================================\n");
 
-					sleep_for(seconds(30));
+				sleep_for(seconds(30));
+				auto respBanned = make_unique<Response_418>();
+				respBanned->Init(
+					rawClientSocket,
+					clientIP,
+					cleanRoute,
+					"text/html");
+				server->SocketCleanup(socket);
+				return;
+			}
+			else if (bannedClient.first == ""
+				&& !blacklistedKeywords.empty()
+				&& server->IsBlacklistedRoute(cleanRoute))
+			{
+				KalaServer::PrintConsoleMessage(
+					0,
+					false,
+					ConsoleMessageType::Type_Message,
+					"",
+					"=============== BANNED CLIENT ======================\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Reason : " + cleanRoute + "\n"
+					"====================================================\n");
+
+				sleep_for(milliseconds(5));
+
+				pair<string, string> bannedClient{};
+				bannedClient.first = clientIP;
+				bannedClient.second = cleanRoute;
+
+				if (server->BanClient(bannedClient))
+				{
 					auto respBanned = make_unique<Response_418>();
 					respBanned->Init(
-						rawClientSocket,
+						clientSocket,
 						clientIP,
 						cleanRoute,
 						"text/html");
-					server->SocketCleanup(socket);
-					return;
 				}
-				else if (bannedClient.first == ""
-					&& !blacklistedKeywords.empty()
-					&& server->IsBlacklistedRoute(cleanRoute))
-				{
-					KalaServer::PrintConsoleMessage(
-						0,
-						false,
-						ConsoleMessageType::Type_Message,
-						"",
-						"=============== BANNED CLIENT ======================\n"
-						" IP     : " + clientIP + "\n"
-						" Socket : " + to_string(clientSocket) + "\n"
-						" Reason : " + cleanRoute + "\n"
-						"====================================================\n");
 
-					sleep_for(milliseconds(5));
-
-					pair<string, string> bannedClient{};
-					bannedClient.first = clientIP;
-					bannedClient.second = cleanRoute;
-
-					if (server->BanClient(bannedClient))
-					{
-						auto respBanned = make_unique<Response_418>();
-						respBanned->Init(
-							clientSocket,
-							clientIP,
-							cleanRoute,
-							"text/html");
-					}
-
-					server->SocketCleanup(socket);
-					return;
-				}
+				server->SocketCleanup(socket);
+				return;
 			}
+		}
 
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SERVER",
+			"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
+
+		string body{};
+		string statusLine = "HTTP/1.1 200 OK";
+
+		//
+		// CHECK IF ROUTE EXISTS
+		//
+
+		GetWhitelistedRoutes();
+
+		Route foundRoute{};
+		for (const auto& r : whitelistedRoutes)
+		{
+			if (r.route == cleanRoute)
+			{
+				foundRoute = r;
+				break;
+			}
+		}
+
+		if (foundRoute.route.empty())
+		{
 			KalaServer::PrintConsoleMessage(
-				0,
+				2,
 				true,
 				ConsoleMessageType::Type_Message,
-				"SERVER",
-				"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
+				"CLIENT",
+				"Client ["
+				+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '"
+				+ cleanRoute + "'!");
 
-			string body{};
-			string statusLine = "HTTP/1.1 200 OK";
+			auto resp404 = make_unique<Response_404>();
+			resp404->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			server->SocketCleanup(socket);
+			return;
+		}
 
-			GetWhitelistedRoutes();
-
-			Route foundRoute{};
-			for (const auto& r : whitelistedRoutes)
+		bool extentionExists = false;
+		for (const auto& ext : whitelistedExtensions)
+		{
+			if (path(cleanRoute).extension().generic_string() == ext)
 			{
-				if (r.route == cleanRoute)
-				{
-					foundRoute = r;
-					break;
-				}
+				extentionExists = true;
+				break;
 			}
+		}
 
-			if (foundRoute.route.empty())
+		//
+		// CHECK IF ROUTE EXTENSION IS ALLOWED
+		//
+
+		bool isAllowedFile =
+			cleanRoute.find_last_of('.') == string::npos
+			|| extentionExists;
+
+		if (!isAllowedFile)
+		{
+			KalaServer::PrintConsoleMessage(
+				2,
+				true,
+				ConsoleMessageType::Type_Warning,
+				"CLIENT",
+				"Client ["
+				+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + cleanRoute
+				+ "' from path '" + foundRoute.route + "'.");
+
+			auto resp403 = make_unique<Response_403>();
+			resp403->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			server->SocketCleanup(socket);
+			return;
+		}
+
+		//
+		// CHECK IF CLIENT AND ROUTE AUTH LEVEL ARE THE SAME
+		//
+
+		bool isRegisteredRoute = IsRegisteredRoute(route);
+		bool isAdminRoute = IsAdminRoute(route);
+
+		bool isClientRegistered = false;
+		bool isClientAdmin = false;
+
+		bool canAccessRegisteredRoute =
+			isRegisteredRoute
+			&& (isClientRegistered
+			|| isClientAdmin
+			|| isHost);
+
+		bool canAccessAdminRoute =
+			isAdminRoute
+			&& (isClientAdmin
+			|| isHost);
+
+		bool allowEntrance =
+			(!isRegisteredRoute
+			&& !isAdminRoute)
+			|| canAccessRegisteredRoute
+			|| canAccessAdminRoute;
+
+		string routeAuth = "[USER]";
+		string clientAuth = "[USER]";
+
+		if (isRegisteredRoute) routeAuth = "[REGISTERED]";
+		if (isAdminRoute) routeAuth = "[ADMIN]";
+
+		if (isClientRegistered) clientAuth = "[REGISTERED]";
+		if (isClientAdmin || isHost) clientAuth = "[ADMIN]";
+
+		if (!allowEntrance)
+		{
+			KalaServer::PrintConsoleMessage(
+				2,
+				true,
+				ConsoleMessageType::Type_Warning,
+				"CLIENT",
+				"Client ["
+				+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth 
+				+ " tried to access route '" + cleanRoute
+				+ "' with auth level " + routeAuth + "!");
+
+			auto resp403 = make_unique<Response_403>();
+			resp403->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			server->SocketCleanup(socket);
+			return;
+		}
+
+		if ((isClientRegistered
+			|| isClientAdmin
+			|| isHost)
+			&& isRegisteredRoute)
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				false,
+				ConsoleMessageType::Type_Message,
+				"",
+				"==== APPROVED CLIENT CONNECTED TO PRIVATE ROUTE ====\n"
+				" IP     : " + clientIP + "\n"
+				" Socket : " + to_string(clientSocket) + "\n"
+				" Reason : " + cleanRoute + "\n"
+				"====================================================\n");
+		}
+
+		if ((isClientAdmin
+			|| isHost)
+			&& (isRegisteredRoute
+			|| isAdminRoute))
+		{
+			KalaServer::PrintConsoleMessage(
+				0,
+				false,
+				ConsoleMessageType::Type_Message,
+				"",
+				"===== APPROVED CLIENT CONNECTED TO ADMIN ROUTE =====\n"
+				" IP     : " + clientIP + "\n"
+				" Socket : " + to_string(clientSocket) + "\n"
+				" Reason : " + cleanRoute + "\n"
+				"====================================================\n");
+		}
+
+		try
+		{
+			size_t rangeStart = 0;
+			size_t rangeEnd = 0;
+
+			string rangeHeader = server->ExtractHeaderValue(
+				request,
+				"Range");
+			server->ParseByteRange(
+				rangeHeader,
+				rangeStart,
+				rangeEnd);
+
+			size_t totalSize = 0;
+			bool sliced = false;
+			vector<char> result = server->ServeFile(
+				cleanRoute,
+				rangeStart,
+				rangeEnd,
+				totalSize,
+				sliced);
+
+			if (result.empty())
 			{
 				KalaServer::PrintConsoleMessage(
 					2,
 					true,
-					ConsoleMessageType::Type_Message,
+					ConsoleMessageType::Type_Error,
 					"CLIENT",
-					"Client [" 
-					+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '" 
-					+ cleanRoute + "'!");
+					"Client ["
+					+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+					+ cleanRoute + "'.");
 
-				auto resp404 = make_unique<Response_404>();
-				resp404->Init(
+				auto resp500 = make_unique<Response_500>();
+				resp500->Init(
 					rawClientSocket,
 					clientIP,
 					cleanRoute,
@@ -1615,142 +2024,59 @@ namespace KalaKit::Core
 			}
 			else
 			{
-				bool extentionExists = false;
-				for (const auto& ext : whitelistedExtensions)
+				if (sliced)
 				{
-					if (path(cleanRoute).extension().generic_string() == ext)
-					{
-						extentionExists = true;
-						break;
-					}
-				}
+					auto resp206 = make_unique<Response_206>();
 
-				bool isAllowedFile =
-					cleanRoute.find_last_of('.') == string::npos
-					|| extentionExists;
+					resp206->hasRange = true;
+					resp206->rangeStart = rangeStart;
+					resp206->rangeEnd = rangeStart + result.size() - 1;
+					resp206->totalSize = totalSize;
+					resp206->contentRange =
+						"bytes 0-"
+						+ to_string(result.size() - 1)
+						+ "/"
+						+ to_string(totalSize);
 
-				if (!isAllowedFile)
-				{
-					KalaServer::PrintConsoleMessage(
-						2,
-						true,
-						ConsoleMessageType::Type_Warning,
-						"CLIENT",
-						"Client [" 
-						+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + cleanRoute 
-						+ "' from path '" + foundRoute.route + "'.");
-
-					auto resp403 = make_unique<Response_403>();
-					resp403->Init(
+					resp206->Init(
 						rawClientSocket,
 						clientIP,
 						cleanRoute,
-						"text/html");
+						foundRoute.mimeType);
 					server->SocketCleanup(socket);
 					return;
 				}
 				else
 				{
-					try
-					{
-						size_t rangeStart = 0;
-						size_t rangeEnd = 0;
-
-						string rangeHeader = server->ExtractHeaderValue(
-							request, 
-							"Range");
-						server->ParseByteRange(
-							rangeHeader, 
-							rangeStart, 
-							rangeEnd);
-
-						size_t totalSize = 0;
-						bool sliced = false;
-						vector<char> result = server->ServeFile(
-							cleanRoute,
-							rangeStart,
-							rangeEnd,
-							totalSize,
-							sliced);
-
-						if (result.empty())
-						{
-							KalaServer::PrintConsoleMessage(
-								2,
-								true,
-								ConsoleMessageType::Type_Error,
-								"CLIENT",
-								"Client ["
-								+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-								+ cleanRoute + "'.");
-
-							auto resp500 = make_unique<Response_500>();
-							resp500->Init(
-								rawClientSocket,
-								clientIP,
-								cleanRoute,
-								"text/html");
-							server->SocketCleanup(socket);
-							return;
-						}
-						else
-						{
-							if (sliced)
-							{
-								auto resp206 = make_unique<Response_206>();
-
-								resp206->hasRange = true;
-								resp206->rangeStart = rangeStart;
-								resp206->rangeEnd = rangeStart + result.size() - 1;
-								resp206->totalSize = totalSize;
-								resp206->contentRange = 
-									"bytes 0-" 
-									+ to_string(result.size() - 1)
-									+ "/"
-									+ to_string(totalSize);
-
-								resp206->Init(
-									rawClientSocket,
-									clientIP,
-									cleanRoute,
-									foundRoute.mimeType);
-								server->SocketCleanup(socket);
-								return;
-							}
-							else
-							{
-								auto resp200 = make_unique<Response_200>();
-								resp200->Init(
-									rawClientSocket,
-									clientIP,
-									cleanRoute,
-									foundRoute.mimeType);
-								server->SocketCleanup(socket);
-								return;
-							}
-						}
-					}
-					catch (const exception& e)
-					{
-						KalaServer::PrintConsoleMessage(
-							2,
-							true,
-							ConsoleMessageType::Type_Error,
-							"CLIENT",
-							"Client ["
-							+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-							+ cleanRoute + "'.\nError:\n" + e.what());
-
-						auto resp500 = make_unique<Response_500>();
-						resp500->Init(
-							rawClientSocket,
-							clientIP,
-							cleanRoute,
-							"text/html");
-						server->SocketCleanup(socket);
-					}
+					auto resp200 = make_unique<Response_200>();
+					resp200->Init(
+						rawClientSocket,
+						clientIP,
+						cleanRoute,
+						foundRoute.mimeType);
+					server->SocketCleanup(socket);
+					return;
 				}
 			}
+		}
+		catch (const exception& e)
+		{
+			KalaServer::PrintConsoleMessage(
+				2,
+				true,
+				ConsoleMessageType::Type_Error,
+				"CLIENT",
+				"Client ["
+				+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+				+ cleanRoute + "'.\nError:\n" + e.what());
+
+			auto resp500 = make_unique<Response_500>();
+			resp500->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			server->SocketCleanup(socket);
 		}
 	}
 

@@ -26,11 +26,19 @@ namespace KalaKit::Core
 	using std::pair;
 	//using KalaKit::KalaTypes::u16;
 
+	enum class AccessLevel
+	{
+		access_user,
+		access_registered,
+		access_admin
+	};
+
 	struct Route
 	{
 		string route;
 		string filePath;
 		string mimeType;
+		AccessLevel accessLevel;
 	};
 
 	struct ErrorMessage
@@ -96,7 +104,9 @@ namespace KalaKit::Core
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
-			const DataFile& datafile);
+			const DataFile& datafile,
+			const vector<string>& registeredRoutes,
+			const vector<string>& adminRoutes);
 
 		/// <summary>
 		/// Starts up the server accept loop and health status report.
@@ -167,6 +177,16 @@ namespace KalaKit::Core
 		pair<string, string> IsWhitelistedClient(const string& ip) const;
 
 		/// <summary>
+		/// Returns true if route requres registered user access.
+		/// </summary>
+		bool IsRegisteredRoute(const string& route);
+
+		/// <summary>
+		/// Returns true if route requres admin access.
+		/// </summary>
+		bool IsAdminRoute(const string& route);
+
+		/// <summary>
 		/// Allows server to start accepting connections. Do not call manually.
 		/// </summary>
 		void SetServerReadyState(bool newReadyState) { isServerReady = newReadyState; };
@@ -215,6 +235,11 @@ namespace KalaKit::Core
 		/// Reads 'whitelisted-ips.txt' and stores all IPs and reasons in whitelistedIPs pair.
 		/// </summary>
 		void GetWhitelistedIPs();
+
+		/// <summary>
+		/// Assign route access level dynamically based off of registered and admin route vectors.
+		/// </summary>
+		void SetRouteAccessLevels();
 
 		/// <summary>
 		/// Handle each client in its own thread.
