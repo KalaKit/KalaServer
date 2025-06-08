@@ -23,7 +23,7 @@ To compile from source code simply run 'build_all.bat' or 'build_debug.bat' or '
 
 # How to use
 
-Compile the project from source using the existing CMakeLists.txt at root by running 'build_all.bat' and then open 'KalaServer_example.exe' inside 'build-release/example' or 'build-debug/example' to start the example server made with KalaServer.
+Copy KalaServer.lib to your exe directory and compile your preferred way and follow the [documentation](https://thekalakit.com/pages/docs/kalaserver-setup) for more info on how to set up the code or look at the [source code](https://github.com/Lost-Empire-Entertainment/KalaKit-website) for the KalaKit website. 
 
 Documentation for connecting via url/ip:
 - [How to get access locally without a domain](docs/connect/local-access.md)

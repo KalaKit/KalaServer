@@ -23,5 +23,3 @@ add_library(KalaServer STATIC ${SERVER_SOURCE_FILES} "KalaServer/src/response/re
 target_include_directories(KalaServer PUBLIC 
 	"${INCLUDE_DIR}"
 )
-
-add_subdirectory("${EXAMPLE_ROOT}")
