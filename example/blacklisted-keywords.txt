@@ -87,11 +87,6 @@
 
 # Dangerous File Types & Repos
   .php
-  .tar
-  .zip
-  .gz
-  .7z
-  .rar
   .log
   .git
   .svn

@@ -35,7 +35,7 @@ namespace KalaKit::Core
 		type_plain, type_json, type_xml, type_csv, type_markdown,
 
 		// ARCHIVES AND BINARIES
-		type_zip, type_gz, type_pdf, type_wasm
+		type_zip, type_gz, type_tar, type_7z, type_rar, type_pdf, type_wasm
 	};
 }
 
@@ -65,7 +65,7 @@ namespace KalaKit::Core
 		string_view mime;
 	};
 
-	static inline const array<MimeEntry, 35> mimeTable = 
+	static inline const array<MimeEntry, 38> mimeTable = 
 	{ {
 		// SCRIPTS
 
@@ -120,6 +120,9 @@ namespace KalaKit::Core
 
 		{ MimeType::type_zip,      ".zip",  "application/zip" },
 		{ MimeType::type_gz,       ".gz",   "application/gzip" },
+		{ MimeType::type_tar,      ".tar",  "application/x-tar" },
+		{ MimeType::type_7z,       ".7z",   "application/x-7z-compressed" },
+		{ MimeType::type_rar,      ".rar",  "application/vnd.rar" },
 		{ MimeType::type_pdf,      ".pdf",  "application/pdf" },
 		{ MimeType::type_wasm,     ".wasm", "application/wasm" }
 	} };
