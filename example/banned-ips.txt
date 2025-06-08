@@ -1,200 +1,200 @@
 # Web Client Exploits (HTML/CSS/JS)
 
 ## Headless Browsers & Scripted Abuse
-    23.94.5.110               | js canvas and audio fingerprinting probe flood
-    35.247.122.180            | JS probe targeting WordPress jquery.js (cloud bot)
-    82.102.16.18              | js-based post spammer used on contact and order forms
-    185.100.87.254            | puppeteer automation used for checkout abuse
-    185.217.0.171             | slowloris.js-style keepalive abuse via JS
-    185.217.0.172             | rapid xhr/fetch loop targeting form endpoints
-    185.220.101.42            | headless chrome fingerprint evasion sequence
+  23.94.5.110               | js canvas and audio fingerprinting probe flood
+  35.247.122.180            | JS probe targeting WordPress jquery.js (cloud bot)
+  82.102.16.18              | js-based post spammer used on contact and order forms
+  185.100.87.254            | puppeteer automation used for checkout abuse
+  185.217.0.171             | slowloris.js-style keepalive abuse via JS
+  185.217.0.172             | rapid xhr/fetch loop targeting form endpoints
+  185.220.101.42            | headless chrome fingerprint evasion sequence
 
 ## Crypto Mining, JS Injections & Wallet Hijacks
-    185.100.87.80             | coinhive-style webminer injection via script tag
-    185.220.100.253           | JS miner injection via hidden iframe pattern
-    193.34.167.21             | JS wallet probe targeting blockchain.info URLs
-    213.202.216.189           | obfuscated crypto wallet hijack scripts detected
+  185.100.87.80             | coinhive-style webminer injection via script tag
+  185.220.100.253           | JS miner injection via hidden iframe pattern
+  193.34.167.21             | JS wallet probe targeting blockchain.info URLs
+  213.202.216.189           | obfuscated crypto wallet hijack scripts detected
 
 ==================================================
 
 # E-Commerce and Financial
 
 ## Cart, Checkout, and Shop Abusers
-    45.142.120.30             | abused PayPal sandbox with repeated checkout flow
-    185.128.24.14             | scraped product listings with fake JS interaction
-    185.205.209.142           | enumerated gift cards via injected JS
-    185.209.0.68              | mass cart flooding bot targeting add-to-cart JS
-    193.106.191.13            | automated Shopify and WooCommerce endpoint abuse
-    217.138.197.165           | simulated fake checkouts via repeated POSTs
+  45.142.120.30             | abused PayPal sandbox with repeated checkout flow
+  185.128.24.14             | scraped product listings with fake JS interaction
+  185.205.209.142           | enumerated gift cards via injected JS
+  185.209.0.68              | mass cart flooding bot targeting add-to-cart JS
+  193.106.191.13            | automated Shopify and WooCommerce endpoint abuse
+  217.138.197.165           | simulated fake checkouts via repeated POSTs
 
 ## Cryptocurrency and Payment Injection
-    80.82.77.139              | SWIFT phishing loader targeting checkout pages
-    185.191.171.41            | injected BTC payment scripts via external JS
-    185.191.171.99            | redirected to Ethereum scam via malicious JS
+  80.82.77.139              | SWIFT phishing loader targeting checkout pages
+  185.191.171.41            | injected BTC payment scripts via external JS
+  185.191.171.99            | redirected to Ethereum scam via malicious JS
 
 ==================================================
 
 # Hosting Providers, Cloud Infra, and VPS Abuse
 
 ## Google Cloud
-    34.41.58.2                | aggressive API enumeration from Google Cloud
+  34.41.58.2                | aggressive API enumeration from Google Cloud
 
 ## DigitalOcean
-    104.248.0.0               | high-volume port scanning cluster
-    134.209.0.0               | repeated exploit probes from DigitalOcean server
-    137.184.0.0               | webshell upload attempts from DigitalOcean range
-    139.59.111.28             | WordPress ID3 license probe
-    157.245.195.89            | CMS brute-force origin
+  104.248.0.0               | high-volume port scanning cluster
+  134.209.0.0               | repeated exploit probes from DigitalOcean server
+  137.184.0.0               | webshell upload attempts from DigitalOcean range
+  139.59.111.28             | WordPress ID3 license probe
+  157.245.195.89            | CMS brute-force origin
 
 ## OVH, ColoCrossing, and Rented VPS Abuse
-    45.136.155.229            | automated exploit toolkit scanner (VPS node)
-    51.210.0.0                | mass HTTP fingerprinting campaign (OVH)
-    51.38.0.0                 | aggressive route discovery on admin panels (OVH)
-    95.142.46.0               | repeated upload probe sequences (Netherlands VPS)
-    107.175.0.0               | frequent code injection attacks (colo-hosted)
-    192.3.253.0               | targeted login spray campaigns
-    198.23.249.0              | command execution payloads detected
-    198.98.51.0               | vuln scanner abuse patterns from rented VPS
-    209.141.32.0              | hosting known for abuse clusters and malware drop
-    217.160.0.0               | botnet link crawling from 1&1 range
+  45.136.155.229            | automated exploit toolkit scanner (VPS node)
+  51.210.0.0                | mass HTTP fingerprinting campaign (OVH)
+  51.38.0.0                 | aggressive route discovery on admin panels (OVH)
+  95.142.46.0               | repeated upload probe sequences (Netherlands VPS)
+  107.175.0.0               | frequent code injection attacks (colo-hosted)
+  192.3.253.0               | targeted login spray campaigns
+  198.23.249.0              | command execution payloads detected
+  198.98.51.0               | vuln scanner abuse patterns from rented VPS
+  209.141.32.0              | hosting known for abuse clusters and malware drop
+  217.160.0.0               | botnet link crawling from 1&1 range
 
 ==================================================
 
 # CMS-Specific Attacks
 
 ## WordPress and Plugin Exploits
-    2a06:98c0:3600::103       | persistent dictionary attack targeting WP sites
-    45.76.197.27              | dumb bot tried /wp-login.php
-    45.141.215.55             | WordPress probe followed by fallback scan on /old/
-    104.131.0.0               | wp-json enumeration to discover user data
-    129.146.7.215             | aggressive WordPress scanner probing xmlrpc, feeds, and legacy paths
-    142.93.0.0                | xmlrpc abuse for brute-force amplification
-    143.198.197.183           | wp-includes bruteforce scan
-    152.42.241.137            | wp-includes and xmlrpc probe via repeated GETs
-    157.245.195.89            | CMS brute-force - DigitalOcean host
-    159.65.5.61               | wlwmanifest.xml probe for WordPress discovery
-    178.128.0.0               | WordPress plugin vulnerability scanner
-    188.166.176.210           | wlwmanifest.xml probe for WordPress discovery
-    188.166.215.111           | direct POST exploit attempts on wp-login
-    206.189.0.0               | credential stuffing attack on WP login
+  2a06:98c0:3600::103       | persistent dictionary attack targeting WP sites
+  45.76.197.27              | dumb bot tried /wp-login.php
+  45.141.215.55             | WordPress probe followed by fallback scan on /old/
+  104.131.0.0               | wp-json enumeration to discover user data
+  129.146.7.215             | aggressive WordPress scanner probing xmlrpc, feeds, and legacy paths
+  142.93.0.0                | xmlrpc abuse for brute-force amplification
+  143.198.197.183           | wp-includes bruteforce scan
+  152.42.241.137            | wp-includes and xmlrpc probe via repeated GETs
+  157.245.195.89            | CMS brute-force - DigitalOcean host
+  159.65.5.61               | wlwmanifest.xml probe for WordPress discovery
+  178.128.0.0               | WordPress plugin vulnerability scanner
+  188.166.176.210           | wlwmanifest.xml probe for WordPress discovery
+  188.166.215.111           | direct POST exploit attempts on wp-login
+  206.189.0.0               | credential stuffing attack on WP login
 
 ## Laravel, PHPMyAdmin, and Generic Panels
-    159.65.0.0                | phpMyAdmin panel discovery and .env leak attempts
-    162.243.0.0               | malicious shell upload form targeting /uploads
-    165.22.0.0                | Laravel .env file exposure scan
+  159.65.0.0                | phpMyAdmin panel discovery and .env leak attempts
+  162.243.0.0               | malicious shell upload form targeting /uploads
+  165.22.0.0                | Laravel .env file exposure scan
 
 ==================================================
 
 # Scanning, Enumeration, and Recon Probes
 
 ## Port Scanners and Enumeration Bots
-    54.36.148.0               | continuous port scanning across multiple protocols
-    101.198.0.151             | frontend recon bot fishing for exposed configs
-    155.4.131.116             | Russian IP scanning for unsecured web assets
-    156.146.41.8              | known fingerprinting pattern across admin routes
-    159.89.98.186             | stealthy API and asset path enumeration
-    167.71.13.196             | checking for unauthorized internal service access
-    185.244.25.0              | botnet node attempting fingerprinting payloads
-    196.119.139.16            | /.git-rewrite repeated bot hits
+  54.36.148.0               | continuous port scanning across multiple protocols
+  101.198.0.151             | frontend recon bot fishing for exposed configs
+  155.4.131.116             | Russian IP scanning for unsecured web assets
+  156.146.41.8              | known fingerprinting pattern across admin routes
+  159.89.98.186             | stealthy API and asset path enumeration
+  167.71.13.196             | checking for unauthorized internal service access
+  185.244.25.0              | botnet node attempting fingerprinting payloads
+  196.119.139.16            | /.git-rewrite repeated bot hits
 
 ==================================================
 
 # Remote Code Execution & Upload Exploits
 
 ## Web Shells and Uploads
-    45.9.20.0                 | aggressive upload attempts to detect shell access
-    91.219.236.0              | RCE payloads attempting eval and system calls
-    93.123.109.105            | attempted access to /.git/config for source leak
-    185.100.87.202            | confirmed PHP shell payloads uploaded
-    185.225.19.240            | RFI upload path scanning (remote file inclusion)
-    193.106.191.0             | local file inclusion vector to shell drop
-    194.110.115.0             | mass multi-vector upload probing
-    198.144.121.0             | shell upload and redirect abuse via POST
+  45.9.20.0                 | aggressive upload attempts to detect shell access
+  91.219.236.0              | RCE payloads attempting eval and system calls
+  93.123.109.105            | attempted access to /.git/config for source leak
+  185.100.87.202            | confirmed PHP shell payloads uploaded
+  185.225.19.240            | RFI upload path scanning (remote file inclusion)
+  193.106.191.0             | local file inclusion vector to shell drop
+  194.110.115.0             | mass multi-vector upload probing
+  198.144.121.0             | shell upload and redirect abuse via POST
 
 ==================================================
 
 # Asset Scraping and Download Abuse
 
-    91.132.137.0              | automated file scraping via recursive GET
-    185.180.143.0             | flooded asset downloads via custom downloader
-    185.191.33.0              | wget-based scraping of downloadable content
-    185.207.107.217           | deep directory indexing and file listing pulls
-    185.244.217.0             | repeated curl and wget range access on assets
+  91.132.137.0              | automated file scraping via recursive GET
+  185.180.143.0             | flooded asset downloads via custom downloader
+  185.191.33.0              | wget-based scraping of downloadable content
+  185.207.107.217           | deep directory indexing and file listing pulls
+  185.244.217.0             | repeated curl and wget range access on assets
 
 ==================================================
 
 # Known SEO Spam / Link Injection
 
-    5.45.207.0                | buttons-for-website.com spam crawler
-    23.111.114.116            | odd access to /gazzar/thanks/index.html
-    46.229.168.0              | semalt SEO spam botnet
-    195.154.0.0               | xtbot spam referrer
+  5.45.207.0                | buttons-for-website.com spam crawler
+  23.111.114.116            | odd access to /gazzar/thanks/index.html
+  46.229.168.0              | semalt SEO spam botnet
+  195.154.0.0               | xtbot spam referrer
 
 ==================================================
 
 # Fake Search Engine Crawlers
 
-    185.191.171.43            | fake Googlebot scraper using forged headers
+  185.191.171.43            | fake Googlebot scraper using forged headers
 
 ==================================================
 
 # Scripted Clients and File Transfer Bots
 
-    45.12.253.0               | custom Python script flooding POST handlers
-    146.70.70.0               | rclone-based transfer abuse targeting uploads
+  45.12.253.0               | custom Python script flooding POST handlers
+  146.70.70.0               | rclone-based transfer abuse targeting uploads
 
 ==================================================
 
 # TOR Exit Nodes and Anonymity Networks
 
-    171.25.193.0              | TOR privacy relay used in masked attacks
-    176.10.104.0              | TOR privacy node used in credential stuffing
-    185.220.100.0             | TOR anonymized request origin
-    185.220.101.0             | TOR anonymized request origin
-    185.220.102.0             | TOR anonymized request origin
-    199.249.230.0             | TOR network relay linked to scraping attempts
-    204.13.200.0              | TOR proxy node used in botnet distribution
-    209.126.136.0             | rotating TOR exit used for bypassing IP bans
+  171.25.193.0              | TOR privacy relay used in masked attacks
+  176.10.104.0              | TOR privacy node used in credential stuffing
+  185.220.100.0             | TOR anonymized request origin
+  185.220.101.0             | TOR anonymized request origin
+  185.220.102.0             | TOR anonymized request origin
+  199.249.230.0             | TOR network relay linked to scraping attempts
+  204.13.200.0              | TOR proxy node used in botnet distribution
+  209.126.136.0             | rotating TOR exit used for bypassing IP bans
 
 ==================================================
 
 # Confirmed Repeat Offenders and Abuse Feeds
 
-    43.156.228.27             | VPN IP used in forum spam and proxy abuse
-    45.134.200.0              | VPS node linked to widespread attack attempts
-    91.193.43.172             | flagged by Spamhaus for continuous abuse activity
-    92.255.85.0               | listed on multiple abuse and malicious IP feeds
-    185.100.87.0              | suspicious proxy service used in previous attacks
-    185.191.171.0             | high-volume automated attack origin
-    185.191.171.30            | known malicious actor with repeated activity
+  43.156.228.27             | VPN IP used in forum spam and proxy abuse
+  45.134.200.0              | VPS node linked to widespread attack attempts
+  91.193.43.172             | flagged by Spamhaus for continuous abuse activity
+  92.255.85.0               | listed on multiple abuse and malicious IP feeds
+  185.100.87.0              | suspicious proxy service used in previous attacks
+  185.191.171.0             | high-volume automated attack origin
+  185.191.171.30            | known malicious actor with repeated activity
 
 ==================================================
 
 # Country-Based Malicious Clusters
 
 ## Russia
-    89.248.165.0              | flagged for abuse operations
-    91.215.85.0               | targeted PHP exploits and login brute force
-    91.240.118.0              | bulletproof host linked to botnet C2
-    185.128.24.0              | indexed open directories for malicious use
-    185.142.236.0             | repeated bruteforce behavior observed
+  89.248.165.0              | flagged for abuse operations
+  91.215.85.0               | targeted PHP exploits and login brute force
+  91.240.118.0              | bulletproof host linked to botnet C2
+  185.128.24.0              | indexed open directories for malicious use
+  185.142.236.0             | repeated bruteforce behavior observed
 
 ## China
-    27.128.0.0                | automated web application probe origin
-    61.160.212.38             | large-scale scanner probing open services
-    61.160.224.0              | cloud bot harvesting admin endpoints
-    61.177.172.73             | mass scanning campaign hitting all exposed ports
-    122.114.0.0               | vulnerability scanner for known web exploits
-    218.92.0.0                | scraper botnet traffic patterns
+  27.128.0.0                | automated web application probe origin
+  61.160.212.38             | large-scale scanner probing open services
+  61.160.224.0              | cloud bot harvesting admin endpoints
+  61.177.172.73             | mass scanning campaign hitting all exposed ports
+  122.114.0.0               | vulnerability scanner for known web exploits
+  218.92.0.0                | scraper botnet traffic patterns
 
 ## Iran
-    82.99.252.0               | telecom network used for scanning
-    185.55.224.0              | APT node involved in persistent probing
-    185.105.52.0              | repeated exploit patterns from Iranian subnet
+  82.99.252.0               | telecom network used for scanning
+  185.55.224.0              | APT node involved in persistent probing
+  185.105.52.0              | repeated exploit patterns from Iranian subnet
 
 ## North Korea
-    175.45.176.0              | known DPRK-owned IP range
-    210.52.109.0              | military node used in passive reconnaissance
+  175.45.176.0              | known DPRK-owned IP range
+  210.52.109.0              | military node used in passive reconnaissance
 
 # Auto-banned by server
 

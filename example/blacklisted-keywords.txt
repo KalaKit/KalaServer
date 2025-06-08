@@ -7,7 +7,7 @@
   template
   theme
   skins
-  
+
 ==================================================
 
 # Admin & Control Panels
@@ -15,7 +15,7 @@
   panel
   control
   sito
-  
+
 ==================================================
 
 # Malware, Crypto, & Scam Indicators
@@ -34,7 +34,7 @@
   scam
   cryptojack
   ransom
-  
+
 ==================================================
 
 # System Access & Exploit Attempts
@@ -46,7 +46,6 @@
   exploit
   passwd
   proc
-  env
   id_rsa
   vuln
   sqlmap
@@ -62,7 +61,7 @@
   sqlite
   phpinfo
   index
-  
+
 ==================================================
 
 # Development, API & Debug Interfaces
@@ -73,7 +72,7 @@
   debug
   logs
   monitoring
-  
+
 ==================================================
 
 # Legacy, Testing, and Unprotected Folders
@@ -82,7 +81,7 @@
   test
   dev
   staging
-  
+
 ==================================================
 
 # Dangerous File Types & Repos
@@ -92,3 +91,15 @@
   .svn
   .hg
   .env
+
+==================================================
+
+# Git, VSCode, and Visual Studio Artifacts
+  settings
+  launch
+  tasks
+  git
+  vs
+  proj
+  code
+  sln

@@ -23,7 +23,7 @@
   151.101.0.0/16       | Fastly (used by GitHub, Reddit, npm, etc.)
   151.101.1.69         | Fastly node used by Reddit and GitHub
   151.101.65.69        | Fastly alt node (redundant)
-  
+
 ==================================================
 
 # Search Engine and Preview Bots (Safe)
@@ -40,7 +40,7 @@
   108.174.0.0/16       | LinkedIn bots and marketing previews
   199.255.192.0/22     | LinkedIn preview & scraping bots
   207.241.224.0/19     | Internet Archive (Wayback Machine)
-  
+
 ==================================================
 
 # Major Social / Media Platforms
@@ -49,7 +49,7 @@
   161.117.0.0/16       | TikTok / ByteDance CDN (Singapore/global)
   47.246.0.0/16        | ByteDance cloud/CDN infrastructure (global)
   54.236.0.0/15        | Pinterest preview fetcher via AWS EC2
-  
+
 ==================================================
 
 # Gaming / Game Development Infrastructure
@@ -64,7 +64,7 @@
   195.201.0.0/16       | Godot game engine infra (Germany – Hetzner)
   104.155.0.0/16       | Riot Games (LoL, Valorant infra, hosted on GCP)
   192.207.0.0/16       | Roblox Corporation (games, CDN)
-  
+
 ==================================================
 
 # Safe Browser-Based Link Preview and Unfurl Bots
@@ -81,7 +81,7 @@
   185.191.171.0/24     | Brave browser and Bravebot (privacy-safe)
   185.199.108.0/22     | GitHub Pages + raw content preview CDN (Fastly)
   64.62.202.0/24       | Tutanota secure email preview service
-  
+
 ==================================================
 
 # Creative / Media / Design Software Infrastructure
@@ -101,7 +101,7 @@
   185.199.109.0/24     | Foundry (Nuke, Modo) GitHub-hosted documentation/CDNs
   35.203.0.0/16        | Canva backend services (Google-hosted)
   52.84.0.0/14         | Amazon CloudFront (used by Adobe, Autodesk, Canva)
-  
+
 ==================================================
 
 # IPv6 - Discord, Microsoft, Cloudflare, Fastly, Google, Meta
