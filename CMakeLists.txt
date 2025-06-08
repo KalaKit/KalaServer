@@ -6,19 +6,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 project("KalaServer")
 
-set(KALASERVER_ROOT "${CMAKE_SOURCE_DIR}/KalaServer")
-set(EXAMPLE_ROOT "${CMAKE_SOURCE_DIR}/example")
-
-set(SRC_DIR "${KALASERVER_ROOT}/src")
-
-set(INCLUDE_DIR "${KALASERVER_ROOT}/include")
+set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
+set(INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include")
 
 file(GLOB_RECURSE SERVER_SOURCE_FILES CONFIGURE_DEPENDS
 	${SRC_DIR}/*.cpp
 	${SRC_DIR}/*/*.cpp
 )
 
-add_library(KalaServer STATIC ${SERVER_SOURCE_FILES} "KalaServer/src/response/response.cpp")
+add_library(KalaServer STATIC ${SERVER_SOURCE_FILES})
 
 target_include_directories(KalaServer PUBLIC 
 	"${INCLUDE_DIR}"
