@@ -1461,7 +1461,7 @@ namespace KalaKit::Core
 					" Reason : " + bannedClient.second + "\n"
 					"====================================================\n");
 
-				sleep_for(seconds(10));
+				sleep_for(seconds(30));
 				auto respBanned = make_unique<Response_418>();
 				respBanned->Init(
 					rawClientSocket,
