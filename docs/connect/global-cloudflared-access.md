@@ -19,14 +19,6 @@ This section assumes you already own a domain on cloudflare.
 	- proxied: true
 	
 - copy 'config.yml' template from 'example' folder to your 'Users' path inside a new '.cloudflared' folder and fill the slots that contain template values
-
-- create a cloudflared tunnel if you havent yet
-	- log in to 'https://one.dash.cloudflare.com/'
-	- go to networks > tunnels
-	- select 'Create a tunnel'
-	- choose connector type 'Cloudflared' and click next
-	- enter tunnel name (needs to be save as you add to server)
-	- select 'Save tunnel'
 	
 - Add a new cloudflared application
 	- log in to 'https://one.dash.cloudflare.com/'
