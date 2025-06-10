@@ -69,6 +69,10 @@ using std::min;
 
 namespace KalaKit::Core
 {	
+	//keeps track of user attempts to routes per second
+	unordered_map<string, unordered_map<string, int>> requestCounter;
+	mutex counterMutex;
+
 	atomic<bool> canUpdateRouteAccess{ true };
 	//Routes only registered users can access
 	vector<string> registeredRoutes{};
@@ -101,6 +105,7 @@ namespace KalaKit::Core
 	bool Server::Initialize(
 		unsigned int port,
 		unsigned int healthTimer,
+		unsigned int rateLimitTimer,
 		const string& serverName,
 		const string& domainName,
 		const ErrorMessage& errorMessage,
@@ -111,6 +116,7 @@ namespace KalaKit::Core
 		server = make_unique<Server>(
 			port,
 			healthTimer,
+			rateLimitTimer,
 			serverName,
 			domainName,
 			errorMessage,
@@ -1153,6 +1159,13 @@ namespace KalaKit::Core
 				sleep_for(seconds(60));
 			}
 		}).detach();
+
+		thread([] 
+		{
+			sleep_for(seconds(1));
+			lock_guard<mutex> lock(counterMutex);
+			requestCounter.clear();
+		}).detach();
 	}
 
 	void Server::GetMachineIPs()
@@ -1790,6 +1803,49 @@ namespace KalaKit::Core
 				pair<string, string> bannedClient{};
 				bannedClient.first = clientIP;
 				bannedClient.second = cleanRoute;
+
+				if (server->BanClient(bannedClient))
+				{
+					auto respBanned = make_unique<Response_418>();
+					respBanned->Init(
+						clientSocket,
+						clientIP,
+						cleanRoute,
+						"text/html");
+				}
+
+				server->SocketCleanup(socket);
+				return;
+			}
+		}
+
+		if (server->rateLimitTimer > 0
+			&& !isHost
+			&& whitelistedClient.first == "")
+		{
+			lock_guard<mutex> lock(counterMutex);
+			int& count = requestCounter[clientIP][route];
+			count++;
+
+			if (count > server->rateLimitTimer)
+			{
+				string reason = "Exceeded allowed connection rate limit of " + to_string(rateLimitTimer) + " times per second";
+				KalaServer::PrintConsoleMessage(
+					0,
+					false,
+					ConsoleMessageType::Type_Message,
+					"",
+					"=============== BANNED CLIENT ======================\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Reason : " + reason + "\n"
+					"====================================================\n");
+
+				sleep_for(milliseconds(5));
+
+				pair<string, string> bannedClient{};
+				bannedClient.first = clientIP;
+				bannedClient.second = reason;
 
 				if (server->BanClient(bannedClient))
 				{

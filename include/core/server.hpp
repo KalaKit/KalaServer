@@ -84,12 +84,14 @@ namespace KalaKit::Core
 		Server(
 			unsigned int port,
 			unsigned int healthTimer,
+			unsigned int rateLimitTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
 			const DataFile& dataFile) :
 			port(port),
 			healthTimer(healthTimer),
+			rateLimitTimer(rateLimitTimer),
 			serverName(serverName),
 			domainName(domainName),
 			errorMessage(errorMessage),
@@ -101,6 +103,7 @@ namespace KalaKit::Core
 		static bool Initialize(
 			unsigned int port,
 			unsigned int healthTimer,
+			unsigned int rateLimitTimer,
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
@@ -256,6 +259,7 @@ namespace KalaKit::Core
 
 		unsigned int port; //Local server port
 		unsigned int healthTimer; //Countdown until server reports health check.
+		unsigned int rateLimitTimer; //If client connections to one route per second exceed this then that client gets banned.		string serverName; //The server name used for cloudflare/dns calls
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
 	};
