@@ -15,21 +15,21 @@
 # define OPENSSL_BIO_H
 # pragma once
 
-# include <openssl/macros.h>
+# include <macros.h>
 # ifndef OPENSSL_NO_DEPRECATED_3_0
 #  define HEADER_BIO_H
 # endif
 
-# include <openssl/e_os2.h>
+# include <e_os2.h>
 
 # ifndef OPENSSL_NO_STDIO
 #  include <stdio.h>
 # endif
 # include <stdarg.h>
 
-# include <openssl/crypto.h>
-# include <openssl/bioerr.h>
-# include <openssl/core.h>
+# include <crypto.h>
+# include <bioerr.h>
+# include <core.h>
 
 #ifdef  __cplusplus
 extern "C" {

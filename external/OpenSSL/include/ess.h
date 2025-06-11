@@ -16,11 +16,11 @@
 # define OPENSSL_ESS_H
 # pragma once
 
-# include <openssl/opensslconf.h>
+# include <opensslconf.h>
 
-# include <openssl/safestack.h>
-# include <openssl/x509.h>
-# include <openssl/esserr.h>
+# include <safestack.h>
+# include <x509.h>
+# include <esserr.h>
 
 # ifdef  __cplusplus
 extern "C" {

@@ -47,6 +47,7 @@ using std::exit;
 using std::to_string;
 using std::ifstream;
 using std::stringstream;
+using std::ostringstream;
 using std::exception;
 using std::filesystem::path;
 using std::filesystem::current_path;
@@ -886,13 +887,84 @@ namespace KalaKit::Core
 		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_STREAM;
 		
-		if (getaddrinfo(emailData.smtpServer.c_str(). "587", &hints, &res) != 0)
+		if (getaddrinfo(emailData.smtpServer.c_str(), "587", &hints, &res) != 0)
 		{
 			WSACleanup();
 			return false;
 		}
 		
-		
+		SOCKET sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (connect(sock, res->ai_addr, static_cast<int>(res->ai_addrlen)) == SOCKET_ERROR)
+		{
+			closesocket(sock);
+			WSACleanup();
+			return false;
+		}
+
+		freeaddrinfo(res);
+
+		char recvBuf[2048] = {};
+		recv(sock, recvBuf, sizeof(recvBuf) - 1, 0);
+
+		string ehlo = "EHLO localhost\r\n";
+		send(sock, ehlo.c_str(), static_cast<int>(ehlo.size()), 0);
+		recv(sock, recvBuf, sizeof(recvBuf) - 1, 0);
+
+		string starttls = "STARTTLS\r\n";
+		send(sock, starttls.c_str(), static_cast<int>(starttls.size()), 0);
+		recv(sock, recvBuf, sizeof(recvBuf) - 1, 0);
+
+		SSL_library_init();
+		SSL_load_error_strings();
+		auto ctx = unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)>(SSL_CTX_new(TLS_client_method()), SSL_CTX_free);
+		if (!ctx) return false;
+
+		SSL* ssl = SSL_new(ctx.get());
+		SSL_set_fd(ssl, static_cast<int>(sock));
+		if (SSL_connect(ssl) != 1)
+		{
+			SSL_free(ssl);
+			closesocket(sock);
+			WSACleanup();
+			return false;
+		}
+
+		auto check = [&](const string& cmd)
+		{
+			return send_ssl(ssl, cmd) && !recv_ssl(ssl).starts_with("S");
+		};
+
+		if (!check("EHLO localhost")) return false;
+		if (!check("AUTH LOGIN")) return false;
+		if (!check(base64_encode(emailData.username))) return false;
+		if (!check(base64_encode(emailData.password))) return false;
+		if (!check("MAIL FROM:<" + emailData.sender + ">")) return false;
+		for (const auto& r : emailData.receivers)
+		{
+			if (!check("RCPT TO:<" + r + ">")) return false;
+		}
+		if (!check("DATA")) return false;
+
+		ostringstream msg{};
+		msg << "Subject: " << emailData.subject << "\r\n";
+		msg << "From: " << emailData.sender << "\r\n";
+		msg << "To: ";
+		for (size_t i = 0; i < emailData.receivers.size(); ++i)
+		{
+			msg << emailData.receivers[i];
+			if (i + 1 < emailData.receivers.size()) msg << ", ";
+		}
+		msg << "\r\n\r\n" << emailData.body << "\r\n\r\n";
+
+		if (!check(msg.str())) return false;
+		send_ssl(ssl, "QUIT");
+
+		SSL_shutdown(ssl);
+		SSL_free(ssl);
+		closesocket(sock);
+		WSACleanup();
+
+		return true;
 	}
 
 	string Server::ExtractHeaderValue(

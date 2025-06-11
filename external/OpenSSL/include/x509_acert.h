@@ -16,9 +16,9 @@
 # define OPENSSL_X509_ACERT_H
 # pragma once
 
-# include <openssl/x509v3.h>
-# include <openssl/x509.h>
-# include <openssl/pem.h>
+# include <x509v3.h>
+# include <x509.h>
+# include <pem.h>
 
 typedef struct X509_acert_st X509_ACERT;
 typedef struct X509_acert_info_st X509_ACERT_INFO;

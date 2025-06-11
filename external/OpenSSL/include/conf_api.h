@@ -11,13 +11,13 @@
 # define OPENSSL_CONF_API_H
 # pragma once
 
-# include <openssl/macros.h>
+# include <macros.h>
 # ifndef OPENSSL_NO_DEPRECATED_3_0
 #  define HEADER_CONF_API_H
 # endif
 
-# include <openssl/lhash.h>
-# include <openssl/conf.h>
+# include <lhash.h>
+# include <conf.h>
 
 #ifdef  __cplusplus
 extern "C" {

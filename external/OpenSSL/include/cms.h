@@ -16,17 +16,17 @@
 # define OPENSSL_CMS_H
 # pragma once
 
-# include <openssl/macros.h>
+# include <macros.h>
 # ifndef OPENSSL_NO_DEPRECATED_3_0
 #  define HEADER_CMS_H
 # endif
 
-# include <openssl/opensslconf.h>
+# include <opensslconf.h>
 
 # ifndef OPENSSL_NO_CMS
-# include <openssl/x509.h>
-# include <openssl/x509v3.h>
-# include <openssl/cmserr.h>
+# include <x509.h>
+# include <x509v3.h>
+# include <cmserr.h>
 # ifdef __cplusplus
 extern "C" {
 # endif

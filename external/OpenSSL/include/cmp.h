@@ -17,19 +17,19 @@
 #ifndef OPENSSL_CMP_H
 # define OPENSSL_CMP_H
 
-# include <openssl/opensslconf.h>
+# include <opensslconf.h>
 # ifndef OPENSSL_NO_CMP
 
-#  include <openssl/crmf.h>
-#  include <openssl/cmperr.h>
-#  include <openssl/cmp_util.h>
-#  include <openssl/http.h>
+#  include <crmf.h>
+#  include <cmperr.h>
+#  include <cmp_util.h>
+#  include <http.h>
 
 /* explicit #includes not strictly needed since implied by the above: */
-#  include <openssl/types.h>
-#  include <openssl/safestack.h>
-#  include <openssl/x509.h>
-#  include <openssl/x509v3.h>
+#  include <types.h>
+#  include <safestack.h>
+#  include <x509.h>
+#  include <x509v3.h>
 
 #  ifdef __cplusplus
 extern "C" {

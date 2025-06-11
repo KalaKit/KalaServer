@@ -11,7 +11,7 @@
 # define OPENSSL_BYTEORDER_H
 # pragma once
 
-# include <openssl/e_os2.h>
+# include <e_os2.h>
 # include <string.h>
 
 /*

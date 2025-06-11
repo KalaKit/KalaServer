@@ -9,7 +9,7 @@
 
 /*
  * Unfortunate workaround to avoid symbol conflict with wincrypt.h
- * See https://github.com/openssl/openssl/issues/9981
+ * See https://github.com/issues/9981
  */
 #ifdef _WIN32
 # define WINCRYPT_USE_SYMBOL_PREFIX
@@ -29,9 +29,9 @@
 extern "C" {
 # endif
 
-# include <openssl/e_os2.h>
-# include <openssl/safestack.h>
-# include <openssl/macros.h>
+# include <e_os2.h>
+# include <safestack.h>
+# include <macros.h>
 
 # if OPENSSL_VERSION_MAJOR >= 4
 #  define OSSL_FUTURE_CONST const

@@ -8,9 +8,9 @@
  */
 
 /*
- * The original <openssl/ossl_typ.h> was renamed to <openssl/types.h>
+ * The original <ossl_typ.h> was renamed to <types.h>
  *
  * This header file only exists for compatibility reasons with older
- * applications which #include <openssl/ossl_typ.h>.
+ * applications which #include <ossl_typ.h>.
  */
-# include <openssl/types.h>
+# include <types.h>

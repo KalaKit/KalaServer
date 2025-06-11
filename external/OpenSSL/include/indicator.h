@@ -15,7 +15,7 @@
 extern "C" {
 # endif
 
-#include <openssl/params.h>
+#include <params.h>
 
 typedef int (OSSL_INDICATOR_CALLBACK)(const char *type, const char *desc,
                                       const OSSL_PARAM params[]);
