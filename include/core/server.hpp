@@ -40,6 +40,19 @@ namespace KalaKit::Core
 		string mimeType;
 		AccessLevel accessLevel;
 	};
+	
+	//Send an email to a smtp server like gmail from this server.
+	//Uses STARTTLS on port 587
+	struct EmailData
+	{
+		string smtpServer;        //Target email server name (smpt.gmail.com)
+		string username;          //Required for SMTP authentication
+		string password;          //Required for SMTP authentication
+		string sender;            //Who sends the email
+		vector<string> receivers; //Everyone who receives the email
+		string subject;           //The title of the email
+		string body;              //The contents of the email
+	};
 
 	struct ErrorMessage
 	{
@@ -137,6 +150,8 @@ namespace KalaKit::Core
 			size_t rangeEnd,
 			size_t& outTotalSize,
 			bool& outSliced);
+			
+		bool SendEmail(const EmailData& emailData);
 
 		/// <summary>
 		/// Parse headers from raw HTTP string.

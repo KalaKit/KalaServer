@@ -14,6 +14,7 @@
 #include <memory>
 
 #pragma comment(lib, "Wininet.lib")
+#pragma comment(lib, "ws2_32.lib")
 
 #include "core/core.hpp"
 #include "core/server.hpp"
@@ -25,6 +26,8 @@
 #include "response/response_403.hpp"
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
+#include "ssl.h" //openssl
+#include "err.h" //openssl
 
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::Server;
@@ -844,6 +847,52 @@ namespace KalaKit::Core
 		}
 
 		return {};
+	}
+	
+	bool Server::SendEmail(const EmailData& emailData)
+	{
+		auto base64_encode = [](const string& input) -> string
+		{
+			BIO* bio = BIO_new(BIO_s_mem());
+			BIO* b64 = BIO_new(BIO_f_base64());
+			BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+			b64 = BIO_push(b64, bio);
+			BIO_write(b64, input.data(), static_cast<int>(input.size()));
+			BIO_flush(b64);
+			BUF_MEM* buffer;
+			BIO_get_mem_ptr(b64, &buffer);
+			string output(buffer->data, buffer->length);
+			BIO_free_all(b64);
+			return output;
+		};
+		
+		auto send_ssl = [](SSL* ssl, const string& msg) -> bool
+		{
+			string formatted = msg + "\r\n";
+			return SSL_write(ssl, formatted.c_str(), static_cast<int>(formatted.size())) > 0;
+		};
+		
+		auto recv_ssl = [](SSL* ssl) -> string
+		{
+			char buf[2048] = {};
+			int len = SSL_read(ssl, buf, sizeof(buf) - 1);
+			return len > 0 ? string(buf, len) : "";
+		};
+		
+		WSADATA wsa;
+		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
+		
+		addrinfo hints = {}, *res = nullptr;
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		
+		if (getaddrinfo(emailData.smtpServer.c_str(). "587", &hints, &res) != 0)
+		{
+			WSACleanup();
+			return false;
+		}
+		
+		
 	}
 
 	string Server::ExtractHeaderValue(
