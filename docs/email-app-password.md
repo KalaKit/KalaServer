@@ -13,14 +13,13 @@ To allow this server to send emails through your Gmail account securely, you **m
 
 ## Steps to Generate a Gmail App Password
 
-1. Go to [https://myaccount.google.com/](https://myaccount.google.com/)
+1. Go to https://myaccount.google.com/
 2. Sign in with your Google account if you're not already signed in.
 3. In the left-hand menu, click **Security**.
-4. Under the **"Signing in to Google"** section, ensure:
+4. Under the **"How you sign in to Google"** section, ensure:
    - 2-Step Verification is **turned ON**.
-5. Once 2FA is enabled, a new option **App Passwords** will appear.
-6. Click **App Passwords**.
-7. Under **"Select app"**, choose `Other (Custom name)` and name it something like:
+5. Once 2FA is enabled, search for **App Passwords**.
+6. In the app name you must pick a name to know what your app is gonna be called, something like:
    ```
    KalaServer Email
    ```

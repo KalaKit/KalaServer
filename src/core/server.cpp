@@ -75,6 +75,8 @@ using std::find;
 
 namespace KalaKit::Core
 {	
+	static vector<EmailEvent> staticEmailEvents{};
+
 	//keeps track of user attempts to routes per second
 	unordered_map<string, unordered_map<string, int>> requestCounter;
 	mutex counterMutex;
@@ -131,6 +133,8 @@ namespace KalaKit::Core
 			emailSenderData);
 
 		if (!server->PreInitializeCheck()) return false;
+
+		staticEmailEvents = server->emailSenderData.emailEvents;
 
 		KalaServer::PrintConsoleMessage(
 			0,
@@ -874,7 +878,7 @@ namespace KalaKit::Core
 			b64 = BIO_push(b64, bio);
 			BIO_write(b64, input.data(), static_cast<int>(input.size()));
 			BIO_flush(b64);
-			BUF_MEM* buffer;
+			BUF_MEM* buffer{};
 			BIO_get_mem_ptr(b64, &buffer);
 			string output(buffer->data, buffer->length);
 			BIO_free_all(b64);
@@ -1022,6 +1026,13 @@ namespace KalaKit::Core
 		SSL_free(ssl);
 		closesocket(sock);
 		WSACleanup();
+
+		KalaServer::PrintConsoleMessage(
+			0,
+			true,
+			ConsoleMessageType::Type_Message,
+			"SEND_EMAIL",
+			"Email '" + emailData.subject + "' was successfully sent!");
 
 		return success;
 	}
@@ -1253,9 +1264,9 @@ namespace KalaKit::Core
 				else
 				{
 					thread([clientSocket]
-						{
-							server->HandleClient(static_cast<uintptr_t>(clientSocket));
-						}).detach();
+					{
+						server->HandleClient(static_cast<uintptr_t>(clientSocket));
+					}).detach();
 				}
 
 				sleep_for(milliseconds(5));
@@ -1285,6 +1296,20 @@ namespace KalaKit::Core
 						ConsoleMessageType::Type_Message,
 						"SERVER",
 						fullStatus + "\n");
+
+					vector<string> receivers = { server->emailSenderData.username };
+					server->emailData =
+					{
+						.smtpServer = "smtp.gmail.com",
+						.username = server->emailSenderData.username,
+						.password = server->emailSenderData.password,
+						.sender = server->emailSenderData.username,
+						.receivers = receivers,
+						.subject = "KalaServer health status",
+						.body = fullStatus
+					};
+					server->SendEmail(server->emailData);
+
 					sleep_for(seconds(healthTimer));
 				}
 			}).detach();
@@ -1799,7 +1824,7 @@ namespace KalaKit::Core
 			sizeof(timeout));
 
 		{
-			lock_guard lock(server->clientSocketsMutex);
+			lock_guard socketInsertLock(server->clientSocketsMutex);
 			server->activeClientSockets.insert(socket);
 		}
 
@@ -1955,7 +1980,7 @@ namespace KalaKit::Core
 
 				sleep_for(seconds(30));
 				
-				vector<EmailEvent> ev = server->emailSenderData.emailEvents;
+				vector<EmailEvent> ev = staticEmailEvents;
 				EmailEvent e = EmailEvent::email_banned_client_attempted_connection;
 				bool bannedClientReconnectedEvent =
 					find(ev.begin(), ev.end(), e) != ev.end();
@@ -2002,10 +2027,13 @@ namespace KalaKit::Core
 
 				sleep_for(milliseconds(5));
 				
-				vector<EmailEvent> ev = server->emailSenderData.emailEvents;
+				vector<EmailEvent> ev = staticEmailEvents;
 				EmailEvent e = EmailEvent::email_client_was_banned;
+#pragma warning(push)
+#pragma warning(disable: 26117)
 				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end();
+					find(ev.begin(), ev.end(), e) != ev.end(); //"Releasing unheld lock" false positive
+#pragma warning(pop)
 
 				if (clientWasBannedEvent)
 				{
@@ -2046,7 +2074,7 @@ namespace KalaKit::Core
 			&& !isHost
 			&& whitelistedClient.first == "")
 		{
-			lock_guard<mutex> lock(counterMutex);
+			lock_guard<mutex> counterLock(counterMutex);
 			int& count = requestCounter[clientIP][route];
 			count++;
 
@@ -2065,11 +2093,14 @@ namespace KalaKit::Core
 					"====================================================\n");
 
 				sleep_for(milliseconds(5));
-				
-				vector<EmailEvent> ev = server->emailSenderData.emailEvents;
+
+				vector<EmailEvent> ev = staticEmailEvents;
 				EmailEvent e = EmailEvent::email_client_was_banned;
+#pragma warning(push)
+#pragma warning(disable: 26110)
 				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end();
+					find(ev.begin(), ev.end(), e) != ev.end(); //"Releasing unheld lock" false positive
+#pragma warning(pop)
 
 				if (clientWasBannedEvent)
 				{
@@ -2150,7 +2181,10 @@ namespace KalaKit::Core
 				cleanRoute,
 				"text/html");
 			server->SocketCleanup(socket);
+#pragma warning(push)
+#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 			return;
+#pragma warning(pop)
 		}
 
 		bool extentionExists = false;
@@ -2189,7 +2223,10 @@ namespace KalaKit::Core
 				cleanRoute,
 				"text/html");
 			server->SocketCleanup(socket);
+#pragma warning(push)
+#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 			return;
+#pragma warning(pop)
 		}
 
 		//
@@ -2247,7 +2284,10 @@ namespace KalaKit::Core
 				cleanRoute,
 				"text/html");
 			server->SocketCleanup(socket);
+#pragma warning(push)
+#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 			return;
+#pragma warning(pop)
 		}
 
 		if ((isClientRegistered
@@ -2324,7 +2364,10 @@ namespace KalaKit::Core
 					cleanRoute,
 					"text/html");
 				server->SocketCleanup(socket);
+#pragma warning(push)
+#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 				return;
+#pragma warning(pop)
 			}
 			else
 			{
@@ -2348,7 +2391,10 @@ namespace KalaKit::Core
 						cleanRoute,
 						foundRoute.mimeType);
 					server->SocketCleanup(socket);
+#pragma warning(push)
+#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 					return;
+#pragma warning(pop)
 				}
 				else
 				{
@@ -2359,7 +2405,10 @@ namespace KalaKit::Core
 						cleanRoute,
 						foundRoute.mimeType);
 					server->SocketCleanup(socket);
+#pragma warning(push)
+#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 					return;
+#pragma warning(pop)
 				}
 			}
 		}
@@ -2387,7 +2436,7 @@ namespace KalaKit::Core
 	void Server::SocketCleanup(uintptr_t clientSocket)
 	{
 		{
-			std::lock_guard lock(server->clientSocketsMutex);
+			std::lock_guard socketEraseLock(server->clientSocketsMutex);
 			server->activeClientSockets.erase(clientSocket);
 		}
 	}
