@@ -929,9 +929,14 @@ namespace KalaKit::Core
 			return false;
 		}
 
+		bool success = true;
 		auto check = [&](const string& cmd)
 		{
-			return send_ssl(ssl, cmd) && !recv_ssl(ssl).starts_with("S");
+			if (!send_ssl(ssl, cmd) || recv_ssl(ssl).starts_with("5"))
+			{
+				success = false;
+			}
+			return success;
 		};
 
 		if (!check("EHLO localhost")) return false;
@@ -954,7 +959,7 @@ namespace KalaKit::Core
 			msg << emailData.receivers[i];
 			if (i + 1 < emailData.receivers.size()) msg << ", ";
 		}
-		msg << "\r\n\r\n" << emailData.body << "\r\n\r\n";
+		msg << "\r\n\r\n" << emailData.body << "\r\n.\r\n";
 
 		if (!check(msg.str())) return false;
 		send_ssl(ssl, "QUIT");
@@ -964,7 +969,7 @@ namespace KalaKit::Core
 		closesocket(sock);
 		WSACleanup();
 
-		return true;
+		return success;
 	}
 
 	string Server::ExtractHeaderValue(
