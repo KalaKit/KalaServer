@@ -17,11 +17,26 @@ mkdir %BUILD_ROOT%
 
 cd /d "%SRC_ROOT%"
 
+set "VS_PATH_1=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+set "VS_PATH_2=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+
 :: Ensure Visual Studio environment is set up correctly
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" ||(
-    echo [ERROR] Failed to set up Visual Studio environment.
+if exist "%VS_PATH_1%" (
+	call "%VS_PATH_1%" || (
+		echo [ERROR] Failed to set up Visual Studio Community environment.
+		pause
+		exit /b 1
+	)
+) else if exist "%VS_PATH_2%" (
+	call "%VS_PATH_2%" || (
+		echo [ERROR] Failed to set up Visual Studio Build Tools environment.
+		pause
+		exit /b 1
+	)
+) else (
+	echo [ERROR] Neither Visual Studio Community nor Build Tools environment found.
 	pause
-    exit /b 1
+	exit /b 1
 )
 
 :: Build and install in Release mode
