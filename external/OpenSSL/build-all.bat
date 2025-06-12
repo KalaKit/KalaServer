@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 set PERL=perl
 set NASM=nasm
 set TARGET=VC-WIN64A
-set CONFIG_FLAGS=no-shared no-tests no-asm no-ui no-dso no-engine no-legacy no-camellia no-idea no-md2 no-md4 no-rc2 no-rc4 no-rc5 no-sm2 no-sm3 no-sm4 no-whirlpool no-rmd160 no-comp no-hw no-ssl3 no-ssl3-method no-weak-ssl-ciphers no-apps
+set CONFIG_FLAGS=no-tests no-asm no-ui no-dso no-engine no-legacy no-camellia no-idea no-md2 no-md4 no-rc2 no-rc4 no-rc5 no-sm2 no-sm3 no-sm4 no-whirlpool no-rmd160 no-comp no-hw no-ssl3 no-ssl3-method no-weak-ssl-ciphers no-apps
 
 set "PROJECT_ROOT=%~dp0"
 set "BUILD_ROOT=%PROJECT_ROOT%\build"
