@@ -19,14 +19,9 @@
 
 #include "core/core.hpp"
 #include "core/server.hpp"
+#include "core/client.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
-#include "response/response_200.hpp"
-#include "response/response_206.hpp"
-#include "response/response_404.hpp"
-#include "response/response_403.hpp"
-#include "response/response_418.hpp"
-#include "response/response_500.hpp"
 #include "ssl.h" //openssl
 #include "err.h" //openssl
 
@@ -36,12 +31,6 @@ using KalaKit::Core::ConsoleMessageType;
 using KalaKit::Core::PopupReason;
 using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;
-using KalaKit::ResponseSystem::Response_200;
-using KalaKit::ResponseSystem::Response_206;
-using KalaKit::ResponseSystem::Response_404;
-using KalaKit::ResponseSystem::Response_403;
-using KalaKit::ResponseSystem::Response_500;
-using KalaKit::ResponseSystem::Response_418;
 
 using std::unordered_map;
 using std::exit;
@@ -75,27 +64,10 @@ using std::find;
 
 namespace KalaKit::Core
 {	
-	static vector<EmailEvent> staticEmailEvents{};
-
-	//keeps track of user attempts to routes per second
-	unordered_map<string, unordered_map<string, int>> requestCounter;
-	mutex counterMutex;
-
-	atomic<bool> canUpdateRouteAccess{ true };
 	//Routes only registered users can access
 	vector<string> registeredRoutes{};
 	//Routes only admins and host can access
 	vector<string> adminRoutes{};
-
-	atomic<bool> canUpdateWhitelistedRoutes{ true };
-	//All routes that exist on disk
-	vector<Route> whitelistedRoutes{};
-
-	//All keywords that trigger a ban
-	vector<string> blacklistedKeywords{};
-
-	//All extensions whose files are allowed to be opened
-	vector<string> whitelistedExtensions{};
 
 	atomic<bool> canUpdateWhitelistedIPs{ true };
 	//All IPs that will always bypass ban filter
@@ -133,8 +105,6 @@ namespace KalaKit::Core
 			emailSenderData);
 
 		if (!server->PreInitializeCheck()) return false;
-
-		staticEmailEvents = server->emailSenderData.emailEvents;
 
 		KalaServer::PrintConsoleMessage(
 			0,
@@ -478,7 +448,7 @@ namespace KalaKit::Core
 			"SERVER",
 			"Refreshed whitelisted routes");
 
-		canUpdateWhitelistedRoutes = false;
+		server->canUpdateWhitelistedRoutes = false;
 	}
 
 	void Server::GetFileData(DataFileType dataFileType) const
@@ -493,7 +463,7 @@ namespace KalaKit::Core
 		{
 		case DataFileType::datafile_extension:
 			resultType = "whitelisted extensions";
-			whitelistedExtensions.clear();
+			server->whitelistedExtensions.clear();
 			filePath = server->dataFile.whitelistedExtensionsFile;
 			fullFilePath = path(current_path() / server->dataFile.whitelistedExtensionsFile).string();
 			break;
@@ -510,7 +480,7 @@ namespace KalaKit::Core
 			break;
 		case DataFileType::datafile_blacklistedKeyword:
 			resultType = "blacklisted keywords";
-			blacklistedKeywords.clear();
+			server->blacklistedKeywords.clear();
 			filePath = server->dataFile.blacklistedKeywordsFile;
 			fullFilePath = path(current_path() / server->dataFile.blacklistedKeywordsFile).string();
 			break;
@@ -593,7 +563,7 @@ namespace KalaKit::Core
 		case DataFileType::datafile_extension:
 			for (const pair<string, string> resultValue : result)
 			{
-				whitelistedExtensions.push_back(resultValue.first);
+				server->whitelistedExtensions.push_back(resultValue.first);
 			}
 			break;
 		case DataFileType::datafile_whitelistedIP:
@@ -611,7 +581,7 @@ namespace KalaKit::Core
 		case DataFileType::datafile_blacklistedKeyword:
 			for (const pair<string, string> resultValue : result)
 			{
-				blacklistedKeywords.push_back(resultValue.first);
+				server->blacklistedKeywords.push_back(resultValue.first);
 			}
 			break;
 		}
@@ -657,7 +627,7 @@ namespace KalaKit::Core
 			.mimeType = s_newMimeType
 		};
 
-		whitelistedRoutes.push_back(newRoute);
+		server->whitelistedRoutes.push_back(newRoute);
 
 		KalaServer::PrintConsoleMessage(
 			0,
@@ -673,7 +643,7 @@ namespace KalaKit::Core
 			if (extension == newExtension) return;
 		}
 
-		whitelistedExtensions.push_back(newExtension);
+		server->whitelistedExtensions.push_back(newExtension);
 		KalaServer::PrintConsoleMessage(
 			0,
 			true,
@@ -1037,91 +1007,6 @@ namespace KalaKit::Core
 		return success;
 	}
 
-	string Server::ExtractHeaderValue(
-		const string& request,
-		const string& headerName)
-	{
-		istringstream stream(request);
-		string line;
-		string prefix = headerName + ": ";
-
-		while (getline(stream, line))
-		{
-			if (line.substr(0, prefix.size()) == prefix)
-			{
-				return line.substr(prefix.size());
-			}
-		}
-		return "";
-	}
-
-	void Server::ParseByteRange(
-		const string& header,
-		size_t& outStart,
-		size_t& outEnd)
-	{
-		if (header.empty()
-			|| header.find("bytes=") != 0)
-		{
-			return;
-		}
-
-		//skip "bytes="
-		string rangePart = header.substr(6);
-		size_t dash = rangePart.find('-');
-		if (dash == string::npos) return;
-
-		string startStr = rangePart.substr(0, dash);
-		string endStr = rangePart.substr(dash + 1);
-
-		size_t startFirst = startStr.find_first_not_of(" \r\n\t");
-		size_t startLast = startStr.find_last_not_of(" \r\n\t");
-		if (startFirst != string::npos
-			&& startLast != string::npos)
-		{
-			startStr = startStr.substr(startFirst, startLast - startFirst + 1);
-		}
-		else startStr.clear();
-
-		size_t endFirst = endStr.find_first_not_of(" \r\n\t");
-		size_t endLast = endStr.find_last_not_of(" \r\n\t");
-		if (endFirst != string::npos
-			&& endLast != string::npos)
-		{
-			endStr = endStr.substr(endFirst, endLast - endFirst + 1);
-		}
-		else endStr.clear();
-
-		try
-		{
-			if (startStr.empty())
-			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Error,
-					"SERVER",
-					"Start byte in ParseByeRange is missing for header '" + header + "'!");
-				return;
-			}
-			
-			outStart = static_cast<size_t>(stoull(startStr));
-			outEnd = endStr.empty() ? 0 : static_cast<size_t>(stoull(endStr));
-			return;
-		}
-		catch (const exception& e)
-		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to parse header byte range for header '" + header
-				+ "'!\nReason: " + e.what());
-			return;
-		}
-	}
-
 	bool Server::HasInternet()
 	{
 		if (CloudFlare::tunnelName == "")
@@ -1265,7 +1150,8 @@ namespace KalaKit::Core
 				{
 					thread([clientSocket]
 					{
-						server->HandleClient(static_cast<uintptr_t>(clientSocket));
+						unique_ptr<Client> client = make_unique<Client>();
+						client->HandleClient(static_cast<uintptr_t>(clientSocket));
 					}).detach();
 				}
 
@@ -1349,7 +1235,7 @@ namespace KalaKit::Core
 		{
 			while (KalaServer::isRunning)
 			{
-				if (!canUpdateWhitelistedRoutes) canUpdateWhitelistedRoutes = true;
+				if (!server->canUpdateWhitelistedRoutes) server->canUpdateWhitelistedRoutes = true;
 
 				sleep_for(seconds(60));
 			}
@@ -1359,7 +1245,7 @@ namespace KalaKit::Core
 		{
 			while (KalaServer::isRunning)
 			{
-				if (!canUpdateRouteAccess) canUpdateRouteAccess = true;
+				if (!server->canUpdateRouteAccess) server->canUpdateRouteAccess = true;
 
 				sleep_for(seconds(60));
 			}
@@ -1754,691 +1640,6 @@ namespace KalaKit::Core
 			ConsoleMessageType::Type_Message,
 			"SERVER",
 			"Refreshed route access levels");
-	}
-
-	string Server::ExtractHeader(
-		const string& request, 
-		const string& headerName)
-	{
-		string result{};
-		istringstream stream(request);
-
-		string line{};
-		while (getline(stream, line))
-		{
-			size_t colonPos = line.find(':');
-			if (colonPos != string::npos)
-			{
-				string key = line.substr(0, colonPos);
-				string value = line.substr(colonPos + 1);
-
-				//trim whitespace
-
-				key.erase(remove_if(key.begin(), key.end(), ::isspace), key.end());
-				value.erase(0, value.find_first_not_of(" \t\r\n"));
-				value.erase(value.find_last_not_of(" \t\r\n") + 1);
-
-				//case-insensitive compare
-
-				transform(key.begin(), key.end(), key.begin(), ::tolower);
-				string lowerHeader = headerName;
-				transform(lowerHeader.begin(), lowerHeader.end(), lowerHeader.begin(), ::tolower);
-
-				if (key == lowerHeader)
-				{
-					size_t comma = value.find(',');
-					if (comma != string::npos)
-					{
-						value = value.substr(0, comma);
-					}
-
-					return value;
-				}
-			}
-		}
-		return result;
-	}
-
-	void Server::HandleClient(uintptr_t socket)
-	{
-		//
-		// START CLIENT CONNECTION
-		//
-
-		KalaServer::PrintConsoleMessage(
-			2,
-			true,
-			ConsoleMessageType::Type_Debug,
-			"CLIENT",
-			"Socket [" + to_string(socket) + "] entered handle client thread...");
-
-		SOCKET rawClientSocket = static_cast<SOCKET>(socket);
-		uintptr_t clientSocket = static_cast<uintptr_t>(rawClientSocket);
-
-		DWORD timeout = 1000;
-		setsockopt(
-			rawClientSocket,
-			SOL_SOCKET,
-			SO_RCVTIMEO,
-			(char*)&timeout,
-			sizeof(timeout));
-
-		{
-			lock_guard socketInsertLock(server->clientSocketsMutex);
-			server->activeClientSockets.insert(socket);
-		}
-
-		char buffer[2048] = {};
-		int bytesReceived = recv(rawClientSocket, buffer, sizeof(buffer) - 1, 0);
-
-		if (bytesReceived == SOCKET_ERROR)
-		{
-			//
-			// INVALID SOCKET CONNECTION - CLOSE SOCKET
-			//
-
-			DWORD err = WSAGetLastError();
-			if (err == WSAETIMEDOUT)
-			{
-				KalaServer::PrintConsoleMessage(
-					2,
-					true,
-					ConsoleMessageType::Type_Warning,
-					"CLIENT",
-					"Socket [" + to_string(socket) + "] timed out after 5 seconds without sending any data.");
-			}
-			else
-			{
-				KalaServer::PrintConsoleMessage(
-					2,
-					true,
-					ConsoleMessageType::Type_Warning,
-					"CLIENT",
-					"Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err));
-			}
-
-			server->SocketCleanup(socket);
-			closesocket(rawClientSocket);
-			return;
-		}
-		else if (bytesReceived == 0)
-		{
-			//
-			// EMPTY SOCKET - CLOSE SOCKET
-			//
-
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"CLIENT",
-				"Socket [" + to_string(socket) + "] disconnected without sending any data.");
-
-			server->SocketCleanup(socket);
-			closesocket(rawClientSocket);
-			return;
-		}
-
-		string request(buffer);
-		string route = "/";
-
-		KalaServer::PrintConsoleMessage(
-			2,
-			true,
-			ConsoleMessageType::Type_Debug,
-			"CLIENT",
-			"Socket [" + to_string(socket) + "] raw HTTP request:\n" + request);
-
-		if (request.starts_with("GET "))
-		{
-			size_t pathStart = 4;
-			size_t pathEnd = request.find(' ', pathStart);
-			if (pathEnd != string::npos)
-			{
-				route = request.substr(pathStart, pathEnd - pathStart);
-			}
-		}
-
-		string cleanRoute = route;
-		size_t q = cleanRoute.find('?');
-		if (q != string::npos)
-		{
-			cleanRoute = cleanRoute.substr(0, q);
-		}
-
-		string clientIP = server->ExtractHeader(
-			request,
-			"Cf-Connecting-Ip");
-
-		if (clientIP.empty())
-		{
-			clientIP = "unknown-ip";
-
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"SERVER",
-				"Failed to get client IP for socket [" + to_string(socket) + "]!"
-				"\n"
-				"Full request dump :"
-				"\n" +
-				request);
-		}
-
-		bool isHost = IsHost(clientIP);
-		if (isHost)
-		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Message,
-				"SERVER",
-				"Client [" + to_string(socket) + " - '" + clientIP + "'] is server host.");
-			clientIP = "host";
-
-			//always update routes and their access levels if host joins any route
-			canUpdateWhitelistedRoutes = true;
-			canUpdateRouteAccess = true;
-		}
-
-		pair<string, string> whitelistedClient = server->IsWhitelistedClient(clientIP);
-		pair<string, string> bannedClient = server->IsBannedClient(clientIP);
-
-		//
-		// CHECK IF CLIENT IS WHITELISTED OR BANNED
-		//
-
-		if (isHost
-			|| whitelistedClient.first != "")
-		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Message,
-				"",
-				"=============== WHITELISTED CLIENT =================\n"
-				" IP     : " + clientIP + "\n"
-				" Socket : " + to_string(clientSocket) + "\n"
-				" Reason : " + whitelistedClient.second + "\n"
-				"====================================================\n");
-		}
-		else
-		{
-			if (bannedClient.first != "")
-			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					false,
-					ConsoleMessageType::Type_Message,
-					"",
-					"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + bannedClient.second + "\n"
-					"====================================================\n");
-
-				sleep_for(seconds(30));
-				
-				vector<EmailEvent> ev = staticEmailEvents;
-				EmailEvent e = EmailEvent::email_banned_client_attempted_connection;
-				bool bannedClientReconnectedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end();
-
-				if (bannedClientReconnectedEvent)
-				{
-					vector<string> receivers = { server->emailSenderData.username };
-					server->emailData = 
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = server->emailSenderData.username,
-						.password = server->emailSenderData.password,
-						.sender = server->emailSenderData.username,
-						.receivers = receivers,
-						.subject = "Banned client reconnected",
-						.body = "Already banned client " + clientIP + " tried to reconnect to  '" + cleanRoute + "'!"
-					};
-					server->SendEmail(server->emailData);	
-				}
-				
-				auto respBanned = make_unique<Response_418>();
-				respBanned->Init(
-					rawClientSocket,
-					clientIP,
-					cleanRoute,
-					"text/html");
-				server->SocketCleanup(socket);
-				return;
-			}
-			else if (bannedClient.first == ""
-				&& !blacklistedKeywords.empty()
-				&& server->IsBlacklistedRoute(cleanRoute))
-			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					false,
-					ConsoleMessageType::Type_Message,
-					"",
-					"=============== BANNED CLIENT ======================\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + cleanRoute + "\n"
-					"====================================================\n");
-
-				sleep_for(milliseconds(5));
-				
-				vector<EmailEvent> ev = staticEmailEvents;
-				EmailEvent e = EmailEvent::email_client_was_banned;
-#pragma warning(push)
-#pragma warning(disable: 26117)
-				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end(); //"Releasing unheld lock" false positive
-#pragma warning(pop)
-
-				if (clientWasBannedEvent)
-				{
-					vector<string> receivers = { server->emailSenderData.username };
-					server->emailData = 
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = server->emailSenderData.username,
-						.password = server->emailSenderData.password,
-						.sender = server->emailSenderData.username,
-						.receivers = receivers,
-						.subject = "Client connected to blacklisted route",
-						.body = "client " + clientIP + " was banned because they tried to access route '" + cleanRoute + "'!"
-					};
-					server->SendEmail(server->emailData);	
-				}
-
-				pair<string, string> bannedClient{};
-				bannedClient.first = clientIP;
-				bannedClient.second = cleanRoute;
-
-				if (server->BanClient(bannedClient))
-				{
-					auto respBanned = make_unique<Response_418>();
-					respBanned->Init(
-						clientSocket,
-						clientIP,
-						cleanRoute,
-						"text/html");
-				}
-
-				server->SocketCleanup(socket);
-				return;
-			}
-		}
-
-		if (server->rateLimitTimer > 0
-			&& !isHost
-			&& whitelistedClient.first == "")
-		{
-			lock_guard<mutex> counterLock(counterMutex);
-			int& count = requestCounter[clientIP][route];
-			count++;
-
-			if (count > server->rateLimitTimer)
-			{
-				string reason = "Exceeded allowed connection rate limit of " + to_string(rateLimitTimer) + " times per second";
-				KalaServer::PrintConsoleMessage(
-					0,
-					false,
-					ConsoleMessageType::Type_Message,
-					"",
-					"=============== BANNED CLIENT ======================\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + reason + "\n"
-					"====================================================\n");
-
-				sleep_for(milliseconds(5));
-
-				vector<EmailEvent> ev = staticEmailEvents;
-				EmailEvent e = EmailEvent::email_client_was_banned;
-#pragma warning(push)
-#pragma warning(disable: 26110)
-				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end(); //"Releasing unheld lock" false positive
-#pragma warning(pop)
-
-				if (clientWasBannedEvent)
-				{
-					vector<string> receivers = { server->emailSenderData.username };
-					server->emailData = 
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = server->emailSenderData.username,
-						.password = server->emailSenderData.password,
-						.sender = server->emailSenderData.username,
-						.receivers = receivers,
-						.subject = "Client exceeded rate limit in KalaKit website",
-						.body = "client " + clientIP + " was banned because they exceeded the rate limit of '" + to_string(rateLimitTimer) + "'!"
-					};
-					server->SendEmail(server->emailData);	
-				}
-
-				pair<string, string> bannedClient{};
-				bannedClient.first = clientIP;
-				bannedClient.second = reason;
-
-				if (server->BanClient(bannedClient))
-				{
-					auto respBanned = make_unique<Response_418>();
-					respBanned->Init(
-						clientSocket,
-						clientIP,
-						cleanRoute,
-						"text/html");
-				}
-
-				server->SocketCleanup(socket);
-				return;
-			}
-		}
-
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
-
-		string body{};
-		string statusLine = "HTTP/1.1 200 OK";
-
-		//
-		// CHECK IF ROUTE EXISTS
-		//
-
-		GetWhitelistedRoutes();
-
-		Route foundRoute{};
-		for (const auto& r : whitelistedRoutes)
-		{
-			if (r.route == cleanRoute)
-			{
-				foundRoute = r;
-				break;
-			}
-		}
-
-		if (foundRoute.route.empty())
-		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Message,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '"
-				+ cleanRoute + "'!");
-
-			auto resp404 = make_unique<Response_404>();
-			resp404->Init(
-				rawClientSocket,
-				clientIP,
-				cleanRoute,
-				"text/html");
-			server->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
-			return;
-#pragma warning(pop)
-		}
-
-		bool extentionExists = false;
-		for (const auto& ext : whitelistedExtensions)
-		{
-			if (path(cleanRoute).extension().generic_string() == ext)
-			{
-				extentionExists = true;
-				break;
-			}
-		}
-
-		//
-		// CHECK IF ROUTE EXTENSION IS ALLOWED
-		//
-
-		bool isAllowedFile =
-			cleanRoute.find_last_of('.') == string::npos
-			|| extentionExists;
-
-		if (!isAllowedFile)
-		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + cleanRoute
-				+ "' from path '" + foundRoute.route + "'.");
-
-			auto resp403 = make_unique<Response_403>();
-			resp403->Init(
-				rawClientSocket,
-				clientIP,
-				cleanRoute,
-				"text/html");
-			server->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
-			return;
-#pragma warning(pop)
-		}
-
-		//
-		// CHECK IF CLIENT AND ROUTE AUTH LEVEL ARE THE SAME
-		//
-
-		bool isRegisteredRoute = IsRegisteredRoute(route);
-		bool isAdminRoute = IsAdminRoute(route);
-
-		bool isClientRegistered = false;
-		bool isClientAdmin = false;
-
-		bool canAccessRegisteredRoute =
-			isRegisteredRoute
-			&& (isClientRegistered
-			|| isClientAdmin
-			|| isHost);
-
-		bool canAccessAdminRoute =
-			isAdminRoute
-			&& (isClientAdmin
-			|| isHost);
-
-		bool allowEntrance =
-			(!isRegisteredRoute
-			&& !isAdminRoute)
-			|| canAccessRegisteredRoute
-			|| canAccessAdminRoute;
-
-		string routeAuth = "[USER]";
-		string clientAuth = "[USER]";
-
-		if (isRegisteredRoute) routeAuth = "[REGISTERED]";
-		if (isAdminRoute) routeAuth = "[ADMIN]";
-
-		if (isClientRegistered) clientAuth = "[REGISTERED]";
-		if (isClientAdmin || isHost) clientAuth = "[ADMIN]";
-
-		if (!allowEntrance)
-		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth 
-				+ " tried to access route '" + cleanRoute
-				+ "' with auth level " + routeAuth + "!");
-
-			auto resp403 = make_unique<Response_403>();
-			resp403->Init(
-				rawClientSocket,
-				clientIP,
-				cleanRoute,
-				"text/html");
-			server->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
-			return;
-#pragma warning(pop)
-		}
-
-		if ((isClientRegistered
-			|| isClientAdmin
-			|| isHost)
-			&& isRegisteredRoute)
-		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Message,
-				"",
-				"==== APPROVED CLIENT CONNECTED TO PRIVATE ROUTE ====\n"
-				" IP     : " + clientIP + "\n"
-				" Socket : " + to_string(clientSocket) + "\n"
-				" Reason : " + cleanRoute + "\n"
-				"====================================================\n");
-		}
-
-		if ((isClientAdmin
-			|| isHost)
-			&& (isRegisteredRoute
-			|| isAdminRoute))
-		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Message,
-				"",
-				"===== APPROVED CLIENT CONNECTED TO ADMIN ROUTE =====\n"
-				" IP     : " + clientIP + "\n"
-				" Socket : " + to_string(clientSocket) + "\n"
-				" Reason : " + cleanRoute + "\n"
-				"====================================================\n");
-		}
-
-		try
-		{
-			size_t rangeStart = 0;
-			size_t rangeEnd = 0;
-
-			string rangeHeader = server->ExtractHeaderValue(
-				request,
-				"Range");
-			server->ParseByteRange(
-				rangeHeader,
-				rangeStart,
-				rangeEnd);
-
-			size_t totalSize = 0;
-			bool sliced = false;
-			vector<char> result = server->ServeFile(
-				cleanRoute,
-				rangeStart,
-				rangeEnd,
-				totalSize,
-				sliced);
-
-			if (result.empty())
-			{
-				KalaServer::PrintConsoleMessage(
-					2,
-					true,
-					ConsoleMessageType::Type_Error,
-					"CLIENT",
-					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-					+ cleanRoute + "'.");
-
-				auto resp500 = make_unique<Response_500>();
-				resp500->Init(
-					rawClientSocket,
-					clientIP,
-					cleanRoute,
-					"text/html");
-				server->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
-				return;
-#pragma warning(pop)
-			}
-			else
-			{
-				if (sliced)
-				{
-					auto resp206 = make_unique<Response_206>();
-
-					resp206->hasRange = true;
-					resp206->rangeStart = rangeStart;
-					resp206->rangeEnd = rangeStart + result.size() - 1;
-					resp206->totalSize = totalSize;
-					resp206->contentRange =
-						"bytes 0-"
-						+ to_string(result.size() - 1)
-						+ "/"
-						+ to_string(totalSize);
-
-					resp206->Init(
-						rawClientSocket,
-						clientIP,
-						cleanRoute,
-						foundRoute.mimeType);
-					server->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
-					return;
-#pragma warning(pop)
-				}
-				else
-				{
-					auto resp200 = make_unique<Response_200>();
-					resp200->Init(
-						rawClientSocket,
-						clientIP,
-						cleanRoute,
-						foundRoute.mimeType);
-					server->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
-					return;
-#pragma warning(pop)
-				}
-			}
-		}
-		catch (const exception& e)
-		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Error,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-				+ cleanRoute + "'.\nError:\n" + e.what());
-
-			auto resp500 = make_unique<Response_500>();
-			resp500->Init(
-				rawClientSocket,
-				clientIP,
-				cleanRoute,
-				"text/html");
-			server->SocketCleanup(socket);
-		}
-	}
-
-	void Server::SocketCleanup(uintptr_t clientSocket)
-	{
-		{
-			std::lock_guard socketEraseLock(server->clientSocketsMutex);
-			server->activeClientSockets.erase(clientSocket);
-		}
 	}
 
 	void Server::Quit() const

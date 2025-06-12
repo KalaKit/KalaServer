@@ -94,7 +94,12 @@ namespace KalaKit::Core
 		datafile_bannedIP,
 		datafile_blacklistedKeyword
 	};
-	
+
+	//keeps track of user attempts to routes per second
+	static inline unordered_map<string, unordered_map<string, int>> requestCounter;
+
+	static inline mutex counterMutex;
+
 	class Server
 	{
 	public:
@@ -115,6 +120,23 @@ namespace KalaKit::Core
 		
 		//The contents of the email + sender and receivers of the email
 		EmailData emailData;
+
+		atomic<bool> canUpdateWhitelistedRoutes{ true };
+		atomic<bool> canUpdateRouteAccess{ true };
+
+		mutex clientSocketsMutex;
+		unordered_set<uintptr_t> activeClientSockets;
+
+		//All keywords that trigger a ban
+		vector<string> blacklistedKeywords{};
+
+		//All routes that exist on disk
+		vector<Route> whitelistedRoutes{};
+
+		//All extensions whose files are allowed to be opened
+		vector<string> whitelistedExtensions{};
+
+		unsigned int rateLimitTimer; //If client connections to one route per second exceed this then that client gets banned.
 
 		Server(
 			unsigned int port,
@@ -177,21 +199,6 @@ namespace KalaKit::Core
 			bool& outSliced);
 			
 		bool SendEmail(const EmailData& emailData);
-
-		/// <summary>
-		/// Parse headers from raw HTTP string.
-		/// </summary>
-		string ExtractHeaderValue(
-			const string& request,
-			const string& headerName);
-
-		/// <summary>
-		/// Parse byte range from header.
-		/// </summary>
-		void ParseByteRange(
-			const string& header,
-			size_t& outStart,
-			size_t& outEnd);
 
 		/// <summary>
 		/// Check whether this route is allowed to be accessed.
@@ -258,13 +265,6 @@ namespace KalaKit::Core
 		bool PreInitializeCheck() const;
 
 		/// <summary>
-		/// Header parser for getting the results from a cloudflared header.
-		/// </summary>
-		string ExtractHeader(
-			const string& request,
-			const string& headerName);
-
-		/// <summary>
 		/// Calls 'ipconfig' and stores all host IPs in machineIPs vector.
 		/// </summary>
 		void GetMachineIPs();
@@ -284,22 +284,12 @@ namespace KalaKit::Core
 		/// </summary>
 		void SetRouteAccessLevels();
 
-		/// <summary>
-		/// Handle each client in its own thread.
-		/// </summary>
-		void HandleClient(uintptr_t);
-
-		void SocketCleanup(uintptr_t clientSocket);
-
 		bool isServerReady = false; //Used to check if server is ready to start.
 
 		mutable uintptr_t serverSocket{}; //Current active socket
-		mutex clientSocketsMutex;
-		unordered_set<uintptr_t> activeClientSockets;
 
 		unsigned int port; //Local server port
 		unsigned int healthTimer; //Countdown until server reports health check.
-		unsigned int rateLimitTimer; //If client connections to one route per second exceed this then that client gets banned.		string serverName; //The server name used for cloudflare/dns calls
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
 	};
