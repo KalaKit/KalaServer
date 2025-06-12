@@ -41,6 +41,14 @@ namespace KalaKit::Core
 		AccessLevel accessLevel;
 	};
 	
+	//Choose what events to send emails for
+	enum class EmailEvent
+	{
+		email_none,
+		email_client_was_banned,
+		email_banned_client_attempted_connection
+	};
+	
 	//Send an email to a smtp server like gmail from this server.
 	//Uses STARTTLS on port 587
 	struct EmailData
@@ -57,8 +65,9 @@ namespace KalaKit::Core
 	//The account info of the email sender
 	struct EmailSenderData
 	{
-		string username;          //Your email account
-		string password;          //Your app password (read docs/email-app-password.txt for more info)
+		vector<EmailEvent> emailEvents; //Choose what events to send emails for
+		string username;                //Your email account
+		string password;                //Your app password (read docs/email-app-password.txt for more info)
 	};
 
 	struct ErrorMessage

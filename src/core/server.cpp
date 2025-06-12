@@ -12,6 +12,7 @@
 #include <sstream>
 #include <filesystem>
 #include <memory>
+#include <algorithm>
 
 #pragma comment(lib, "Wininet.lib")
 #pragma comment(lib, "ws2_32.lib")
@@ -70,6 +71,7 @@ using std::atomic_bool;
 using std::streamsize;
 using std::streamoff;
 using std::min;
+using std::find;
 
 namespace KalaKit::Core
 {	
@@ -854,6 +856,16 @@ namespace KalaKit::Core
 	
 	bool Server::SendEmail(const EmailData& emailData)
 	{
+		auto fail = [&](const string& reason) 
+		{
+			KalaServer::PrintConsoleMessage(
+				2, 
+				true, 
+				ConsoleMessageType::Type_Error, 
+				"SEND_EMAIL", 
+				reason);
+		};
+		
 		auto base64_encode = [](const string& input) -> string
 		{
 			BIO* bio = BIO_new(BIO_s_mem());
@@ -883,7 +895,11 @@ namespace KalaKit::Core
 		};
 		
 		WSADATA wsa;
-		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
+		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+		{
+			fail("WSAStartup failed!");
+			return false;
+		}
 		
 		addrinfo hints = {}, *res = nullptr;
 		hints.ai_family = AF_INET;
@@ -891,6 +907,7 @@ namespace KalaKit::Core
 		
 		if (getaddrinfo(emailData.smtpServer.c_str(), "587", &hints, &res) != 0)
 		{
+			fail("Failed to resolve SMTP server!");
 			WSACleanup();
 			return false;
 		}
@@ -898,6 +915,7 @@ namespace KalaKit::Core
 		SOCKET sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (connect(sock, res->ai_addr, static_cast<int>(res->ai_addrlen)) == SOCKET_ERROR)
 		{
+			fail("Connection to SMTP server failed!");
 			closesocket(sock);
 			WSACleanup();
 			return false;
@@ -919,12 +937,17 @@ namespace KalaKit::Core
 		SSL_library_init();
 		SSL_load_error_strings();
 		auto ctx = unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)>(SSL_CTX_new(TLS_client_method()), SSL_CTX_free);
-		if (!ctx) return false;
+		if (!ctx)
+		{
+			fail("Failed to create SSL context!");
+			return false;
+		}
 
 		SSL* ssl = SSL_new(ctx.get());
 		SSL_set_fd(ssl, static_cast<int>(sock));
 		if (SSL_connect(ssl) != 1)
 		{
+			fail("SSL handshake failed!");
 			SSL_free(ssl);
 			closesocket(sock);
 			WSACleanup();
@@ -936,21 +959,50 @@ namespace KalaKit::Core
 		{
 			if (!send_ssl(ssl, cmd) || recv_ssl(ssl).starts_with("5"))
 			{
+				fail("SMTP command failed: " + cmd);
 				success = false;
 			}
 			return success;
 		};
 
-		if (!check("EHLO localhost")) return false;
-		if (!check("AUTH LOGIN")) return false;
-		if (!check(base64_encode(emailData.username))) return false;
-		if (!check(base64_encode(emailData.password))) return false;
-		if (!check("MAIL FROM:<" + emailData.sender + ">")) return false;
+		if (!check("EHLO localhost")) 
+		{
+			fail("SMTP EHLO command failed!");
+			return false;
+		}
+		if (!check("AUTH LOGIN")) 
+		{
+			fail("SMTP AUTH LOGIN failed!");
+			return false;
+		}
+		if (!check(base64_encode(emailData.username))) 
+		{
+			fail("SMTP username authentication failed!");
+			return false;
+		}
+		if (!check(base64_encode(emailData.password))) 
+		{
+			fail("SMTP password authentication failed!");
+			return false;
+		}
+		if (!check("MAIL FROM:<" + emailData.sender + ">")) 
+		{
+			fail("SMTP MAIL FROM command failed!");
+			return false;
+		}
 		for (const auto& r : emailData.receivers)
 		{
-			if (!check("RCPT TO:<" + r + ">")) return false;
+			if (!check("RCPT TO:<" + r + ">")) 
+			{
+				fail("SMTP RCPT TO failed for: " + r);
+				return false;
+			}
 		}
-		if (!check("DATA")) return false;
+		if (!check("DATA")) 
+		{
+			fail("SMTP DATA command failed!");
+			return false;
+		}
 
 		ostringstream msg{};
 		msg << "Subject: " << emailData.subject << "\r\n";
@@ -1902,6 +1954,28 @@ namespace KalaKit::Core
 					"====================================================\n");
 
 				sleep_for(seconds(30));
+				
+				vector<EmailEvent> ev = server->emailSenderData.emailEvents;
+				EmailEvent e = EmailEvent::email_banned_client_attempted_connection;
+				bool bannedClientReconnectedEvent =
+					find(ev.begin(), ev.end(), e) != ev.end();
+
+				if (bannedClientReconnectedEvent)
+				{
+					vector<string> receivers = { server->emailSenderData.username };
+					server->emailData = 
+					{
+						.smtpServer = "smtp.gmail.com",
+						.username = server->emailSenderData.username,
+						.password = server->emailSenderData.password,
+						.sender = server->emailSenderData.username,
+						.receivers = receivers,
+						.subject = "Banned client reconnected",
+						.body = "Already banned client " + clientIP + " tried to reconnect to  '" + cleanRoute + "'!"
+					};
+					server->SendEmail(server->emailData);	
+				}
+				
 				auto respBanned = make_unique<Response_418>();
 				respBanned->Init(
 					rawClientSocket,
@@ -1928,18 +2002,26 @@ namespace KalaKit::Core
 
 				sleep_for(milliseconds(5));
 				
-				vector<string> receivers = { server->emailSenderData.username };
-				server->emailData = 
+				vector<EmailEvent> ev = server->emailSenderData.emailEvents;
+				EmailEvent e = EmailEvent::email_client_was_banned;
+				bool clientWasBannedEvent =
+					find(ev.begin(), ev.end(), e) != ev.end();
+
+				if (clientWasBannedEvent)
 				{
-					.smtpServer = "smtp.gmail.com",
-					.username = server->emailSenderData.username,
-					.password = server->emailSenderData.password,
-					.sender = server->emailSenderData.username,
-					.receivers = receivers,
-					.subject = "test",
-					.body = "body"
-				};
-				server->SendEmail(server->emailData);
+					vector<string> receivers = { server->emailSenderData.username };
+					server->emailData = 
+					{
+						.smtpServer = "smtp.gmail.com",
+						.username = server->emailSenderData.username,
+						.password = server->emailSenderData.password,
+						.sender = server->emailSenderData.username,
+						.receivers = receivers,
+						.subject = "Client connected to blacklisted route",
+						.body = "client " + clientIP + " was banned because they tried to access route '" + cleanRoute + "'!"
+					};
+					server->SendEmail(server->emailData);	
+				}
 
 				pair<string, string> bannedClient{};
 				bannedClient.first = clientIP;
@@ -1983,6 +2065,27 @@ namespace KalaKit::Core
 					"====================================================\n");
 
 				sleep_for(milliseconds(5));
+				
+				vector<EmailEvent> ev = server->emailSenderData.emailEvents;
+				EmailEvent e = EmailEvent::email_client_was_banned;
+				bool clientWasBannedEvent =
+					find(ev.begin(), ev.end(), e) != ev.end();
+
+				if (clientWasBannedEvent)
+				{
+					vector<string> receivers = { server->emailSenderData.username };
+					server->emailData = 
+					{
+						.smtpServer = "smtp.gmail.com",
+						.username = server->emailSenderData.username,
+						.password = server->emailSenderData.password,
+						.sender = server->emailSenderData.username,
+						.receivers = receivers,
+						.subject = "Client exceeded rate limit in KalaKit website",
+						.body = "client " + clientIP + " was banned because they exceeded the rate limit of '" + to_string(rateLimitTimer) + "'!"
+					};
+					server->SendEmail(server->emailData);	
+				}
 
 				pair<string, string> bannedClient{};
 				bannedClient.first = clientIP;
