@@ -114,6 +114,7 @@ namespace KalaKit::Core
 		const string& domainName,
 		const ErrorMessage& errorMessage,
 		const DataFile& dataFile,
+		const EmailSenderData& emailSenderData,
 		const vector<string>& submittedRegisteredRoutes,
 		const vector<string>& submittedAdminRoutes)
 	{
@@ -124,7 +125,8 @@ namespace KalaKit::Core
 			serverName,
 			domainName,
 			errorMessage,
-			dataFile);
+			dataFile,
+			emailSenderData);
 
 		if (!server->PreInitializeCheck()) return false;
 
@@ -1925,6 +1927,19 @@ namespace KalaKit::Core
 					"====================================================\n");
 
 				sleep_for(milliseconds(5));
+				
+				vector<string> receivers = { server->emailSenderData.username };
+				server->emailData = 
+				{
+					.smtpServer = "smtp.gmail.com",
+					.username = server->emailSenderData.username,
+					.password = server->emailSenderData.password,
+					.sender = server->emailSenderData.username,
+					.receivers = receivers,
+					.subject = "test",
+					.body = "body"
+				};
+				server->SendEmail(server->emailData);
 
 				pair<string, string> bannedClient{};
 				bannedClient.first = clientIP;

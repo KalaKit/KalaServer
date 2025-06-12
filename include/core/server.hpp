@@ -53,6 +53,13 @@ namespace KalaKit::Core
 		string subject;           //The title of the email
 		string body;              //The contents of the email
 	};
+	
+	//The account info of the email sender
+	struct EmailSenderData
+	{
+		string username;          //Your email account
+		string password;          //Your app password (read docs/email-app-password.txt for more info)
+	};
 
 	struct ErrorMessage
 	{
@@ -93,6 +100,12 @@ namespace KalaKit::Core
 		/// for ips, extensions, keywords and others.
 		/// </summary>
 		DataFile dataFile;
+		
+		//Your email username and app password to be able to send emails
+		EmailSenderData emailSenderData;
+		
+		//The contents of the email + sender and receivers of the email
+		EmailData emailData;
 
 		Server(
 			unsigned int port,
@@ -101,14 +114,16 @@ namespace KalaKit::Core
 			const string& serverName,
 			const string& domainName,
 			const ErrorMessage& errorMessage,
-			const DataFile& dataFile) :
+			const DataFile& dataFile,
+			const EmailSenderData& emailSenderData) :
 			port(port),
 			healthTimer(healthTimer),
 			rateLimitTimer(rateLimitTimer),
 			serverName(serverName),
 			domainName(domainName),
 			errorMessage(errorMessage),
-			dataFile(dataFile) {}
+			dataFile(dataFile),
+			emailSenderData(emailSenderData) {}
 
 		/// <summary>
 		/// Initializes the server. Must be ran first before any other components.
@@ -121,6 +136,7 @@ namespace KalaKit::Core
 			const string& domainName,
 			const ErrorMessage& errorMessage,
 			const DataFile& datafile,
+			const EmailSenderData& emailSenderData,
 			const vector<string>& registeredRoutes,
 			const vector<string>& adminRoutes);
 
