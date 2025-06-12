@@ -28,11 +28,6 @@ target_include_directories(KalaServer PUBLIC
 	"${EXT_OPENSSL_DIR}/include"
 )
 
-# Ensure linker uses static OpenSSL
-target_compile_definitions(KalaServer PRIVATE
-    OPENSSL_NO_DYNAMIC_ENGINE
-)
-
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	target_link_libraries(KalaServer PRIVATE
 		"${OPENSSL_LIB1_RELEASE}"
