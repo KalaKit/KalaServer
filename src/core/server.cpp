@@ -20,15 +20,10 @@
 #include "core/core.hpp"
 #include "core/server.hpp"
 #include "core/client.hpp"
+#include "core/event.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
-#include "ssl.h" //openssl
-#include "err.h" //openssl
 
-using KalaKit::Core::KalaServer;
-using KalaKit::Core::Server;
-using KalaKit::Core::ConsoleMessageType;
-using KalaKit::Core::PopupReason;
 using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;
 
@@ -106,17 +101,21 @@ namespace KalaKit::Core
 
 		if (!server->PreInitializeCheck()) return false;
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			false,
-			ConsoleMessageType::Type_Message,
-			"",
-			"=============================="
-			"\n"
-			"Initializing server '" + server->GetServerName() + "'"
-			"\n"
-			"=============================="
-			"\n");
+		PrintData iData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = false,
+			.customTag = "",
+			.message = 
+				"=============================="
+				"\n"
+				"Initializing server '" + server->GetServerName() + "'"
+				"\n"
+				"=============================="
+				"\n"
+		};
+		unique_ptr<Event> iEvent = make_unique<Event>();
+		iEvent->SendEvent(EventType::event_print_message, iData);
 
 		server->GetFileData(DataFileType::datafile_extension);
 		server->GetWhitelistedRoutes();
@@ -131,9 +130,13 @@ namespace KalaKit::Core
 		WSADATA wsaData{};
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"WSAStartup failed!");
+			PopupData wfData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "WSAStartup failed!"
+			};
+			unique_ptr<Event> wfEvent = make_unique<Event>();
+			wfEvent->SendEvent(EventType::event_popup_error, wfData);
 			return false;
 		}
 
@@ -142,9 +145,13 @@ namespace KalaKit::Core
 
 		if (thisSocket == INVALID_SOCKET)
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Socket creation failed!");
+			PopupData scfData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Socket creation failed!"
+			};
+			unique_ptr<Event> scfEvent = make_unique<Event>();
+			scfEvent->SendEvent(EventType::event_popup_error, scfData);
 			return false;
 		}
 
@@ -158,48 +165,59 @@ namespace KalaKit::Core
 			(sockaddr*)&serverAddr,
 			sizeof(serverAddr)) == SOCKET_ERROR)
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Bind failed!");
+			PopupData bfData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Bind failed!"
+			};
+			unique_ptr<Event> bfEvent = make_unique<Event>();
+			bfEvent->SendEvent(EventType::event_popup_error, bfData);
 			return false;
 		}
 
 		if (listen(thisSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Listen failed!");
+			PopupData lfData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Listen failed!"
+			};
+			unique_ptr<Event> lfEvent = make_unique<Event>();
+			lfEvent->SendEvent(EventType::event_popup_error, lfData);
 			return false;
 		}
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			false,
-			ConsoleMessageType::Type_Message,
-			"",
-			"");
+		unique_ptr<Event> emptyEvent = make_unique<Event>();
+		emptyEvent->PrintNewLine();
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"Server is running on port '" + to_string(server->port) + "'.");
+		PrintData pData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "SERVER",
+			.message = "Server is running on port '" + to_string(server->port) + "'."
+		};
+		unique_ptr<Event> pEvent = make_unique<Event>();
+		pEvent->SendEvent(EventType::event_print_message, pData);
 
 		KalaServer::isRunning = true;
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			false,
-			ConsoleMessageType::Type_Message,
-			"",
-			"\n"
-			"=============================="
-			"\n"
-			"Initialization finished!"
-			"\n"
-			"=============================="
-			"\n");
+		PrintData ifData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = false,
+			.customTag = "",
+			.message = 
+				"\n"
+				"=============================="
+				"\n"
+				"Initialization finished!"
+				"\n"
+				"=============================="
+				"\n"
+		};
+		unique_ptr<Event> ifEvent = make_unique<Event>();
+		ifEvent->SendEvent(EventType::event_print_message, ifData);
 
 		return true;
 	}
@@ -208,33 +226,49 @@ namespace KalaKit::Core
 	{
 		if (!KalaServer::IsRunningAsAdmin())
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"This program must be ran with admin privileges!");
+			PopupData apData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "This program must be ran with admin privileges!"
+			};
+			unique_ptr<Event> apEvent = make_unique<Event>();
+			apEvent->SendEvent(EventType::event_popup_error, apData);
 			return false;
 		}
 
 		if (serverName == "")
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with empty server name!");
+			PopupData esnData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Cannot start server with empty server name!"
+			};
+			unique_ptr<Event> esnEvent = make_unique<Event>();
+			esnEvent->SendEvent(EventType::event_popup_error, esnData);
 			return false;
 		}
 		if (domainName == "")
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with empty domain name!");
+			PopupData ednData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Cannot start server with empty domain name!"
+			};
+			unique_ptr<Event> ednEvent = make_unique<Event>();
+			ednEvent->SendEvent(EventType::event_popup_error, ednData);
 			return false;
 		}
 
 		string whitelistedRoutesFolderPath = (current_path() / server->dataFile.whitelistedRoutesFolder).string();
 		if (!exists(whitelistedRoutesFolderPath))
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with invalid whitelisted routes folder '" + whitelistedRoutesFolderPath + "'!");
+			PopupData wrData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Cannot start server with invalid whitelisted routes folder '" + whitelistedRoutesFolderPath + "'!"
+			};
+			unique_ptr<Event> wrEvent = make_unique<Event>();
+			wrEvent->SendEvent(EventType::event_popup_error, wrData);
 			return false;
 		}
 
@@ -242,9 +276,13 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.whitelistedExtensionsFile).string();
 		if (!exists(whitelistedExtensionsFilePath))
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with invalid whitelisted extensions file '" + whitelistedExtensionsFilePath + "'!");
+			PopupData weData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Cannot start server with invalid whitelisted extensions file '" + whitelistedExtensionsFilePath + "'!"
+			};
+			unique_ptr<Event> weEvent = make_unique<Event>();
+			weEvent->SendEvent(EventType::event_popup_error, weData);
 			return false;
 		}
 
@@ -252,9 +290,13 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.whitelistedIPsFile).string();
 		if (!exists(whitelistedIPsFilePath))
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with invalid whitelisted IPs file '" + whitelistedIPsFilePath + "'!");
+			PopupData wiData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Cannot start server with invalid whitelisted IPs file '" + whitelistedIPsFilePath + "'!"
+			};
+			unique_ptr<Event> wiEvent = make_unique<Event>();
+			wiEvent->SendEvent(EventType::event_popup_error, wiData);
 			return false;
 		}
 
@@ -262,9 +304,13 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.bannedIPsFile).string();
 		if (!exists(bannedIPsFilePath))
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with invalid banned IPs file '" + bannedIPsFilePath + "'!");
+			PopupData biData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Cannot start server with invalid banned IPs file '" + bannedIPsFilePath + "'!"
+			};
+			unique_ptr<Event> biEvent = make_unique<Event>();
+			biEvent->SendEvent(EventType::event_popup_error, biData);
 			return false;
 		}
 
@@ -272,9 +318,13 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.blacklistedKeywordsFile).string();
 		if (!exists(blacklistedKeywordsFilePath))
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Cannot start server with invalid blacklisted keywords file '" + blacklistedKeywordsFilePath + "'!");
+			PopupData bkData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Cannot start server with invalid blacklisted keywords file '" + blacklistedKeywordsFilePath + "'!"
+			};
+			unique_ptr<Event> bkEvent = make_unique<Event>();
+			bkEvent->SendEvent(EventType::event_popup_error, bkData);
 			return false;
 		}
 
@@ -332,12 +382,15 @@ namespace KalaKit::Core
 		ifstream readFile(server->dataFile.bannedIPsFile);
 		if (!readFile)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to read 'banned-ips.txt' to ban IP!");
+			PrintData biData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Failed to read 'banned-ips.txt' to ban IP!"
+			};
+			unique_ptr<Event> biEvent = make_unique<Event>();
+			biEvent->SendEvent(EventType::event_print_error, biData);
 			return false;
 		}
 
@@ -359,12 +412,15 @@ namespace KalaKit::Core
 		ofstream writeFile(server->dataFile.bannedIPsFile, ios::app);
 		if (!writeFile)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to write into 'banned-ips.txt' to ban IP!");
+			PrintData biData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Failed to write into 'banned-ips.txt' to ban IP!"
+			};
+			unique_ptr<Event> biEvent = make_unique<Event>();
+			biEvent->SendEvent(EventType::event_print_error, biData);
 			return false;
 		}
 
@@ -387,18 +443,26 @@ namespace KalaKit::Core
 		string routeFolder = server->dataFile.whitelistedRoutesFolder;
 		if (routeFolder.empty())
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Whitelisted routes root folder has not been assigned!");
+			PopupData rrfData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Whitelisted routes root folder has not been assigned!"
+			};
+			unique_ptr<Event> rrfEvent = make_unique<Event>();
+			rrfEvent->SendEvent(EventType::event_popup_error, rrfData);
 			return;
 		}
 
 		path routePath = current_path() / routeFolder;
 		if (!exists(routePath))
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Whitelisted routes root folder '" + server->dataFile.whitelistedRoutesFolder + "' does not exist!");
+			PopupData wrfData =
+			{
+				.reason = EventType::event_popup_error,
+				.message = "Whitelisted routes root folder '" + server->dataFile.whitelistedRoutesFolder + "' does not exist!"
+			};
+			unique_ptr<Event> wrfEvent = make_unique<Event>();
+			wrfEvent->SendEvent(EventType::event_popup_error, wrfData);
 			return;
 		}
 
@@ -441,12 +505,15 @@ namespace KalaKit::Core
 			server->AddNewWhitelistedRoute(correctRoute, correctFilePath);
 		}
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"Refreshed whitelisted routes");
+		PrintData rwrData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "SERVER",
+			.message = "Refreshed whitelisted routes"
+		};
+		unique_ptr<Event> rwrEvent = make_unique<Event>();
+		rwrEvent->SendEvent(EventType::event_print_message, rwrData);
 
 		server->canUpdateWhitelistedRoutes = false;
 	}
@@ -501,12 +568,15 @@ namespace KalaKit::Core
 		ifstream file(fullFilePath);
 		if (!file)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to open '" + path(filePath).filename().string() + "'!");
+			PrintData ffData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Failed to open '" + path(filePath).filename().string() + "'!"
+			};
+			unique_ptr<Event> ffEvent = make_unique<Event>();
+			ffEvent->SendEvent(EventType::event_print_message, ffData);
 			return;
 		}
 
@@ -586,12 +656,15 @@ namespace KalaKit::Core
 			break;
 		}
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"Refreshed " + resultType);
+		PrintData rtData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "SERVER",
+			.message = "Refreshed " + resultType
+		};
+		unique_ptr<Event> rtEvent = make_unique<Event>();
+		rtEvent->SendEvent(EventType::event_print_message, rtData);
 	}
 
 	void Server::AddNewWhitelistedRoute(const string& route, const string& filePath) const
@@ -604,12 +677,15 @@ namespace KalaKit::Core
 		path fullPath = path(filePath);
 		if (!exists(fullPath))
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Page path '" + filePath + "' does not exist!.");
+			PrintData ppData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Page path '" + filePath + "' does not exist!."
+			};
+			unique_ptr<Event> ppEvent = make_unique<Event>();
+			ppEvent->SendEvent(EventType::event_print_error, ppData);
 
 			return;
 		}
@@ -629,12 +705,15 @@ namespace KalaKit::Core
 
 		server->whitelistedRoutes.push_back(newRoute);
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"\n  Added route '" + route + "'\n  file path   '" + filePath + "'\n  mime type   '" + s_newMimeType + "'!");
+		PrintData arData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "SERVER",
+			.message = "\n  Added route '" + route + "'\n  file path   '" + filePath + "'\n  mime type   '" + s_newMimeType + "'!"
+		};
+		unique_ptr<Event> arEvent = make_unique<Event>();
+		arEvent->SendEvent(EventType::event_print_message, arData);
 	}
 	void Server::AddNewWhitelistedExtension(const string& newExtension) const
 	{
@@ -644,12 +723,15 @@ namespace KalaKit::Core
 		}
 
 		server->whitelistedExtensions.push_back(newExtension);
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"Added new extension '" + newExtension + "'");
+		PrintData neData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "SERVER",
+			.message = "Added new extension '" + newExtension + "'"
+		};
+		unique_ptr<Event> neEvent = make_unique<Event>();
+		neEvent->SendEvent(EventType::event_print_message, neData);
 	}
 
 	void Server::RemoveWhitelistedRoute(const string& thisRoute) const
@@ -668,12 +750,15 @@ namespace KalaKit::Core
 
 		if (foundRoute == "")
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"SERVER",
-				"Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!");
+			PrintData rrData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Route '" + thisRoute + "' cannot be removed because it hasn't been whitelisted!"
+			};
+			unique_ptr<Event> rrEvent = make_unique<Event>();
+			rrEvent->SendEvent(EventType::event_print_warning, rrData);
 		}
 	}
 	void Server::RemoveWhitelistedExtension(const string& thisExtension) const
@@ -690,12 +775,15 @@ namespace KalaKit::Core
 
 		if (foundExtension == "")
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"SERVER",
-				"Extension '" + thisExtension + "' cannot be removed because it hasn't been whitelisted!");
+			PrintData erData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Extension '" + thisExtension + "' cannot be removed because it hasn't been whitelisted!"
+			};
+			unique_ptr<Event> erEvent = make_unique<Event>();
+			erEvent->SendEvent(EventType::event_print_warning, erData);
 		}
 	}
 
@@ -711,12 +799,15 @@ namespace KalaKit::Core
 
 		if (route.empty())
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVE-FILE",
-				"Serve received empty route!");
+			PrintData seData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVE-FILE",
+				.message = "Serve received empty route!"
+			};
+			unique_ptr<Event> seEvent = make_unique<Event>();
+			seEvent->SendEvent(EventType::event_print_error, seData);
 			return {};
 		}
 
@@ -733,12 +824,15 @@ namespace KalaKit::Core
 		}
 		if (foundRoute.route.empty())
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVE-FILE",
-				"Route '" + route + "' is not whitelisted!");
+			PrintData rwData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVE-FILE",
+				.message = "Route '" + route + "' is not whitelisted!"
+			};
+			unique_ptr<Event> rwEvent = make_unique<Event>();
+			rwEvent->SendEvent(EventType::event_print_error, rwData);
 			return {};
 		}
 
@@ -748,12 +842,15 @@ namespace KalaKit::Core
 			ifstream file(fullFilePath, ios::binary);
 			if (!file)
 			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Error,
-					"SERVE-FILE",
-					"Failed to open file '" + fullFilePath.generic_string() + "'!");
+				PrintData ofData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "SERVE-FILE",
+					.message = "Failed to open file '" + fullFilePath.generic_string() + "'!"
+				};
+				unique_ptr<Event> ofEvent = make_unique<Event>();
+				ofEvent->SendEvent(EventType::event_print_error, ofData);
 				return {};
 			}
 
@@ -765,13 +862,17 @@ namespace KalaKit::Core
 
 			if (rangeStart >= outTotalSize)
 			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Error,
-					"SERVE-FILE",
-					"Range start (" + to_string(rangeStart) +
-					") is beyond total size (" + to_string(outTotalSize) + ")!");
+				PrintData rsData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "SERVE-FILE",
+					.message = 
+						"Range start (" + to_string(rangeStart) +
+						") is beyond total size (" + to_string(outTotalSize) + ")!"
+				};
+				unique_ptr<Event> rsEvent = make_unique<Event>();
+				rsEvent->SendEvent(EventType::event_print_error, rsData);
 				return {};
 			}
 
@@ -816,207 +917,34 @@ namespace KalaKit::Core
 		}
 		catch (const exception& e)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVE-FILE",
-				"Exception while serving route '" + route + "':\n" + e.what());
+			PrintData erData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVE-FILE",
+				.message = "Exception while serving route '" + route + "':\n" + e.what()
+			};
+			unique_ptr<Event> erEvent = make_unique<Event>();
+			erEvent->SendEvent(EventType::event_print_error, erData);
 			return {};
 		}
 
 		return {};
-	}
-	
-	bool Server::SendEmail(const EmailData& emailData)
-	{
-		auto fail = [&](const string& reason) 
-		{
-			KalaServer::PrintConsoleMessage(
-				2, 
-				true, 
-				ConsoleMessageType::Type_Error, 
-				"SEND_EMAIL", 
-				reason);
-		};
-		
-		auto base64_encode = [](const string& input) -> string
-		{
-			BIO* bio = BIO_new(BIO_s_mem());
-			BIO* b64 = BIO_new(BIO_f_base64());
-			BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-			b64 = BIO_push(b64, bio);
-			BIO_write(b64, input.data(), static_cast<int>(input.size()));
-			BIO_flush(b64);
-			BUF_MEM* buffer{};
-			BIO_get_mem_ptr(b64, &buffer);
-			string output(buffer->data, buffer->length);
-			BIO_free_all(b64);
-			return output;
-		};
-		
-		auto send_ssl = [](SSL* ssl, const string& msg) -> bool
-		{
-			string formatted = msg + "\r\n";
-			return SSL_write(ssl, formatted.c_str(), static_cast<int>(formatted.size())) > 0;
-		};
-		
-		auto recv_ssl = [](SSL* ssl) -> string
-		{
-			char buf[2048] = {};
-			int len = SSL_read(ssl, buf, sizeof(buf) - 1);
-			return len > 0 ? string(buf, len) : "";
-		};
-		
-		WSADATA wsa;
-		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-		{
-			fail("WSAStartup failed!");
-			return false;
-		}
-		
-		addrinfo hints = {}, *res = nullptr;
-		hints.ai_family = AF_INET;
-		hints.ai_socktype = SOCK_STREAM;
-		
-		if (getaddrinfo(emailData.smtpServer.c_str(), "587", &hints, &res) != 0)
-		{
-			fail("Failed to resolve SMTP server!");
-			WSACleanup();
-			return false;
-		}
-		
-		SOCKET sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-		if (connect(sock, res->ai_addr, static_cast<int>(res->ai_addrlen)) == SOCKET_ERROR)
-		{
-			fail("Connection to SMTP server failed!");
-			closesocket(sock);
-			WSACleanup();
-			return false;
-		}
-
-		freeaddrinfo(res);
-
-		char recvBuf[2048] = {};
-		recv(sock, recvBuf, sizeof(recvBuf) - 1, 0);
-
-		string ehlo = "EHLO localhost\r\n";
-		send(sock, ehlo.c_str(), static_cast<int>(ehlo.size()), 0);
-		recv(sock, recvBuf, sizeof(recvBuf) - 1, 0);
-
-		string starttls = "STARTTLS\r\n";
-		send(sock, starttls.c_str(), static_cast<int>(starttls.size()), 0);
-		recv(sock, recvBuf, sizeof(recvBuf) - 1, 0);
-
-		SSL_library_init();
-		SSL_load_error_strings();
-		auto ctx = unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)>(SSL_CTX_new(TLS_client_method()), SSL_CTX_free);
-		if (!ctx)
-		{
-			fail("Failed to create SSL context!");
-			return false;
-		}
-
-		SSL* ssl = SSL_new(ctx.get());
-		SSL_set_fd(ssl, static_cast<int>(sock));
-		if (SSL_connect(ssl) != 1)
-		{
-			fail("SSL handshake failed!");
-			SSL_free(ssl);
-			closesocket(sock);
-			WSACleanup();
-			return false;
-		}
-
-		bool success = true;
-		auto check = [&](const string& cmd)
-		{
-			if (!send_ssl(ssl, cmd) || recv_ssl(ssl).starts_with("5"))
-			{
-				fail("SMTP command failed: " + cmd);
-				success = false;
-			}
-			return success;
-		};
-
-		if (!check("EHLO localhost")) 
-		{
-			fail("SMTP EHLO command failed!");
-			return false;
-		}
-		if (!check("AUTH LOGIN")) 
-		{
-			fail("SMTP AUTH LOGIN failed!");
-			return false;
-		}
-		if (!check(base64_encode(emailData.username))) 
-		{
-			fail("SMTP username authentication failed!");
-			return false;
-		}
-		if (!check(base64_encode(emailData.password))) 
-		{
-			fail("SMTP password authentication failed!");
-			return false;
-		}
-		if (!check("MAIL FROM:<" + emailData.sender + ">")) 
-		{
-			fail("SMTP MAIL FROM command failed!");
-			return false;
-		}
-		for (const auto& r : emailData.receivers)
-		{
-			if (!check("RCPT TO:<" + r + ">")) 
-			{
-				fail("SMTP RCPT TO failed for: " + r);
-				return false;
-			}
-		}
-		if (!check("DATA")) 
-		{
-			fail("SMTP DATA command failed!");
-			return false;
-		}
-
-		ostringstream msg{};
-		msg << "Subject: " << emailData.subject << "\r\n";
-		msg << "From: " << emailData.sender << "\r\n";
-		msg << "To: ";
-		for (size_t i = 0; i < emailData.receivers.size(); ++i)
-		{
-			msg << emailData.receivers[i];
-			if (i + 1 < emailData.receivers.size()) msg << ", ";
-		}
-		msg << "\r\n\r\n" << emailData.body << "\r\n.\r\n";
-
-		if (!check(msg.str())) return false;
-		send_ssl(ssl, "QUIT");
-
-		SSL_shutdown(ssl);
-		SSL_free(ssl);
-		closesocket(sock);
-		WSACleanup();
-
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SEND_EMAIL",
-			"Email '" + emailData.subject + "' was successfully sent!");
-
-		return success;
 	}
 
 	bool Server::HasInternet()
 	{
 		if (CloudFlare::tunnelName == "")
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Cannot check for internet access because tunnel name has not been assigned.");
+			PrintData iaData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Cannot check for internet access because tunnel name has not been assigned."
+			};
+			unique_ptr<Event> iaEvent = make_unique<Event>();
+			iaEvent->SendEvent(EventType::event_print_error, iaData);
 			return false;
 		}
 
@@ -1050,12 +978,15 @@ namespace KalaKit::Core
 	{
 		if (tunnelHandle == NULL)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Cannot check for tunnel state because tunnel '" + CloudFlare::tunnelName + "' is not running.");
+			PrintData tsData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Cannot check for tunnel state because tunnel '" + CloudFlare::tunnelName + "' is not running."
+			};
+			unique_ptr<Event> tsEvent = make_unique<Event>();
+			tsEvent->SendEvent(EventType::event_print_error, tsData);
 			return false;
 		}
 
@@ -1063,12 +994,15 @@ namespace KalaKit::Core
 
 		if (rawTunnelHandle == INVALID_HANDLE_VALUE)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Cannot check for tunnel state because handle for tunnel '" + CloudFlare::tunnelName + "' is invalid.");
+			PrintData tsData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Cannot check for tunnel state because handle for tunnel '" + CloudFlare::tunnelName + "' is invalid."
+			};
+			unique_ptr<Event> tsEvent = make_unique<Event>();
+			tsEvent->SendEvent(EventType::event_print_error, tsData);
 			return false;
 		}
 
@@ -1082,12 +1016,15 @@ namespace KalaKit::Core
 	{
 		if (!server->isServerReady)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Server '" + server->serverName + "' is not ready to start! Do not call this manually.");
+			PrintData srData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Server '" + server->serverName + "' is not ready to start! Do not call this manually."
+			};
+			unique_ptr<Event> srEvent = make_unique<Event>();
+			srEvent->SendEvent(EventType::event_print_error, srData);
 			return;
 		}
 
@@ -1194,7 +1131,9 @@ namespace KalaKit::Core
 						.subject = "KalaServer health status",
 						.body = fullStatus
 					};
-					server->SendEmail(server->emailData);
+
+					unique_ptr<Event> event = make_unique<Event>();
+					event->SendEvent(EventType::event_server_health_ping, server->emailData);
 
 					sleep_for(seconds(healthTimer));
 				}

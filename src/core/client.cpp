@@ -13,6 +13,7 @@
 #include "core/client.hpp"
 #include "core/core.hpp"
 #include "core/server.hpp"
+#include "core/event.hpp"
 #include "response/response_200.hpp"
 #include "response/response_206.hpp"
 #include "response/response_404.hpp"
@@ -147,7 +148,7 @@ namespace KalaKit::Core
 					0,
 					true,
 					ConsoleMessageType::Type_Error,
-					"SERVER",
+					"CLIENT",
 					"Start byte in ParseByeRange is missing for header '" + header + "'!");
 				return;
 			}
@@ -162,7 +163,7 @@ namespace KalaKit::Core
 				0,
 				true,
 				ConsoleMessageType::Type_Error,
-				"SERVER",
+				"CLIENT",
 				"Failed to parse header byte range for header '" + header
 				+ "'!\nReason: " + e.what());
 			return;
@@ -288,7 +289,7 @@ namespace KalaKit::Core
 				0,
 				true,
 				ConsoleMessageType::Type_Warning,
-				"SERVER",
+				"CLIENT",
 				"Failed to get client IP for socket [" + to_string(socket) + "]!"
 				"\n"
 				"Full request dump :"
@@ -303,7 +304,7 @@ namespace KalaKit::Core
 				0,
 				true,
 				ConsoleMessageType::Type_Message,
-				"SERVER",
+				"CLIENT",
 				"Client [" + to_string(socket) + " - '" + clientIP + "'] is server host.");
 			clientIP = "host";
 
@@ -350,8 +351,8 @@ namespace KalaKit::Core
 
 				sleep_for(seconds(30));
 
-				vector<EmailEvent> ev = Server::server->emailSenderData.emailEvents;
-				EmailEvent e = EmailEvent::email_banned_client_attempted_connection;
+				vector<EventType> ev = Server::server->emailSenderData.events;
+				EventType e = EventType::event_already_banned_client_connected;
 				bool bannedClientReconnectedEvent =
 					find(ev.begin(), ev.end(), e) != ev.end();
 
@@ -368,7 +369,8 @@ namespace KalaKit::Core
 						.subject = "Banned client reconnected",
 						.body = "Already banned client " + clientIP + " tried to reconnect to  '" + cleanRoute + "'!"
 					};
-					Server::server->SendEmail(Server::server->emailData);
+					unique_ptr<Event> event = make_unique<Event>();
+					event->SendEvent(e, Server::server->emailData);
 				}
 
 				auto respBanned = make_unique<Response_418>();
@@ -397,8 +399,8 @@ namespace KalaKit::Core
 
 				sleep_for(milliseconds(5));
 
-				vector<EmailEvent> ev = Server::server->emailSenderData.emailEvents;
-				EmailEvent e = EmailEvent::email_client_was_banned;
+				vector<EventType> ev = Server::server->emailSenderData.events;
+				EventType e = EventType::event_banned_for_accessing_blacklisted_route;
 #pragma warning(push)
 #pragma warning(disable: 26117)
 				bool clientWasBannedEvent =
@@ -418,7 +420,8 @@ namespace KalaKit::Core
 						.subject = "Client connected to blacklisted route",
 						.body = "client " + clientIP + " was banned because they tried to access route '" + cleanRoute + "'!"
 					};
-					Server::server->SendEmail(Server::server->emailData);
+					unique_ptr<Event> event = make_unique<Event>();
+					event->SendEvent(e, Server::server->emailData);
 				}
 
 				pair<string, string> bannedClient{};
@@ -464,8 +467,8 @@ namespace KalaKit::Core
 
 				sleep_for(milliseconds(5));
 
-				vector<EmailEvent> ev = Server::server->emailSenderData.emailEvents;
-				EmailEvent e = EmailEvent::email_client_was_banned;
+				vector<EventType> ev = Server::server->emailSenderData.events;
+				EventType e = EventType::event_banned_for_exceeding_rate_limit;
 #pragma warning(push)
 #pragma warning(disable: 26110)
 				bool clientWasBannedEvent =
@@ -485,7 +488,8 @@ namespace KalaKit::Core
 						.subject = "Client exceeded rate limit in KalaKit website",
 						.body = "client " + clientIP + " was banned because they exceeded the rate limit of '" + to_string(Server::server->rateLimitTimer) + "'!"
 					};
-					Server::server->SendEmail(Server::server->emailData);
+					unique_ptr<Event> event = make_unique<Event>();
+					event->SendEvent(e, Server::server->emailData);
 				}
 
 				pair<string, string> bannedClient{};
@@ -511,7 +515,7 @@ namespace KalaKit::Core
 			0,
 			true,
 			ConsoleMessageType::Type_Message,
-			"SERVER",
+			"CLIENT",
 			"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
 
 		string body{};

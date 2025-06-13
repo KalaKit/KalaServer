@@ -14,6 +14,7 @@
 
 //#include "external/ktypes.hpp"
 #include "core/mimetype.hpp"
+#include "core/event.hpp"
 
 namespace KalaKit::Core
 {
@@ -41,33 +42,12 @@ namespace KalaKit::Core
 		AccessLevel accessLevel;
 	};
 	
-	//Choose what events to send emails for
-	enum class EmailEvent
-	{
-		email_none,
-		email_client_was_banned,
-		email_banned_client_attempted_connection
-	};
-	
-	//Send an email to a smtp server like gmail from this server.
-	//Uses STARTTLS on port 587
-	struct EmailData
-	{
-		string smtpServer;        //Target email server name (smpt.gmail.com)
-		string username;          //Required for SMTP authentication
-		string password;          //Required for SMTP authentication
-		string sender;            //Who sends the email
-		vector<string> receivers; //Everyone who receives the email
-		string subject;           //The title of the email
-		string body;              //The contents of the email
-	};
-	
 	//The account info of the email sender
 	struct EmailSenderData
 	{
-		vector<EmailEvent> emailEvents; //Choose what events to send emails for
-		string username;                //Your email account
-		string password;                //Your app password (read docs/email-app-password.txt for more info)
+		vector<EventType> events; //Choose what events to send emails for
+		string username;          //Your email account
+		string password;          //Your app password (read docs/email-app-password.txt for more info)
 	};
 
 	struct ErrorMessage
@@ -197,8 +177,6 @@ namespace KalaKit::Core
 			size_t rangeEnd,
 			size_t& outTotalSize,
 			bool& outSliced);
-			
-		bool SendEmail(const EmailData& emailData);
 
 		/// <summary>
 		/// Check whether this route is allowed to be accessed.
