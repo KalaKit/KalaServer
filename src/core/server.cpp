@@ -1253,9 +1253,12 @@ namespace KalaKit::Core
 
 		thread([] 
 		{
-			sleep_for(seconds(1));
-			lock_guard<mutex> lock(counterMutex);
-			requestCounter.clear();
+			while (KalaServer::isRunning)
+			{
+				sleep_for(seconds(1));
+				lock_guard<mutex> lock(counterMutex);
+				requestCounter.clear();
+			}
 		}).detach();
 	}
 
