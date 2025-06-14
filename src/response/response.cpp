@@ -8,11 +8,16 @@
 #include "core/core.hpp"
 #include "response/response.hpp"
 #include "external/kcrash.hpp"
+#include "core/event.hpp"
 
 using KalaKit::Core::KalaServer;
-using KalaKit::Core::ConsoleMessageType;
 using KalaKit::KalaCrash::Crash;
+using KalaKit::Core::Event;
+using KalaKit::Core::EventType;
+using KalaKit::Core::PrintData;
 
+using std::unique_ptr;
+using std::make_unique;
 using std::to_string;
 
 namespace KalaKit::ResponseSystem
@@ -60,12 +65,16 @@ namespace KalaKit::ResponseSystem
 
 		closesocket(socket);
 
-		KalaServer::PrintConsoleMessage(
-			2,
-			true,
-			ConsoleMessageType::Type_Message,
-			"RESPONSE",
-			"[" + to_string(clientSocket) + " - '" + clientIP + "']"
-			+ " -> " + route + " [" + statusLine + "]\n");
+		PrintData rData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = false,
+			.customTag = "RESPONSE",
+			.message =
+				"[" + to_string(clientSocket) + " - '" + clientIP + "']"
+				+ " -> " + route + " [" + statusLine + "]\n"
+		};
+		unique_ptr<Event> rEvent = make_unique<Event>();
+		rEvent->SendEvent(EventType::event_print_message, rData);
 	}
 }

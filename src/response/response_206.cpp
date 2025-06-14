@@ -6,12 +6,16 @@
 #include "core/core.hpp"
 #include "core/server.hpp"
 #include "response/response_206.hpp"
+#include "core/event.hpp"
 
 using KalaKit::Core::Server;
 using KalaKit::Core::KalaServer;
-using KalaKit::Core::ConsoleMessageType;
-using KalaKit::Core::Server;
+using KalaKit::Core::Event;
+using KalaKit::Core::EventType;
+using KalaKit::Core::PrintData;
 
+using std::unique_ptr;
+using std::make_unique;
 using std::to_string;
 
 namespace KalaKit::ResponseSystem
@@ -42,12 +46,15 @@ namespace KalaKit::ResponseSystem
 
 		if (body.empty())
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"206 response file body was empty!");
+			PrintData rData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = false,
+				.customTag = "RESPONSE",
+				.message = "206 response file body was empty!"
+			};
+			unique_ptr<Event> rEvent = make_unique<Event>();
+			rEvent->SendEvent(EventType::event_print_message, rData);
 
 			string newBody =
 				"<html>"

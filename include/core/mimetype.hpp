@@ -9,6 +9,7 @@
 #include <string_view>
 #include <array>
 #include <algorithm>
+#include <string>
 
 namespace KalaKit::Core
 {
@@ -53,6 +54,7 @@ namespace std
 
 namespace KalaKit::Core
 {
+	using std::string;
 	using std::string_view;
 	using std::unordered_map;
 	using std::transform;

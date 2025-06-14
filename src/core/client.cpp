@@ -144,12 +144,15 @@ namespace KalaKit::Core
 		{
 			if (startStr.empty())
 			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					true,
-					ConsoleMessageType::Type_Error,
-					"CLIENT",
-					"Start byte in ParseByeRange is missing for header '" + header + "'!");
+				PrintData sbData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "CLIENT",
+					.message = "Start byte in ParseByeRange is missing for header '" + header + "'!"
+				};
+				unique_ptr<Event> sbEvent = make_unique<Event>();
+				sbEvent->SendEvent(EventType::event_print_message, sbData);
 				return;
 			}
 
@@ -159,13 +162,17 @@ namespace KalaKit::Core
 		}
 		catch (const exception& e)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"CLIENT",
-				"Failed to parse header byte range for header '" + header
-				+ "'!\nReason: " + e.what());
+			PrintData hbData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message = 
+					"Failed to parse header byte range for header '" + header
+					+ "'!\nReason: " + e.what()
+			};
+			unique_ptr<Event> hbEvent = make_unique<Event>();
+			hbEvent->SendEvent(EventType::event_print_message, hbData);
 			return;
 		}
 	}
@@ -176,12 +183,15 @@ namespace KalaKit::Core
 		// START CLIENT CONNECTION
 		//
 
-		KalaServer::PrintConsoleMessage(
-			2,
-			true,
-			ConsoleMessageType::Type_Debug,
-			"CLIENT",
-			"Socket [" + to_string(socket) + "] entered handle client thread...");
+		PrintData seData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "CLIENT",
+			.message = "Socket [" + to_string(socket) + "] entered handle client thread..."
+		};
+		unique_ptr<Event> seEvent = make_unique<Event>();
+		seEvent->SendEvent(EventType::event_print_message, seData);
 
 		SOCKET rawClientSocket = static_cast<SOCKET>(socket);
 		uintptr_t clientSocket = static_cast<uintptr_t>(rawClientSocket);
@@ -211,21 +221,27 @@ namespace KalaKit::Core
 			DWORD err = WSAGetLastError();
 			if (err == WSAETIMEDOUT)
 			{
-				KalaServer::PrintConsoleMessage(
-					2,
-					true,
-					ConsoleMessageType::Type_Warning,
-					"CLIENT",
-					"Socket [" + to_string(socket) + "] timed out after 5 seconds without sending any data.");
+				PrintData stData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "CLIENT",
+					.message = "Socket [" + to_string(socket) + "] timed out after 5 seconds without sending any data."
+				};
+				unique_ptr<Event> stEvent = make_unique<Event>();
+				stEvent->SendEvent(EventType::event_print_message, stData);
 			}
 			else
 			{
-				KalaServer::PrintConsoleMessage(
-					2,
-					true,
-					ConsoleMessageType::Type_Warning,
-					"CLIENT",
-					"Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err));
+				PrintData srData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "CLIENT",
+					.message = "Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err)
+				};
+				unique_ptr<Event> srEvent = make_unique<Event>();
+				srEvent->SendEvent(EventType::event_print_message, srData);
 			}
 
 			this->SocketCleanup(socket);
@@ -238,12 +254,15 @@ namespace KalaKit::Core
 			// EMPTY SOCKET - CLOSE SOCKET
 			//
 
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"CLIENT",
-				"Socket [" + to_string(socket) + "] disconnected without sending any data.");
+			PrintData sdData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message = "Socket [" + to_string(socket) + "] disconnected without sending any data."
+			};
+			unique_ptr<Event> sdEvent = make_unique<Event>();
+			sdEvent->SendEvent(EventType::event_print_message, sdData);
 
 			this->SocketCleanup(socket);
 			closesocket(rawClientSocket);
@@ -253,12 +272,15 @@ namespace KalaKit::Core
 		string request(buffer);
 		string route = "/";
 
-		KalaServer::PrintConsoleMessage(
-			2,
-			true,
-			ConsoleMessageType::Type_Debug,
-			"CLIENT",
-			"Socket [" + to_string(socket) + "] raw HTTP request:\n" + request);
+		PrintData shData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "CLIENT",
+			.message = "Socket [" + to_string(socket) + "] raw HTTP request:\n" + request
+		};
+		unique_ptr<Event> shEvent = make_unique<Event>();
+		shEvent->SendEvent(EventType::event_print_message, shData);
 
 		if (request.starts_with("GET "))
 		{
@@ -285,27 +307,34 @@ namespace KalaKit::Core
 		{
 			clientIP = "unknown-ip";
 
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"CLIENT",
-				"Failed to get client IP for socket [" + to_string(socket) + "]!"
-				"\n"
-				"Full request dump :"
-				"\n" +
-				request);
+			PrintData frData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message = 
+					"Failed to get client IP for socket [" + to_string(socket) + "]!"
+					"\n"
+					"Full request dump :"
+					"\n" +
+					request
+			};
+			unique_ptr<Event> frEvent = make_unique<Event>();
+			frEvent->SendEvent(EventType::event_print_message, frData);
 		}
 
 		bool isHost = Server::server->IsHost(clientIP);
 		if (isHost)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Message,
-				"CLIENT",
-				"Client [" + to_string(socket) + " - '" + clientIP + "'] is server host.");
+			PrintData ciData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message = "Client [" + to_string(socket) + " - '" + clientIP + "'] is server host."
+			};
+			unique_ptr<Event> ciEvent = make_unique<Event>();
+			ciEvent->SendEvent(EventType::event_print_message, ciData);
 			clientIP = "host";
 
 			//always update routes and their access levels if host joins any route
@@ -323,31 +352,39 @@ namespace KalaKit::Core
 		if (isHost
 			|| whitelistedClient.first != "")
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Message,
-				"",
-				"=============== WHITELISTED CLIENT =================\n"
-				" IP     : " + clientIP + "\n"
-				" Socket : " + to_string(clientSocket) + "\n"
-				" Reason : " + whitelistedClient.second + "\n"
-				"====================================================\n");
+			PrintData wcData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message = 
+					"=============== WHITELISTED CLIENT =================\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Reason : " + whitelistedClient.second + "\n"
+					"====================================================\n"
+			};
+			unique_ptr<Event> wcEvent = make_unique<Event>();
+			wcEvent->SendEvent(EventType::event_print_message, wcData);
 		}
 		else
 		{
 			if (bannedClient.first != "")
 			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					false,
-					ConsoleMessageType::Type_Message,
-					"",
-					"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + bannedClient.second + "\n"
-					"====================================================\n");
+				PrintData buData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "CLIENT",
+					.message =
+						"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
+						" IP     : " + clientIP + "\n"
+						" Socket : " + to_string(clientSocket) + "\n"
+						" Reason : " + bannedClient.second + "\n"
+						"====================================================\n"
+				};
+				unique_ptr<Event> buEvent = make_unique<Event>();
+				buEvent->SendEvent(EventType::event_print_message, buData);
 
 				sleep_for(seconds(30));
 
@@ -386,16 +423,20 @@ namespace KalaKit::Core
 				&& !Server::server->blacklistedKeywords.empty()
 				&& Server::server->IsBlacklistedRoute(cleanRoute))
 			{
-				KalaServer::PrintConsoleMessage(
-					0,
-					false,
-					ConsoleMessageType::Type_Message,
-					"",
-					"=============== BANNED CLIENT ======================\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + cleanRoute + "\n"
-					"====================================================\n");
+				PrintData bcData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "CLIENT",
+					.message =
+						"=============== BANNED CLIENT ======================\n"
+						" IP     : " + clientIP + "\n"
+						" Socket : " + to_string(clientSocket) + "\n"
+						" Reason : " + cleanRoute + "\n"
+						"====================================================\n"
+				};
+				unique_ptr<Event> bcEvent = make_unique<Event>();
+				bcEvent->SendEvent(EventType::event_print_message, bcData);
 
 				sleep_for(milliseconds(5));
 
@@ -454,16 +495,20 @@ namespace KalaKit::Core
 			if (count > Server::server->rateLimitTimer)
 			{
 				string reason = "Exceeded allowed connection rate limit of " + to_string(Server::server->rateLimitTimer) + " times per second";
-				KalaServer::PrintConsoleMessage(
-					0,
-					false,
-					ConsoleMessageType::Type_Message,
-					"",
-					"=============== BANNED CLIENT ======================\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + reason + "\n"
-					"====================================================\n");
+				PrintData srData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "CLIENT",
+					.message = 
+						"=============== BANNED CLIENT ======================\n"
+						" IP     : " + clientIP + "\n"
+						" Socket : " + to_string(clientSocket) + "\n"
+						" Reason : " + reason + "\n"
+						"====================================================\n"
+				};
+				unique_ptr<Event> srEvent = make_unique<Event>();
+				srEvent->SendEvent(EventType::event_print_message, srData);
 
 				sleep_for(milliseconds(5));
 
@@ -511,12 +556,15 @@ namespace KalaKit::Core
 			}
 		}
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"CLIENT",
-			"New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!");
+		PrintData scData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "CLIENT",
+			.message = "New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!"
+		};
+		unique_ptr<Event> scEvent = make_unique<Event>();
+		scEvent->SendEvent(EventType::event_print_message, scData);
 
 		string body{};
 		string statusLine = "HTTP/1.1 200 OK";
@@ -539,14 +587,18 @@ namespace KalaKit::Core
 
 		if (foundRoute.route.empty())
 		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Message,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '"
-				+ cleanRoute + "'!");
+			PrintData caData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message = 
+					"Client ["
+					+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '"
+					+ cleanRoute + "'!"
+			};
+			unique_ptr<Event> caEvent = make_unique<Event>();
+			caEvent->SendEvent(EventType::event_print_message, caData);
 
 			auto resp404 = make_unique<Response_404>();
 			resp404->Init(
@@ -581,14 +633,18 @@ namespace KalaKit::Core
 
 		if (!isAllowedFile)
 		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + cleanRoute
-				+ "' from path '" + foundRoute.route + "'.");
+			PrintData ttData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message =
+					"Client ["
+					+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + cleanRoute
+					+ "' from path '" + foundRoute.route + "'."
+			};
+			unique_ptr<Event> ttEvent = make_unique<Event>();
+			ttEvent->SendEvent(EventType::event_print_message, ttData);
 
 			auto resp403 = make_unique<Response_403>();
 			resp403->Init(
@@ -641,15 +697,19 @@ namespace KalaKit::Core
 
 		if (!allowEntrance)
 		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Warning,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
-				+ " tried to access route '" + cleanRoute
-				+ "' with auth level " + routeAuth + "!");
+			PrintData alData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message =
+					"Client ["
+					+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
+					+ " tried to access route '" + cleanRoute
+					+ "' with auth level " + routeAuth + "!"
+			};
+			unique_ptr<Event> alEvent = make_unique<Event>();
+			alEvent->SendEvent(EventType::event_print_message, alData);
 
 			auto resp403 = make_unique<Response_403>();
 			resp403->Init(
@@ -669,16 +729,20 @@ namespace KalaKit::Core
 			|| isHost)
 			&& isRegisteredRoute)
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Message,
-				"",
-				"==== APPROVED CLIENT CONNECTED TO PRIVATE ROUTE ====\n"
-				" IP     : " + clientIP + "\n"
-				" Socket : " + to_string(clientSocket) + "\n"
-				" Reason : " + cleanRoute + "\n"
-				"====================================================\n");
+			PrintData prData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message =
+					"==== APPROVED CLIENT CONNECTED TO PRIVATE ROUTE ====\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Reason : " + cleanRoute + "\n"
+					"====================================================\n"
+			};
+			unique_ptr<Event> prEvent = make_unique<Event>();
+			prEvent->SendEvent(EventType::event_print_message, prData);
 		}
 
 		if ((isClientAdmin
@@ -686,16 +750,20 @@ namespace KalaKit::Core
 			&& (isRegisteredRoute
 				|| isAdminRoute))
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Message,
-				"",
-				"===== APPROVED CLIENT CONNECTED TO ADMIN ROUTE =====\n"
-				" IP     : " + clientIP + "\n"
-				" Socket : " + to_string(clientSocket) + "\n"
-				" Reason : " + cleanRoute + "\n"
-				"====================================================\n");
+			PrintData ccData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message =
+					"===== APPROVED CLIENT CONNECTED TO ADMIN ROUTE =====\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Reason : " + cleanRoute + "\n"
+					"====================================================\n"
+			};
+			unique_ptr<Event> ccEvent = make_unique<Event>();
+			ccEvent->SendEvent(EventType::event_print_message, ccData);
 		}
 
 		try
@@ -722,14 +790,18 @@ namespace KalaKit::Core
 
 			if (result.empty())
 			{
-				KalaServer::PrintConsoleMessage(
-					2,
-					true,
-					ConsoleMessageType::Type_Error,
-					"CLIENT",
-					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-					+ cleanRoute + "'.");
+				PrintData abData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.customTag = "CLIENT",
+					.message =
+						"Client ["
+						+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+						+ cleanRoute + "'."
+				};
+				unique_ptr<Event> abEvent = make_unique<Event>();
+				abEvent->SendEvent(EventType::event_print_message, abData);
 
 				auto resp500 = make_unique<Response_500>();
 				resp500->Init(
@@ -788,14 +860,18 @@ namespace KalaKit::Core
 		}
 		catch (const exception& e)
 		{
-			KalaServer::PrintConsoleMessage(
-				2,
-				true,
-				ConsoleMessageType::Type_Error,
-				"CLIENT",
-				"Client ["
-				+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
-				+ cleanRoute + "'.\nError:\n" + e.what());
+			PrintData taData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "CLIENT",
+				.message =
+					"Client ["
+					+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+					+ cleanRoute + "'.\nError:\n" + e.what()
+			};
+			unique_ptr<Event> taEvent = make_unique<Event>();
+			taEvent->SendEvent(EventType::event_print_message, taData);
 
 			auto resp500 = make_unique<Response_500>();
 			resp500->Init(

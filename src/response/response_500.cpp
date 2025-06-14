@@ -3,15 +3,21 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include <memory>
+
 #include "core/core.hpp"
 #include "core/server.hpp"
 #include "response/response_500.hpp"
+#include "core/event.hpp"
 
 using KalaKit::Core::Server;
 using KalaKit::Core::KalaServer;
-using KalaKit::Core::ConsoleMessageType;
+using KalaKit::Core::Event;
+using KalaKit::Core::EventType;
+using KalaKit::Core::PrintData;
 
-using KalaKit::Core::Server;
+using std::unique_ptr;
+using std::make_unique;
 
 namespace KalaKit::ResponseSystem
 {
@@ -38,12 +44,15 @@ namespace KalaKit::ResponseSystem
 
 		if (body.empty())
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"500 response file body was empty!");
+			PrintData rData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = false,
+				.customTag = "RESPONSE",
+				.message = "500 response file body was empty!"
+			};
+			unique_ptr<Event> rEvent = make_unique<Event>();
+			rEvent->SendEvent(EventType::event_print_message, rData);
 
 			string newBody =
 				"<html>"

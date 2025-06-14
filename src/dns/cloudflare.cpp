@@ -11,6 +11,7 @@
 #include <thread>
 #include <sstream>
 #include <set>
+#include <memory>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -18,11 +19,13 @@
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
+#include "core/event.hpp"
 
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::Server;
-using KalaKit::Core::ConsoleMessageType;
-using KalaKit::Core::PopupReason;
+using KalaKit::Core::Event;
+using KalaKit::Core::EventType;
+using KalaKit::Core::PrintData;
 
 using std::filesystem::current_path;
 using std::filesystem::exists;
@@ -39,6 +42,8 @@ using std::replace;
 using std::istringstream;
 using std::thread;
 using std::set;
+using std::unique_ptr;
+using std::make_unique;
 
 namespace KalaKit::DNS
 {

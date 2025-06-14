@@ -49,7 +49,7 @@ namespace KalaKit::Core
 
 	}
 
-	void Event::SendEvent(EventType type, const PopupData& popupData)
+	void Event::SendEvent(EventType type, const string& message)
 	{
 
 	}
@@ -122,7 +122,7 @@ namespace KalaKit::Core
 		cout << result + "\n";
 	}
 
-	void Event::CreatePopup(const PopupData& popupData)
+	void Event::CreatePopup(EventType type, const string& message)
 	{
 		string popupTitle{};
 		string serverName = "Server";
@@ -132,7 +132,7 @@ namespace KalaKit::Core
 			serverName = Server::server->GetServerName();
 		}
 
-		if (popupData.reason == EventType::event_popup_error)
+		if (type == EventType::event_popup_error)
 		{
 			popupTitle = serverName + " error";
 
@@ -145,15 +145,15 @@ namespace KalaKit::Core
 				| MB_OK);
 			*/
 
-			Crash(popupData.message);
+			Crash(message);
 		}
-		else if (popupData.reason == EventType::event_popup_warning)
+		else if (type == EventType::event_popup_warning)
 		{
 			popupTitle = serverName + "  warning";
 
 			MessageBoxA(
 				nullptr,
-				popupData.message.c_str(),
+				message.c_str(),
 				popupTitle.c_str(),
 				MB_ICONWARNING
 				| MB_OK);

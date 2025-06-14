@@ -130,13 +130,8 @@ namespace KalaKit::Core
 		WSADATA wsaData{};
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		{
-			PopupData wfData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "WSAStartup failed!"
-			};
 			unique_ptr<Event> wfEvent = make_unique<Event>();
-			wfEvent->SendEvent(EventType::event_popup_error, wfData);
+			wfEvent->SendEvent(EventType::event_popup_error, "WSAStartup failed!");
 			return false;
 		}
 
@@ -145,13 +140,8 @@ namespace KalaKit::Core
 
 		if (thisSocket == INVALID_SOCKET)
 		{
-			PopupData scfData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Socket creation failed!"
-			};
 			unique_ptr<Event> scfEvent = make_unique<Event>();
-			scfEvent->SendEvent(EventType::event_popup_error, scfData);
+			scfEvent->SendEvent(EventType::event_popup_error, "Socket creation failed!");
 			return false;
 		}
 
@@ -165,25 +155,15 @@ namespace KalaKit::Core
 			(sockaddr*)&serverAddr,
 			sizeof(serverAddr)) == SOCKET_ERROR)
 		{
-			PopupData bfData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Bind failed!"
-			};
 			unique_ptr<Event> bfEvent = make_unique<Event>();
-			bfEvent->SendEvent(EventType::event_popup_error, bfData);
+			bfEvent->SendEvent(EventType::event_popup_error, "Bind failed!");
 			return false;
 		}
 
 		if (listen(thisSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
-			PopupData lfData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Listen failed!"
-			};
 			unique_ptr<Event> lfEvent = make_unique<Event>();
-			lfEvent->SendEvent(EventType::event_popup_error, lfData);
+			lfEvent->SendEvent(EventType::event_popup_error, "Listen failed!");
 			return false;
 		}
 
@@ -226,49 +206,30 @@ namespace KalaKit::Core
 	{
 		if (!KalaServer::IsRunningAsAdmin())
 		{
-			PopupData apData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "This program must be ran with admin privileges!"
-			};
 			unique_ptr<Event> apEvent = make_unique<Event>();
-			apEvent->SendEvent(EventType::event_popup_error, apData);
+			apEvent->SendEvent(EventType::event_popup_error, "This program must be ran with admin privileges!");
 			return false;
 		}
 
 		if (serverName == "")
 		{
-			PopupData esnData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Cannot start server with empty server name!"
-			};
 			unique_ptr<Event> esnEvent = make_unique<Event>();
-			esnEvent->SendEvent(EventType::event_popup_error, esnData);
+			esnEvent->SendEvent(EventType::event_popup_error, "Cannot start server with empty server name!");
 			return false;
 		}
 		if (domainName == "")
 		{
-			PopupData ednData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Cannot start server with empty domain name!"
-			};
 			unique_ptr<Event> ednEvent = make_unique<Event>();
-			ednEvent->SendEvent(EventType::event_popup_error, ednData);
+			ednEvent->SendEvent(EventType::event_popup_error, "Cannot start server with empty domain name!");
 			return false;
 		}
 
 		string whitelistedRoutesFolderPath = (current_path() / server->dataFile.whitelistedRoutesFolder).string();
 		if (!exists(whitelistedRoutesFolderPath))
 		{
-			PopupData wrData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Cannot start server with invalid whitelisted routes folder '" + whitelistedRoutesFolderPath + "'!"
-			};
+			string wrMessage = "Cannot start server with invalid whitelisted routes folder '" + whitelistedRoutesFolderPath + "'!";
 			unique_ptr<Event> wrEvent = make_unique<Event>();
-			wrEvent->SendEvent(EventType::event_popup_error, wrData);
+			wrEvent->SendEvent(EventType::event_popup_error, wrMessage);
 			return false;
 		}
 
@@ -276,13 +237,9 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.whitelistedExtensionsFile).string();
 		if (!exists(whitelistedExtensionsFilePath))
 		{
-			PopupData weData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Cannot start server with invalid whitelisted extensions file '" + whitelistedExtensionsFilePath + "'!"
-			};
+			string weMessage = "Cannot start server with invalid whitelisted extensions file '" + whitelistedExtensionsFilePath + "'!";
 			unique_ptr<Event> weEvent = make_unique<Event>();
-			weEvent->SendEvent(EventType::event_popup_error, weData);
+			weEvent->SendEvent(EventType::event_popup_error, weMessage);
 			return false;
 		}
 
@@ -290,13 +247,9 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.whitelistedIPsFile).string();
 		if (!exists(whitelistedIPsFilePath))
 		{
-			PopupData wiData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Cannot start server with invalid whitelisted IPs file '" + whitelistedIPsFilePath + "'!"
-			};
+			string wiMessage = "Cannot start server with invalid whitelisted IPs file '" + whitelistedIPsFilePath + "'!";
 			unique_ptr<Event> wiEvent = make_unique<Event>();
-			wiEvent->SendEvent(EventType::event_popup_error, wiData);
+			wiEvent->SendEvent(EventType::event_popup_error, wiMessage);
 			return false;
 		}
 
@@ -304,13 +257,9 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.bannedIPsFile).string();
 		if (!exists(bannedIPsFilePath))
 		{
-			PopupData biData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Cannot start server with invalid banned IPs file '" + bannedIPsFilePath + "'!"
-			};
+			string biMessage = "Cannot start server with invalid banned IPs file '" + bannedIPsFilePath + "'!";
 			unique_ptr<Event> biEvent = make_unique<Event>();
-			biEvent->SendEvent(EventType::event_popup_error, biData);
+			biEvent->SendEvent(EventType::event_popup_error, biMessage);
 			return false;
 		}
 
@@ -318,13 +267,9 @@ namespace KalaKit::Core
 			current_path() / server->dataFile.blacklistedKeywordsFile).string();
 		if (!exists(blacklistedKeywordsFilePath))
 		{
-			PopupData bkData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Cannot start server with invalid blacklisted keywords file '" + blacklistedKeywordsFilePath + "'!"
-			};
+			string bkMessage = "Cannot start server with invalid blacklisted keywords file '" + blacklistedKeywordsFilePath + "'!";
 			unique_ptr<Event> bkEvent = make_unique<Event>();
-			bkEvent->SendEvent(EventType::event_popup_error, bkData);
+			bkEvent->SendEvent(EventType::event_popup_error, bkMessage);
 			return false;
 		}
 
@@ -443,26 +388,18 @@ namespace KalaKit::Core
 		string routeFolder = server->dataFile.whitelistedRoutesFolder;
 		if (routeFolder.empty())
 		{
-			PopupData rrfData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Whitelisted routes root folder has not been assigned!"
-			};
+			string rrfMessage = "Whitelisted routes root folder has not been assigned!";
 			unique_ptr<Event> rrfEvent = make_unique<Event>();
-			rrfEvent->SendEvent(EventType::event_popup_error, rrfData);
+			rrfEvent->SendEvent(EventType::event_popup_error, rrfMessage);
 			return;
 		}
 
 		path routePath = current_path() / routeFolder;
 		if (!exists(routePath))
 		{
-			PopupData wrfData =
-			{
-				.reason = EventType::event_popup_error,
-				.message = "Whitelisted routes root folder '" + server->dataFile.whitelistedRoutesFolder + "' does not exist!"
-			};
+			string wrfMessage = "Whitelisted routes root folder '" + server->dataFile.whitelistedRoutesFolder + "' does not exist!";
 			unique_ptr<Event> wrfEvent = make_unique<Event>();
-			wrfEvent->SendEvent(EventType::event_popup_error, wrfData);
+			wrfEvent->SendEvent(EventType::event_popup_error, wrfMessage);
 			return;
 		}
 

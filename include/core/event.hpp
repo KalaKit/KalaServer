@@ -15,7 +15,6 @@ namespace KalaKit::Core
 	using std::unordered_map;
 	using std::vector;
 
-	//What is the event type
 	enum class EventType
 	{
 		event_none,
@@ -55,12 +54,6 @@ namespace KalaKit::Core
 		string message;                 //The contents of the message.
 	};
 
-	struct PopupData
-	{
-		EventType reason;
-		string message;
-	};
-
 	//Send an email to a smtp server like gmail from this server.
 	//Uses STARTTLS on port 587
 	struct EmailData
@@ -83,14 +76,14 @@ namespace KalaKit::Core
 		//Print a message to the console
 		void SendEvent(EventType type, const PrintData& printData);
 		//Create a popup
-		void SendEvent(EventType type, const PopupData& popupData);
+		void SendEvent(EventType type, const string& message);
 		//Send event to email
 		void SendEvent(EventType type, const EmailData& emailData);
 	private:
 		//Prints a message to the server console
 		void PrintConsoleMessage(EventType eventType, const PrintData& printData);
 
-		void CreatePopup(const PopupData& popupData);
+		void CreatePopup(EventType type, const string& message);
 
 		bool SendEmail(const EmailData& emailData);
 	};
