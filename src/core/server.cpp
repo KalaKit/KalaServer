@@ -1031,26 +1031,36 @@ namespace KalaKit::Core
 		if (!CloudFlare::IsRunning()
 			&& !CustomDNS::IsRunning())
 		{
-			KalaServer::CreatePopup(
-				PopupReason::Reason_Error,
-				"Neither cloudflared or dns was started! Please run atleast one of them.");
+			PrintData ncData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Neither cloudflared or dns was started! Please run atleast one of them."
+			};
+			unique_ptr<Event> ncEvent = make_unique<Event>();
+			ncEvent->SendEvent(EventType::event_print_error, ncData);
 			return;
 		}
 
 		thread([]
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				false,
-				ConsoleMessageType::Type_Message,
-				"",
+			PrintData acData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "",
+				.message = 
 				"\n"
 				"=============================="
 				"\n"
 				"Ready to accept connections!"
 				"\n"
 				"=============================="
-				"\n");
+				"\n"
+			};
+			unique_ptr<Event> acEvent = make_unique<Event>();
+			acEvent->SendEvent(EventType::event_print_error, acData);
 
 			SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
 			while (KalaServer::isRunning)
@@ -1075,12 +1085,15 @@ namespace KalaKit::Core
 				SOCKET clientSocket = accept(thisSocket, nullptr, nullptr);
 				if (clientSocket == INVALID_SOCKET)
 				{
-					KalaServer::PrintConsoleMessage(
-						2,
-						true,
-						ConsoleMessageType::Type_Error,
-						"CLIENT",
-						"Accept failed: " + to_string(WSAGetLastError()));
+					PrintData afData =
+					{
+						.indentationLength = 0,
+						.addTimeStamp = true,
+						.customTag = "SERVER",
+						.message = "Accept failed: " + to_string(WSAGetLastError())
+					};
+					unique_ptr<Event> afEvent = make_unique<Event>();
+					afEvent->SendEvent(EventType::event_print_error, afData);
 					continue;
 				}
 				else
@@ -1113,12 +1126,15 @@ namespace KalaKit::Core
 						"Server status: " + internetStatus
 						+ ", " + tunnelStatus;
 
-					KalaServer::PrintConsoleMessage(
-						0,
-						true,
-						ConsoleMessageType::Type_Message,
-						"SERVER",
-						fullStatus + "\n");
+					PrintData fsData =
+					{
+						.indentationLength = 0,
+						.addTimeStamp = true,
+						.customTag = "SERVER",
+						.message = fullStatus + "\n"
+					};
+					unique_ptr<Event> fsEvent = make_unique<Event>();
+					fsEvent->SendEvent(EventType::event_print_error, fsData);
 
 					vector<string> receivers = { server->emailSenderData.username };
 					server->emailData =
@@ -1220,12 +1236,15 @@ namespace KalaKit::Core
 			&sa,
 			0))
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to create read/write pipe for storing host IPs!");
+			PrintData fcData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Failed to create read/write pipe for storing host IPs!"
+			};
+			unique_ptr<Event> fcEvent = make_unique<Event>();
+			fcEvent->SendEvent(EventType::event_print_error, fcData);
 			return;
 		}
 		if (!SetHandleInformation(
@@ -1233,12 +1252,15 @@ namespace KalaKit::Core
 			HANDLE_FLAG_INHERIT,
 			0))
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to set up pipe handle inheritance for storing host IPs!");
+			PrintData phData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Failed to set up pipe handle inheritance for storing host IPs!"
+			};
+			unique_ptr<Event> phEvent = make_unique<Event>();
+			phEvent->SendEvent(EventType::event_print_error, phData);
 			return;
 		}
 
@@ -1264,12 +1286,15 @@ namespace KalaKit::Core
 			&si,
 			&pi))
 		{
-			KalaServer::PrintConsoleMessage(
-				0,
-				true,
-				ConsoleMessageType::Type_Error,
-				"SERVER",
-				"Failed to create process for getting host IPs for storing host IPs!");
+			PrintData cpData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Failed to create process for getting host IPs for storing host IPs!"
+			};
+			unique_ptr<Event> cpEvent = make_unique<Event>();
+			cpEvent->SendEvent(EventType::event_print_error, cpData);
 
 			CloseHandle(hWritePipe);
 			CloseHandle(hReadPipe);
@@ -1324,12 +1349,15 @@ namespace KalaKit::Core
 			}
 		}
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"Refreshed machine IPs");
+		PrintData miData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "SERVER",
+			.message = "Refreshed machine IPs"
+		};
+		unique_ptr<Event> miEvent = make_unique<Event>();
+		miEvent->SendEvent(EventType::event_print_error, miData);
 
 		canUpdateMachineIPs = false;
 	}
@@ -1464,12 +1492,15 @@ namespace KalaKit::Core
 			{
 				for (const auto& invalidRegisteredRoute : invalidRegisteredRoutes)
 				{
-					KalaServer::PrintConsoleMessage(
-						0,
-						true,
-						ConsoleMessageType::Type_Error,
-						"SERVER",
-						"Registered route '" + invalidRegisteredRoute + "' is not whitelisted! Cannot add to allowed registered routes...");
+					PrintData rrData =
+					{
+						.indentationLength = 0,
+						.addTimeStamp = true,
+						.customTag = "SERVER",
+						.message = "Registered route '" + invalidRegisteredRoute + "' is not whitelisted! Cannot add to allowed registered routes..."
+					};
+					unique_ptr<Event> rrEvent = make_unique<Event>();
+					rrEvent->SendEvent(EventType::event_print_error, rrData);
 				}
 			}
 
@@ -1506,12 +1537,15 @@ namespace KalaKit::Core
 			{
 				for (const auto& invalidAdminRoute : invalidAdminRoutes)
 				{
-					KalaServer::PrintConsoleMessage(
-						0,
-						true,
-						ConsoleMessageType::Type_Error,
-						"SERVER",
-						"Admin route '" + invalidAdminRoute + "' is not whitelisted! Cannot add to allowed admin routes...");
+					PrintData arData =
+					{
+						.indentationLength = 0,
+						.addTimeStamp = true,
+						.customTag = "SERVER",
+						.message = "Admin route '" + invalidAdminRoute + "' is not whitelisted! Cannot add to allowed admin routes..."
+					};
+					unique_ptr<Event> arEvent = make_unique<Event>();
+					arEvent->SendEvent(EventType::event_print_error, arData);
 				}
 			}
 
@@ -1547,12 +1581,15 @@ namespace KalaKit::Core
 				{
 					r.accessLevel = AccessLevel::access_registered;
 
-					KalaServer::PrintConsoleMessage(
-						2,
-						true,
-						ConsoleMessageType::Type_Message,
-						"SERVER",
-						"Set route '" + r.route + "' access level to 'registered'");
+					PrintData srData =
+					{
+						.indentationLength = 0,
+						.addTimeStamp = true,
+						.customTag = "SERVER",
+						.message = "Set route '" + r.route + "' access level to 'registered'"
+					};
+					unique_ptr<Event> srEvent = make_unique<Event>();
+					srEvent->SendEvent(EventType::event_print_error, srData);
 
 					break;
 				}
@@ -1564,24 +1601,30 @@ namespace KalaKit::Core
 				{
 					r.accessLevel = AccessLevel::access_admin;
 
-					KalaServer::PrintConsoleMessage(
-						2,
-						true,
-						ConsoleMessageType::Type_Message,
-						"SERVER",
-						"Set route '" + r.route + "' access level to 'admin'");
+					PrintData srData =
+					{
+						.indentationLength = 0,
+						.addTimeStamp = true,
+						.customTag = "SERVER",
+						.message = "Set route '" + r.route + "' access level to 'admin'"
+					};
+					unique_ptr<Event> srEvent = make_unique<Event>();
+					srEvent->SendEvent(EventType::event_print_error, srData);
 
 					break;
 				}
 			}
 		}
 
-		KalaServer::PrintConsoleMessage(
-			0,
-			true,
-			ConsoleMessageType::Type_Message,
-			"SERVER",
-			"Refreshed route access levels");
+		PrintData raData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.customTag = "SERVER",
+			.message = "Refreshed route access levels"
+		};
+		unique_ptr<Event> raEvent = make_unique<Event>();
+		raEvent->SendEvent(EventType::event_print_error, raData);
 	}
 
 	void Server::Quit() const
