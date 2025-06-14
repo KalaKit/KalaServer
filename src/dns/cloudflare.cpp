@@ -59,12 +59,12 @@ namespace KalaKit::DNS
 			PrintData csData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Cannot initialize cloudflared if server has not yet been initialized!"
 			};
 			unique_ptr<Event> csEvent = make_unique<Event>();
-			csEvent->SendEvent(EventType::event_print_message, csData);
+			csEvent->SendEvent(EventType::event_print_error, csData);
 			return false;
 		}
 
@@ -73,12 +73,12 @@ namespace KalaKit::DNS
 			PrintData ciData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Cannot initialize cloudflared while it is already being initialized!"
 			};
 			unique_ptr<Event> ciEvent = make_unique<Event>();
-			ciEvent->SendEvent(EventType::event_print_message, ciData);
+			ciEvent->SendEvent(EventType::event_print_error, ciData);
 			return false;
 		}
 		
@@ -100,7 +100,7 @@ namespace KalaKit::DNS
 				"\n"
 				"Cannot run DNS and cloudflared together!";
 			unique_ptr<Event> crEvent = make_unique<Event>();
-			crEvent->SendEvent(EventType::event_popup_error, crMessage);
+			crEvent->SendEvent(EventType::event_print_error, crMessage);
 			isInitializing = false;
 			return false;
 		}
@@ -129,7 +129,7 @@ namespace KalaKit::DNS
 			PrintData ccData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared cert file already exists at '" + certPath + "'. Skipping creation."
 			};
@@ -150,7 +150,7 @@ namespace KalaKit::DNS
 				PrintData cjData =
 				{
 					.indentationLength = 0,
-					.addTimeStamp = false,
+					.addTimeStamp = true,
 					.customTag = "CLOUDFLARE",
 					.message = "Cloudflared json file already exists at '" + tunnelIDFilePath + "'. Skipping creation."
 				};
@@ -167,7 +167,7 @@ namespace KalaKit::DNS
 		PrintData ciData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Cloudflared initialization completed."
 		};
@@ -300,7 +300,7 @@ namespace KalaKit::DNS
 			PrintData caData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared cert file already exists at '" + certPath + "'. Skipping creation."
 			};
@@ -312,7 +312,7 @@ namespace KalaKit::DNS
 		PrintData ntData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Creating new tunnel cert file at '" + certPath + "'."
 		};
@@ -332,8 +332,8 @@ namespace KalaKit::DNS
 		string command = "cloudflared tunnel login";
 		PrintData ccData =
 		{
-			.indentationLength = 0,
-			.addTimeStamp = false,
+			.indentationLength = 2,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command
 		};
@@ -373,7 +373,7 @@ namespace KalaKit::DNS
 		PrintData lbData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Launched browser to authorize with CloudFlare. PID: " + to_string(pi.dwProcessId)
 		};
@@ -397,7 +397,7 @@ namespace KalaKit::DNS
 		PrintData ncData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Sucessfully created new cloudflared cert file for tunnel '" + tunnelName + "'."
 		};
@@ -415,7 +415,7 @@ namespace KalaKit::DNS
 			PrintData cjData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared credentials json file for tunnel '" + tunnelName + "' already exists at '" + tunnelIDFilePath + "'. Skipping creation."
 			};
@@ -441,8 +441,8 @@ namespace KalaKit::DNS
 		string command1 = "cloudflared tunnel delete " + tunnelName;
 		PrintData c1Data =
 		{
-			.indentationLength = 0,
-			.addTimeStamp = false,
+			.indentationLength = 2,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command1
 		};
@@ -494,8 +494,8 @@ namespace KalaKit::DNS
 		string command2 = "cloudflared tunnel create " + tunnelName;
 		PrintData c2Data =
 		{
-			.indentationLength = 0,
-			.addTimeStamp = false,
+			.indentationLength = 2,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command2
 		};
@@ -555,7 +555,7 @@ namespace KalaKit::DNS
 		PrintData jfData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Created new cloudflared credentials json file for tunnel '" + tunnelName + "'."
 		};
@@ -569,7 +569,7 @@ namespace KalaKit::DNS
 			"  credentials-file: <insert full path to .json file>\n\n"
 			"Press OK to continue once you've updated config.yml. If the tunnel ID is incorrect, DNS routing will fail and 'cloudflared tunnel run' will not work.";
 		unique_ptr<Event> bcEvent = make_unique<Event>();
-		bcEvent->SendEvent(EventType::event_popup_error, bcMessage);
+		bcEvent->SendEvent(EventType::event_popup_warning, bcMessage);
 			
 		RouteTunnel();
 	}
@@ -593,8 +593,8 @@ namespace KalaKit::DNS
 		string command1 = "cloudflared tunnel route dns " + Server::server->GetDomainName() + " " + tunnelName;
 		PrintData c1Data =
 		{
-			.indentationLength = 0,
-			.addTimeStamp = false,
+			.indentationLength = 2,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command1
 		};
@@ -646,8 +646,8 @@ namespace KalaKit::DNS
 		string command2 = "cloudflared tunnel route dns www." + Server::server->GetDomainName() + " " + tunnelName;
 		PrintData c2Data =
 		{
-			.indentationLength = 0,
-			.addTimeStamp = false,
+			.indentationLength = 2,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command2
 		};
@@ -688,7 +688,7 @@ namespace KalaKit::DNS
 		PrintData rcData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Successfully routed cloudflared dns for tunnel '" + tunnelName + "'."
 		};
@@ -770,7 +770,7 @@ namespace KalaKit::DNS
 		PrintData ccData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command
 		};
@@ -811,7 +811,7 @@ namespace KalaKit::DNS
 		PrintData rcData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Running cloudflared tunnel."
 		};
@@ -831,7 +831,7 @@ namespace KalaKit::DNS
 			PrintData pcData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Piping cloudflare messages to internal console."
 			};
@@ -869,12 +869,12 @@ namespace KalaKit::DNS
 							PrintData chData =
 							{
 								.indentationLength = 0,
-								.addTimeStamp = false,
+								.addTimeStamp = true,
 								.customTag = "CLOUDFLARE",
 								.message = "Connection '" + to_string(index) + "' has been marked healthy!"
 							};
 							unique_ptr<Event> chEvent = make_unique<Event>();
-							chEvent->SendEvent(EventType::event_print_message, chData);
+							chEvent->SendEvent(EventType::event_print_warning, chData);
 						}
 
 						if (isConn0Healthy
@@ -901,7 +901,7 @@ namespace KalaKit::DNS
 						PrintData ccData =
 						{
 							.indentationLength = 0,
-							.addTimeStamp = false,
+							.addTimeStamp = true,
 							.customTag = "CLOUDFLARE",
 							.message = 
 								"Connection '" + to_string(index) + "' has been marked unhealthy."
@@ -919,7 +919,7 @@ namespace KalaKit::DNS
 						PrintData clData =
 						{
 							.indentationLength = 0,
-							.addTimeStamp = false,
+							.addTimeStamp = true,
 							.customTag = "CLOUDFLARE_LOG",
 							.message = line
 						};
@@ -943,7 +943,7 @@ namespace KalaKit::DNS
 					PrintData cl2Data =
 					{
 						.indentationLength = 0,
-						.addTimeStamp = false,
+						.addTimeStamp = true,
 						.customTag = "CLOUDFLARE_LOG",
 						.message = message
 					};
@@ -962,12 +962,12 @@ namespace KalaKit::DNS
 			PrintData sdData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Cannot shut down cloudflared because it hasn't been started!"
 			};
 			unique_ptr<Event> sdEvent = make_unique<Event>();
-			sdEvent->SendEvent(EventType::event_print_message, sdData);
+			sdEvent->SendEvent(EventType::event_print_error, sdData);
 			return;
 		}
 
@@ -990,7 +990,7 @@ namespace KalaKit::DNS
 			PrintData sdData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared was shut down."
 			};
@@ -1003,7 +1003,7 @@ namespace KalaKit::DNS
 		PrintData cwData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CLOUDFLARE",
 			.message = "Cloudflared was successfully shut down!"
 		};

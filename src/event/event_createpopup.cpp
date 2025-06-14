@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <string>
+#include <memory>
 
 #include "core/event.hpp"
 #include "core/server.hpp"
@@ -15,6 +16,8 @@ using KalaKit::Core::EventType;
 using KalaKit::Core::Server;
 
 using std::string;
+using std::unique_ptr;
+using std::make_unique;
 
 static void CreatePopup(EventType type, const string& message);
 
@@ -25,7 +28,16 @@ namespace KalaKit::Core
 		if (type != EventType::event_popup_warning
 			&& type != EventType::event_popup_error)
 		{
-
+			PrintData pd =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Invalid event type was assigned to popup event!"
+			};
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_error, pd);
+			return;
 		}
 		CreatePopup(type, message);
 	}

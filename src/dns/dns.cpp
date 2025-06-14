@@ -35,7 +35,7 @@ namespace KalaKit::DNS
 			PrintData initData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CUSTOM_DNS",
 				.message = "Cannot initialize dns if server has not yet been initialized!"
 			};
@@ -49,7 +49,7 @@ namespace KalaKit::DNS
 			PrintData init2Data =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CUSTOM_DNS",
 				.message = "Cannot initialize dns while it is already being initialized!"
 			};
@@ -79,7 +79,7 @@ namespace KalaKit::DNS
 		PrintData dnsData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CUSTOM_DNS",
 			.message = "DNS is currently a placeholder! This does nothing."
 		};
@@ -96,7 +96,7 @@ namespace KalaKit::DNS
 			PrintData sdData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = false,
+				.addTimeStamp = true,
 				.customTag = "CUSTOM_DNS",
 				.message = "Cannot shut down dns because it hasn't been started!"
 			};
@@ -108,7 +108,7 @@ namespace KalaKit::DNS
 		PrintData stData =
 		{
 			.indentationLength = 0,
-			.addTimeStamp = false,
+			.addTimeStamp = true,
 			.customTag = "CUSTOM_DNS",
 			.message = "DNS was successfully shut down!"
 		};

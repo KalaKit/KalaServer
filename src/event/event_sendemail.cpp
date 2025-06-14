@@ -23,7 +23,7 @@ using std::make_unique;
 using std::ostringstream;
 using std::string;
 
-static bool SendEmail(const EmailData& emailData);
+static void SendEmail(const EmailData& emailData);
 
 namespace KalaKit::Core
 {
@@ -31,13 +31,22 @@ namespace KalaKit::Core
 	{
 		if (type != EventType::event_send_email)
 		{
-
+			PrintData pd =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Invalid event type was assigned to send email event!"
+			};
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_error, pd);
+			return;
 		}
 		SendEmail(emailData);
 	}
 }
 
-static bool SendEmail(const EmailData& emailData)
+static void SendEmail(const EmailData& emailData)
 {
 	auto fail = [&](const string& reason)
 	{
@@ -49,7 +58,7 @@ static bool SendEmail(const EmailData& emailData)
 			.message = reason
 		};
 		unique_ptr<Event> emailErrorEvent = make_unique<Event>();
-		emailErrorEvent->SendEvent(EventType::event_print_message, emailErrorData);
+		emailErrorEvent->SendEvent(EventType::event_print_error, emailErrorData);
 	};
 
 	auto base64_encode = [](const string& input) -> string
@@ -84,7 +93,7 @@ static bool SendEmail(const EmailData& emailData)
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
 		fail("WSAStartup failed!");
-		return false;
+		return;
 	}
 
 	addrinfo hints = {}, * res = nullptr;
@@ -95,7 +104,7 @@ static bool SendEmail(const EmailData& emailData)
 	{
 		fail("Failed to resolve SMTP server!");
 		WSACleanup();
-		return false;
+		return;
 	}
 
 	SOCKET sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
@@ -104,7 +113,7 @@ static bool SendEmail(const EmailData& emailData)
 		fail("Connection to SMTP server failed!");
 		closesocket(sock);
 		WSACleanup();
-		return false;
+		return;
 	}
 
 	freeaddrinfo(res);
@@ -126,7 +135,7 @@ static bool SendEmail(const EmailData& emailData)
 	if (!ctx)
 	{
 		fail("Failed to create SSL context!");
-		return false;
+		return;
 	}
 
 	SSL* ssl = SSL_new(ctx.get());
@@ -137,7 +146,7 @@ static bool SendEmail(const EmailData& emailData)
 		SSL_free(ssl);
 		closesocket(sock);
 		WSACleanup();
-		return false;
+		return;
 	}
 
 	bool success = true;
@@ -154,40 +163,40 @@ static bool SendEmail(const EmailData& emailData)
 	if (!check("EHLO localhost"))
 	{
 		fail("SMTP EHLO command failed!");
-		return false;
+		return;
 	}
 	if (!check("AUTH LOGIN"))
 	{
 		fail("SMTP AUTH LOGIN failed!");
-		return false;
+		return;
 	}
 	if (!check(base64_encode(emailData.username)))
 	{
 		fail("SMTP username authentication failed!");
-		return false;
+		return;
 	}
 	if (!check(base64_encode(emailData.password)))
 	{
 		fail("SMTP password authentication failed!");
-		return false;
+		return;
 	}
 	if (!check("MAIL FROM:<" + emailData.sender + ">"))
 	{
 		fail("SMTP MAIL FROM command failed!");
-		return false;
+		return;
 	}
 	for (const auto& r : emailData.receivers)
 	{
 		if (!check("RCPT TO:<" + r + ">"))
 		{
 			fail("SMTP RCPT TO failed for: " + r);
-			return false;
+			return;
 		}
 	}
 	if (!check("DATA"))
 	{
 		fail("SMTP DATA command failed!");
-		return false;
+		return;
 	}
 
 	ostringstream msg{};
@@ -201,7 +210,7 @@ static bool SendEmail(const EmailData& emailData)
 	}
 	msg << "\r\n\r\n" << emailData.body << "\r\n.\r\n";
 
-	if (!check(msg.str())) return false;
+	if (!check(msg.str())) return;
 	send_ssl(ssl, "QUIT");
 
 	SSL_shutdown(ssl);
@@ -218,6 +227,4 @@ static bool SendEmail(const EmailData& emailData)
 	};
 	unique_ptr<Event> emailSuccessEvent = make_unique<Event>();
 	emailSuccessEvent->SendEvent(EventType::event_print_message, emailSuccessData);
-
-	return success;
 }

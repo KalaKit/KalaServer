@@ -6,6 +6,7 @@
 #include <iostream>
 #include <chrono>
 #include <string>
+#include <memory>
 
 #include "core/event.hpp"
 
@@ -20,6 +21,8 @@ using std::time_t;
 using std::tm;
 using std::snprintf;
 using std::string;
+using std::unique_ptr;
+using std::make_unique;
 
 static void PrintConsoleMessage(EventType eventType, const PrintData& printData);
 
@@ -44,7 +47,16 @@ namespace KalaKit::Core
 			&& type != EventType::event_print_warning
 			&& type != EventType::event_print_error)
 		{
-
+			PrintData pd =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.customTag = "SERVER",
+				.message = "Invalid event type was assigned to print message event!"
+			};
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_error, pd);
+			return;
 		}
 		PrintConsoleMessage(type, printData);
 	}

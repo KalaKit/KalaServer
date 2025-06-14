@@ -146,13 +146,13 @@ namespace KalaKit::Core
 			{
 				PrintData sbData =
 				{
-					.indentationLength = 0,
+					.indentationLength = 2,
 					.addTimeStamp = true,
 					.customTag = "CLIENT",
 					.message = "Start byte in ParseByeRange is missing for header '" + header + "'!"
 				};
 				unique_ptr<Event> sbEvent = make_unique<Event>();
-				sbEvent->SendEvent(EventType::event_print_message, sbData);
+				sbEvent->SendEvent(EventType::event_print_error, sbData);
 				return;
 			}
 
@@ -164,7 +164,7 @@ namespace KalaKit::Core
 		{
 			PrintData hbData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "CLIENT",
 				.message = 
@@ -172,7 +172,7 @@ namespace KalaKit::Core
 					+ "'!\nReason: " + e.what()
 			};
 			unique_ptr<Event> hbEvent = make_unique<Event>();
-			hbEvent->SendEvent(EventType::event_print_message, hbData);
+			hbEvent->SendEvent(EventType::event_print_error, hbData);
 			return;
 		}
 	}
@@ -191,7 +191,7 @@ namespace KalaKit::Core
 			.message = "Socket [" + to_string(socket) + "] entered handle client thread..."
 		};
 		unique_ptr<Event> seEvent = make_unique<Event>();
-		seEvent->SendEvent(EventType::event_print_message, seData);
+		seEvent->SendEvent(EventType::event_print_debug, seData);
 
 		SOCKET rawClientSocket = static_cast<SOCKET>(socket);
 		uintptr_t clientSocket = static_cast<uintptr_t>(rawClientSocket);
@@ -223,25 +223,25 @@ namespace KalaKit::Core
 			{
 				PrintData stData =
 				{
-					.indentationLength = 0,
+					.indentationLength = 2,
 					.addTimeStamp = true,
 					.customTag = "CLIENT",
 					.message = "Socket [" + to_string(socket) + "] timed out after 5 seconds without sending any data."
 				};
 				unique_ptr<Event> stEvent = make_unique<Event>();
-				stEvent->SendEvent(EventType::event_print_message, stData);
+				stEvent->SendEvent(EventType::event_print_warning, stData);
 			}
 			else
 			{
 				PrintData srData =
 				{
-					.indentationLength = 0,
+					.indentationLength = 2,
 					.addTimeStamp = true,
 					.customTag = "CLIENT",
 					.message = "Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err)
 				};
 				unique_ptr<Event> srEvent = make_unique<Event>();
-				srEvent->SendEvent(EventType::event_print_message, srData);
+				srEvent->SendEvent(EventType::event_print_warning, srData);
 			}
 
 			this->SocketCleanup(socket);
@@ -256,13 +256,13 @@ namespace KalaKit::Core
 
 			PrintData sdData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "CLIENT",
 				.message = "Socket [" + to_string(socket) + "] disconnected without sending any data."
 			};
 			unique_ptr<Event> sdEvent = make_unique<Event>();
-			sdEvent->SendEvent(EventType::event_print_message, sdData);
+			sdEvent->SendEvent(EventType::event_print_warning, sdData);
 
 			this->SocketCleanup(socket);
 			closesocket(rawClientSocket);
@@ -274,13 +274,13 @@ namespace KalaKit::Core
 
 		PrintData shData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 2,
 			.addTimeStamp = true,
 			.customTag = "CLIENT",
 			.message = "Socket [" + to_string(socket) + "] raw HTTP request:\n" + request
 		};
 		unique_ptr<Event> shEvent = make_unique<Event>();
-		shEvent->SendEvent(EventType::event_print_message, shData);
+		shEvent->SendEvent(EventType::event_print_debug, shData);
 
 		if (request.starts_with("GET "))
 		{
@@ -320,7 +320,7 @@ namespace KalaKit::Core
 					request
 			};
 			unique_ptr<Event> frEvent = make_unique<Event>();
-			frEvent->SendEvent(EventType::event_print_message, frData);
+			frEvent->SendEvent(EventType::event_print_warning, frData);
 		}
 
 		bool isHost = Server::server->IsHost(clientIP);
@@ -355,8 +355,8 @@ namespace KalaKit::Core
 			PrintData wcData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = true,
-				.customTag = "CLIENT",
+				.addTimeStamp = false,
+				.customTag = "",
 				.message = 
 					"=============== WHITELISTED CLIENT =================\n"
 					" IP     : " + clientIP + "\n"
@@ -374,8 +374,8 @@ namespace KalaKit::Core
 				PrintData buData =
 				{
 					.indentationLength = 0,
-					.addTimeStamp = true,
-					.customTag = "CLIENT",
+					.addTimeStamp = false,
+					.customTag = "",
 					.message =
 						"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
 						" IP     : " + clientIP + "\n"
@@ -426,8 +426,8 @@ namespace KalaKit::Core
 				PrintData bcData =
 				{
 					.indentationLength = 0,
-					.addTimeStamp = true,
-					.customTag = "CLIENT",
+					.addTimeStamp = false,
+					.customTag = "",
 					.message =
 						"=============== BANNED CLIENT ======================\n"
 						" IP     : " + clientIP + "\n"
@@ -498,8 +498,8 @@ namespace KalaKit::Core
 				PrintData srData =
 				{
 					.indentationLength = 0,
-					.addTimeStamp = true,
-					.customTag = "CLIENT",
+					.addTimeStamp = false,
+					.customTag = "",
 					.message = 
 						"=============== BANNED CLIENT ======================\n"
 						" IP     : " + clientIP + "\n"
@@ -589,7 +589,7 @@ namespace KalaKit::Core
 		{
 			PrintData caData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "CLIENT",
 				.message = 
@@ -635,7 +635,7 @@ namespace KalaKit::Core
 		{
 			PrintData ttData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "CLIENT",
 				.message =
@@ -644,7 +644,7 @@ namespace KalaKit::Core
 					+ "' from path '" + foundRoute.route + "'."
 			};
 			unique_ptr<Event> ttEvent = make_unique<Event>();
-			ttEvent->SendEvent(EventType::event_print_message, ttData);
+			ttEvent->SendEvent(EventType::event_print_warning, ttData);
 
 			auto resp403 = make_unique<Response_403>();
 			resp403->Init(
@@ -672,17 +672,17 @@ namespace KalaKit::Core
 		bool canAccessRegisteredRoute =
 			isRegisteredRoute
 			&& (isClientRegistered
-				|| isClientAdmin
-				|| isHost);
+			|| isClientAdmin
+			|| isHost);
 
 		bool canAccessAdminRoute =
 			isAdminRoute
 			&& (isClientAdmin
-				|| isHost);
+			|| isHost);
 
 		bool allowEntrance =
 			(!isRegisteredRoute
-				&& !isAdminRoute)
+			&& !isAdminRoute)
 			|| canAccessRegisteredRoute
 			|| canAccessAdminRoute;
 
@@ -699,7 +699,7 @@ namespace KalaKit::Core
 		{
 			PrintData alData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "CLIENT",
 				.message =
@@ -709,7 +709,7 @@ namespace KalaKit::Core
 					+ "' with auth level " + routeAuth + "!"
 			};
 			unique_ptr<Event> alEvent = make_unique<Event>();
-			alEvent->SendEvent(EventType::event_print_message, alData);
+			alEvent->SendEvent(EventType::event_print_warning, alData);
 
 			auto resp403 = make_unique<Response_403>();
 			resp403->Init(
@@ -732,8 +732,8 @@ namespace KalaKit::Core
 			PrintData prData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = true,
-				.customTag = "CLIENT",
+				.addTimeStamp = false,
+				.customTag = "",
 				.message =
 					"==== APPROVED CLIENT CONNECTED TO PRIVATE ROUTE ====\n"
 					" IP     : " + clientIP + "\n"
@@ -753,8 +753,8 @@ namespace KalaKit::Core
 			PrintData ccData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = true,
-				.customTag = "CLIENT",
+				.addTimeStamp = false,
+				.customTag = "",
 				.message =
 					"===== APPROVED CLIENT CONNECTED TO ADMIN ROUTE =====\n"
 					" IP     : " + clientIP + "\n"
@@ -792,7 +792,7 @@ namespace KalaKit::Core
 			{
 				PrintData abData =
 				{
-					.indentationLength = 0,
+					.indentationLength = 2,
 					.addTimeStamp = true,
 					.customTag = "CLIENT",
 					.message =
@@ -801,7 +801,7 @@ namespace KalaKit::Core
 						+ cleanRoute + "'."
 				};
 				unique_ptr<Event> abEvent = make_unique<Event>();
-				abEvent->SendEvent(EventType::event_print_message, abData);
+				abEvent->SendEvent(EventType::event_print_error, abData);
 
 				auto resp500 = make_unique<Response_500>();
 				resp500->Init(
@@ -862,7 +862,7 @@ namespace KalaKit::Core
 		{
 			PrintData taData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "CLIENT",
 				.message =
@@ -871,7 +871,7 @@ namespace KalaKit::Core
 					+ cleanRoute + "'.\nError:\n" + e.what()
 			};
 			unique_ptr<Event> taEvent = make_unique<Event>();
-			taEvent->SendEvent(EventType::event_print_message, taData);
+			taEvent->SendEvent(EventType::event_print_error, taData);
 
 			auto resp500 = make_unique<Response_500>();
 			resp500->Init(

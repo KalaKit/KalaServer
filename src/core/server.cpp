@@ -128,7 +128,7 @@ namespace KalaKit::Core
 		server->SetRouteAccessLevels();
 		
 		WSADATA wsaData{};
-		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 2)
 		{
 			unique_ptr<Event> wfEvent = make_unique<Event>();
 			wfEvent->SendEvent(EventType::event_popup_error, "WSAStartup failed!");
@@ -329,7 +329,7 @@ namespace KalaKit::Core
 		{
 			PrintData biData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Failed to read 'banned-ips.txt' to ban IP!"
@@ -359,7 +359,7 @@ namespace KalaKit::Core
 		{
 			PrintData biData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Failed to write into 'banned-ips.txt' to ban IP!"
@@ -507,13 +507,13 @@ namespace KalaKit::Core
 		{
 			PrintData ffData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Failed to open '" + path(filePath).filename().string() + "'!"
 			};
 			unique_ptr<Event> ffEvent = make_unique<Event>();
-			ffEvent->SendEvent(EventType::event_print_message, ffData);
+			ffEvent->SendEvent(EventType::event_print_error, ffData);
 			return;
 		}
 
@@ -616,7 +616,7 @@ namespace KalaKit::Core
 		{
 			PrintData ppData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Page path '" + filePath + "' does not exist!."
@@ -738,7 +738,7 @@ namespace KalaKit::Core
 		{
 			PrintData seData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVE-FILE",
 				.message = "Serve received empty route!"
@@ -763,7 +763,7 @@ namespace KalaKit::Core
 		{
 			PrintData rwData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVE-FILE",
 				.message = "Route '" + route + "' is not whitelisted!"
@@ -781,7 +781,7 @@ namespace KalaKit::Core
 			{
 				PrintData ofData =
 				{
-					.indentationLength = 0,
+					.indentationLength = 2,
 					.addTimeStamp = true,
 					.customTag = "SERVE-FILE",
 					.message = "Failed to open file '" + fullFilePath.generic_string() + "'!"
@@ -801,7 +801,7 @@ namespace KalaKit::Core
 			{
 				PrintData rsData =
 				{
-					.indentationLength = 0,
+					.indentationLength = 2,
 					.addTimeStamp = true,
 					.customTag = "SERVE-FILE",
 					.message = 
@@ -856,7 +856,7 @@ namespace KalaKit::Core
 		{
 			PrintData erData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVE-FILE",
 				.message = "Exception while serving route '" + route + "':\n" + e.what()
@@ -875,7 +875,7 @@ namespace KalaKit::Core
 		{
 			PrintData iaData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Cannot check for internet access because tunnel name has not been assigned."
@@ -917,7 +917,7 @@ namespace KalaKit::Core
 		{
 			PrintData tsData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Cannot check for tunnel state because tunnel '" + CloudFlare::tunnelName + "' is not running."
@@ -933,7 +933,7 @@ namespace KalaKit::Core
 		{
 			PrintData tsData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Cannot check for tunnel state because handle for tunnel '" + CloudFlare::tunnelName + "' is invalid."
@@ -955,7 +955,7 @@ namespace KalaKit::Core
 		{
 			PrintData srData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Server '" + server->serverName + "' is not ready to start! Do not call this manually."
@@ -970,7 +970,7 @@ namespace KalaKit::Core
 		{
 			PrintData ncData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Neither cloudflared or dns was started! Please run atleast one of them."
@@ -985,19 +985,19 @@ namespace KalaKit::Core
 			PrintData acData =
 			{
 				.indentationLength = 0,
-				.addTimeStamp = true,
+				.addTimeStamp = false,
 				.customTag = "",
 				.message = 
-				"\n"
-				"=============================="
-				"\n"
-				"Ready to accept connections!"
-				"\n"
-				"=============================="
-				"\n"
+					"\n"
+					"=============================="
+					"\n"
+					"Ready to accept connections!"
+					"\n"
+					"=============================="
+					"\n"
 			};
 			unique_ptr<Event> acEvent = make_unique<Event>();
-			acEvent->SendEvent(EventType::event_print_error, acData);
+			acEvent->SendEvent(EventType::event_print_message, acData);
 
 			SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
 			while (KalaServer::isRunning)
@@ -1024,7 +1024,7 @@ namespace KalaKit::Core
 				{
 					PrintData afData =
 					{
-						.indentationLength = 0,
+						.indentationLength = 2,
 						.addTimeStamp = true,
 						.customTag = "SERVER",
 						.message = "Accept failed: " + to_string(WSAGetLastError())
@@ -1065,13 +1065,13 @@ namespace KalaKit::Core
 
 					PrintData fsData =
 					{
-						.indentationLength = 0,
+						.indentationLength = 2,
 						.addTimeStamp = true,
 						.customTag = "SERVER",
 						.message = fullStatus + "\n"
 					};
 					unique_ptr<Event> fsEvent = make_unique<Event>();
-					fsEvent->SendEvent(EventType::event_print_error, fsData);
+					fsEvent->SendEvent(EventType::event_print_message, fsData);
 
 					vector<string> receivers = { server->emailSenderData.username };
 					server->emailData =
@@ -1175,7 +1175,7 @@ namespace KalaKit::Core
 		{
 			PrintData fcData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Failed to create read/write pipe for storing host IPs!"
@@ -1191,7 +1191,7 @@ namespace KalaKit::Core
 		{
 			PrintData phData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Failed to set up pipe handle inheritance for storing host IPs!"
@@ -1225,7 +1225,7 @@ namespace KalaKit::Core
 		{
 			PrintData cpData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
 				.message = "Failed to create process for getting host IPs for storing host IPs!"
@@ -1294,7 +1294,7 @@ namespace KalaKit::Core
 			.message = "Refreshed machine IPs"
 		};
 		unique_ptr<Event> miEvent = make_unique<Event>();
-		miEvent->SendEvent(EventType::event_print_error, miData);
+		miEvent->SendEvent(EventType::event_print_message, miData);
 
 		canUpdateMachineIPs = false;
 	}
@@ -1431,7 +1431,7 @@ namespace KalaKit::Core
 				{
 					PrintData rrData =
 					{
-						.indentationLength = 0,
+						.indentationLength = 2,
 						.addTimeStamp = true,
 						.customTag = "SERVER",
 						.message = "Registered route '" + invalidRegisteredRoute + "' is not whitelisted! Cannot add to allowed registered routes..."
@@ -1476,7 +1476,7 @@ namespace KalaKit::Core
 				{
 					PrintData arData =
 					{
-						.indentationLength = 0,
+						.indentationLength = 2,
 						.addTimeStamp = true,
 						.customTag = "SERVER",
 						.message = "Admin route '" + invalidAdminRoute + "' is not whitelisted! Cannot add to allowed admin routes..."
@@ -1526,7 +1526,7 @@ namespace KalaKit::Core
 						.message = "Set route '" + r.route + "' access level to 'registered'"
 					};
 					unique_ptr<Event> srEvent = make_unique<Event>();
-					srEvent->SendEvent(EventType::event_print_error, srData);
+					srEvent->SendEvent(EventType::event_print_message, srData);
 
 					break;
 				}
@@ -1546,7 +1546,7 @@ namespace KalaKit::Core
 						.message = "Set route '" + r.route + "' access level to 'admin'"
 					};
 					unique_ptr<Event> srEvent = make_unique<Event>();
-					srEvent->SendEvent(EventType::event_print_error, srData);
+					srEvent->SendEvent(EventType::event_print_message, srData);
 
 					break;
 				}
@@ -1561,7 +1561,7 @@ namespace KalaKit::Core
 			.message = "Refreshed route access levels"
 		};
 		unique_ptr<Event> raEvent = make_unique<Event>();
-		raEvent->SendEvent(EventType::event_print_error, raData);
+		raEvent->SendEvent(EventType::event_print_message, raData);
 	}
 
 	void Server::Quit() const
