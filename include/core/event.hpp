@@ -6,13 +6,11 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace KalaKit::Core
 {
 	using std::string;
-	using std::unordered_map;
 	using std::vector;
 
 	enum class EventType
@@ -31,6 +29,7 @@ namespace KalaKit::Core
 		//server action events
 
 		event_server_health_ping,
+		event_send_email,
 		event_refreshed_whitelisted_ips,
 		event_refreshed_banned_ips,
 		event_refreshed_blacklisted_keywords,
@@ -79,12 +78,5 @@ namespace KalaKit::Core
 		void SendEvent(EventType type, const string& message);
 		//Send event to email
 		void SendEvent(EventType type, const EmailData& emailData);
-	private:
-		//Prints a message to the server console
-		void PrintConsoleMessage(EventType eventType, const PrintData& printData);
-
-		void CreatePopup(EventType type, const string& message);
-
-		bool SendEmail(const EmailData& emailData);
 	};
 }
