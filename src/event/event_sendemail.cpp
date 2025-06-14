@@ -36,7 +36,7 @@ namespace KalaKit::Core
 				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
-				.message = "Invalid event type was assigned to send email event!"
+				.message = "Invalid event type was assigned to 'send email' event!"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_print_error, pd);

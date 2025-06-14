@@ -75,6 +75,12 @@ namespace KalaKit::Core
 		datafile_blacklistedKeyword
 	};
 
+	struct HealthPingData
+	{
+		unsigned int rateLimitTimer;       //How often should the health ping occur
+		vector<MessageReceiver> receivers; //Who can receive the health ping
+	};
+
 	//keeps track of user attempts to routes per second
 	static inline unordered_map<string, unordered_map<string, int>> requestCounter;
 
@@ -89,10 +95,8 @@ namespace KalaKit::Core
 		//loads browser defaults otherwise.
 		ErrorMessage errorMessage;
 
-		/// <summary>
-		/// File paths for server admin provided data files
-		/// for ips, extensions, keywords and others.
-		/// </summary>
+		//File paths for server admin provided data files
+		//for ips, extensions, keywords and others.
 		DataFile dataFile;
 		
 		//Your email username and app password to be able to send emails
@@ -100,6 +104,8 @@ namespace KalaKit::Core
 		
 		//The contents of the email + sender and receivers of the email
 		EmailData emailData;
+
+		HealthPingData healthPingData;
 
 		atomic<bool> canUpdateWhitelistedRoutes{ true };
 		atomic<bool> canUpdateRouteAccess{ true };
@@ -120,18 +126,18 @@ namespace KalaKit::Core
 
 		Server(
 			unsigned int port,
-			unsigned int healthTimer,
 			unsigned int rateLimitTimer,
 			const string& serverName,
 			const string& domainName,
+			const HealthPingData& healthPingData,
 			const ErrorMessage& errorMessage,
 			const DataFile& dataFile,
 			const EmailSenderData& emailSenderData) :
 			port(port),
-			healthTimer(healthTimer),
 			rateLimitTimer(rateLimitTimer),
 			serverName(serverName),
 			domainName(domainName),
+			healthPingData(healthPingData),
 			errorMessage(errorMessage),
 			dataFile(dataFile),
 			emailSenderData(emailSenderData) {}
@@ -141,10 +147,10 @@ namespace KalaKit::Core
 		/// </summary>
 		static bool Initialize(
 			unsigned int port,
-			unsigned int healthTimer,
 			unsigned int rateLimitTimer,
 			const string& serverName,
 			const string& domainName,
+			const HealthPingData& healthPingData,
 			const ErrorMessage& errorMessage,
 			const DataFile& datafile,
 			const EmailSenderData& emailSenderData,

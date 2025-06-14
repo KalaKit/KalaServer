@@ -38,11 +38,18 @@ namespace KalaKit::Core
 
 		//client events
 
-		event_banned_for_accessing_blacklisted_route,
-		event_banned_for_exceeding_rate_limit,
+		event_client_was_banned,
 		event_already_banned_client_connected,
 		event_client_connected_to_registered_route,
 		event_client_connected_to_admin_route
+	};
+
+	enum class MessageReceiver
+	{
+		receiver_none,
+		receiver_console,
+		receiver_popup,
+		receiver_email
 	};
 
 	struct PrintData
@@ -66,6 +73,13 @@ namespace KalaKit::Core
 		string body;              //The contents of the email
 	};
 
+	struct Client_Banned_Data
+	{
+		string ip;                         //What IP got banned
+		string reason;                     //Why did they get banned
+		vector<MessageReceiver> receivers; //Who will get a message about this IP being banned
+	};
+
 	class Event
 	{
 	public:
@@ -76,7 +90,11 @@ namespace KalaKit::Core
 		void SendEvent(EventType type, const PrintData& printData);
 		//Create a popup
 		void SendEvent(EventType type, const string& message);
-		//Send event to email
+
+		//Get a server health update
+		void SendEvent(EventType type, const vector<MessageReceiver>& receivers);
+
+		//Send an email
 		void SendEvent(EventType type, const EmailData& emailData);
 	};
 }

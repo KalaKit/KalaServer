@@ -33,7 +33,7 @@ namespace KalaKit::Core
 				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
-				.message = "Invalid event type was assigned to popup event!"
+				.message = "Invalid event type was assigned to 'popup' event!"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_print_error, pd);

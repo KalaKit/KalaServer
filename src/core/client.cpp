@@ -441,7 +441,7 @@ namespace KalaKit::Core
 				sleep_for(milliseconds(5));
 
 				vector<EventType> ev = Server::server->emailSenderData.events;
-				EventType e = EventType::event_banned_for_accessing_blacklisted_route;
+				EventType e = EventType::event_client_was_banned;
 #pragma warning(push)
 #pragma warning(disable: 26117)
 				bool clientWasBannedEvent =
@@ -513,7 +513,7 @@ namespace KalaKit::Core
 				sleep_for(milliseconds(5));
 
 				vector<EventType> ev = Server::server->emailSenderData.events;
-				EventType e = EventType::event_banned_for_exceeding_rate_limit;
+				EventType e = EventType::event_client_was_banned;
 #pragma warning(push)
 #pragma warning(disable: 26110)
 				bool clientWasBannedEvent =

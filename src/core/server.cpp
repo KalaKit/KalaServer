@@ -79,10 +79,10 @@ namespace KalaKit::Core
 
 	bool Server::Initialize(
 		unsigned int port,
-		unsigned int healthTimer,
 		unsigned int rateLimitTimer,
 		const string& serverName,
 		const string& domainName,
+		const HealthPingData& healthPingData,
 		const ErrorMessage& errorMessage,
 		const DataFile& dataFile,
 		const EmailSenderData& emailSenderData,
@@ -91,10 +91,10 @@ namespace KalaKit::Core
 	{
 		server = make_unique<Server>(
 			port,
-			healthTimer,
 			rateLimitTimer,
 			serverName,
 			domainName,
+			healthPingData,
 			errorMessage,
 			dataFile,
 			emailSenderData);
@@ -128,7 +128,7 @@ namespace KalaKit::Core
 		server->SetRouteAccessLevels();
 		
 		WSADATA wsaData{};
-		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 2)
+		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		{
 			unique_ptr<Event> wfEvent = make_unique<Event>();
 			wfEvent->SendEvent(EventType::event_popup_error, "WSAStartup failed!");
@@ -1053,40 +1053,9 @@ namespace KalaKit::Core
 			{
 				while (KalaServer::isRunning)
 				{
-					bool hasInternet = server->HasInternet();
-					bool isTunnelAlive = server->IsTunnelAlive(CloudFlare::tunnelRunHandle);
-
-					string internetStatus = hasInternet ? "[NET: OK]" : "[NET: FAIL]";
-					string tunnelStatus = isTunnelAlive ? "[TUNNEL: OK]" : "[TUNNEL: FAIL]";
-
-					string fullStatus =
-						"Server status: " + internetStatus
-						+ ", " + tunnelStatus;
-
-					PrintData fsData =
-					{
-						.indentationLength = 2,
-						.addTimeStamp = true,
-						.customTag = "SERVER",
-						.message = fullStatus + "\n"
-					};
-					unique_ptr<Event> fsEvent = make_unique<Event>();
-					fsEvent->SendEvent(EventType::event_print_message, fsData);
-
-					vector<string> receivers = { server->emailSenderData.username };
-					server->emailData =
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = server->emailSenderData.username,
-						.password = server->emailSenderData.password,
-						.sender = server->emailSenderData.username,
-						.receivers = receivers,
-						.subject = "KalaServer health status",
-						.body = fullStatus
-					};
-
-					unique_ptr<Event> event = make_unique<Event>();
-					event->SendEvent(EventType::event_server_health_ping, server->emailData);
+					vector<MessageReceiver> receivers = server->healthPingData.receivers;
+					unique_ptr<Event> healthPingEvent = make_unique<Event>();
+					healthPingEvent->SendEvent(EventType::event_server_health_ping, receivers);
 
 					sleep_for(seconds(healthTimer));
 				}
