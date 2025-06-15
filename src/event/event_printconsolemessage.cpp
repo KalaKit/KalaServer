@@ -35,10 +35,11 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = false,
+			.severity = EventType::event_severity_error,
 			.customTag = "",
 			.message = ""
 		};
-		PrintConsoleMessage(EventType::event_severity_message, emptyData);
+		PrintConsoleMessage(EventType::event_print_console_message, emptyData);
 	}
 
 	void Event::SendEvent(EventType type, const PrintData& printData)

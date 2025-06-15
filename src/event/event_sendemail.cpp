@@ -35,11 +35,12 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = EventType::event_severity_error,
 				.customTag = "SERVER",
 				.message = "Only event type 'event_send_email' is allowed in 'Send email' event!"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_severity_error, pd);
+			event->SendEvent(EventType::event_print_console_message, pd);
 			return;
 		}
 		SendEmail(emailData);
