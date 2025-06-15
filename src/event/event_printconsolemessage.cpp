@@ -102,7 +102,7 @@ static void PrintConsoleMessage(EventType eventType, const PrintData& printData)
 	string targetTypeContent{};
 
 #ifndef _DEBUG
-	if (eventType == EventType::event_severity_debug) return;
+	if (printData.severity == EventType::event_severity_debug) return;
 #endif
 
 	if (printData.indentationLength > 0)
