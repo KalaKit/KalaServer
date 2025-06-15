@@ -41,6 +41,20 @@ namespace KalaKit::Core
 			event->SendEvent(EventType::event_print_console_message, pd);
 			return;
 		}
+		if (popupData.severity == EventType::event_none)
+		{
+			PrintData pd =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = EventType::event_severity_error,
+				.customTag = "SERVER",
+				.message = "No severity type was passed to 'Create popup' event!"
+			};
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_console_message, pd);
+			return;
+		}
 		if (popupData.severity != EventType::event_severity_warning
 			&& popupData.severity != EventType::event_severity_error)
 		{

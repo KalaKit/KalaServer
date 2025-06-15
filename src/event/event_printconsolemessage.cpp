@@ -58,6 +58,20 @@ namespace KalaKit::Core
 			event->SendEvent(EventType::event_print_console_message, pd);
 			return;
 		}
+		if (printData.severity == EventType::event_none)
+		{
+			PrintData pd =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = EventType::event_severity_error,
+				.customTag = "SERVER",
+				.message = "No severity type was passed to 'Print to console' event!"
+			};
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_console_message, pd);
+			return;
+		}
 		if (printData.severity != EventType::event_severity_message
 			&& printData.severity != EventType::event_severity_debug
 			&& printData.severity != EventType::event_severity_warning
