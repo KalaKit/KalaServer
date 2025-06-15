@@ -418,7 +418,7 @@ namespace KalaKit::Core
 						.body = "Already banned client " + clientIP + " tried to reconnect to  '" + cleanRoute + "'!"
 					};
 					unique_ptr<Event> event = make_unique<Event>();
-					event->SendEvent(e, emailData);
+					event->SendEvent(rec_e, emailData);
 				}
 
 				auto respBanned = make_unique<Response_418>();
@@ -474,7 +474,7 @@ namespace KalaKit::Core
 						.body = "client " + clientIP + " was banned because they tried to access route '" + cleanRoute + "'!"
 					};
 					unique_ptr<Event> event = make_unique<Event>();
-					event->SendEvent(e, emailData);
+					event->SendEvent(rec_e, emailData);
 				}
 
 				pair<string, string> bannedClient{};
@@ -547,7 +547,7 @@ namespace KalaKit::Core
 						.body = "client " + clientIP + " was banned because they exceeded the rate limit of '" + to_string(Server::server->rateLimitTimer) + "'!"
 					};
 					unique_ptr<Event> event = make_unique<Event>();
-					event->SendEvent(e, emailData);
+					event->SendEvent(rec_e, emailData);
 				}
 
 				pair<string, string> bannedClient{};

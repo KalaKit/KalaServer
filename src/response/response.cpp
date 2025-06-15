@@ -76,6 +76,6 @@ namespace KalaKit::ResponseSystem
 				+ " -> " + route + " [" + statusLine + "]\n"
 		};
 		unique_ptr<Event> rEvent = make_unique<Event>();
-		rEvent->SendEvent(EventType::event_severity_message, rData);
+		rEvent->SendEvent(EventType::event_print_console_message, rData);
 	}
 }
