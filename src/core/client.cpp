@@ -508,8 +508,8 @@ namespace KalaKit::Core
 			&& !isHost
 			&& whitelistedClient.first == "")
 		{
-			lock_guard<mutex> counterLock(counterMutex);
-			int& count = requestCounter[clientIP][route];
+			lock_guard<mutex> counterLock(Server::server->counterMutex);
+			int& count = Server::server->requestCounter[clientIP][route];
 			count++;
 
 			if (count > Server::server->rateLimitTimer)

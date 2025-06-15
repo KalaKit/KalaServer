@@ -83,15 +83,15 @@ namespace KalaKit::Core
 		datafile_blacklistedKeyword
 	};
 
-	//keeps track of user attempts to routes per second
-	static inline unordered_map<string, unordered_map<string, int>> requestCounter;
-
-	static inline mutex counterMutex;
-
 	class Server
 	{
 	public:
 		static inline unique_ptr<Server> server;
+
+		//keeps track of user attempts to routes per second
+		unordered_map<string, unordered_map<string, int>> requestCounter;
+
+		mutable mutex counterMutex;
 
 		//File paths for server admin provided error pages,
 		//loads browser defaults otherwise.
