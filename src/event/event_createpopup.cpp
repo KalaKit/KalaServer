@@ -12,38 +12,39 @@
 #include "external/kcrash.hpp"
 
 using KalaKit::KalaCrash::Crash;
+using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
+using KalaKit::Core::PopupData;
 using KalaKit::Core::Server;
 
 using std::string;
 using std::unique_ptr;
 using std::make_unique;
 
-static void CreatePopup(EventType type, const string& message);
+static void CreatePopup(EventType type, const PopupData& popupData);
 
 namespace KalaKit::Core
 {
-	void Event::SendEvent(EventType type, const string& message)
+	void Event::SendEvent(EventType type, const PopupData& popupData)
 	{
-		if (type != EventType::event_popup_warning
-			&& type != EventType::event_popup_error)
+		if (type != EventType::event_print_console_message)
 		{
 			PrintData pd =
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
-				.message = "Invalid event type was assigned to 'popup' event!"
+				.message = "Only event type 'event_print_console_message' is allowed in 'Create popup' event!"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_error, pd);
+			event->SendEvent(EventType::event_severity_error, pd);
 			return;
 		}
-		CreatePopup(type, message);
+		CreatePopup(type, popupData);
 	}
 }
 
-static void CreatePopup(EventType type, const string& message)
+static void CreatePopup(EventType type, const PopupData& popupData)
 {
 	string popupTitle{};
 	string serverName = "Server";
@@ -53,7 +54,7 @@ static void CreatePopup(EventType type, const string& message)
 		serverName = Server::server->GetServerName();
 	}
 
-	if (type == EventType::event_popup_error)
+	if (type == EventType::event_severity_error)
 	{
 		popupTitle = serverName + " error";
 
@@ -66,15 +67,15 @@ static void CreatePopup(EventType type, const string& message)
 			| MB_OK);
 		*/
 
-		Crash(message);
+		Crash(popupData.message);
 	}
-	else if (type == EventType::event_popup_warning)
+	else if (type == EventType::event_severity_warning)
 	{
 		popupTitle = serverName + "  warning";
 
 		MessageBoxA(
 			nullptr,
-			message.c_str(),
+			popupData.message.c_str(),
 			popupTitle.c_str(),
 			MB_ICONWARNING
 			| MB_OK);

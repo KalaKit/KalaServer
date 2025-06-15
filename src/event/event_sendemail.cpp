@@ -36,10 +36,10 @@ namespace KalaKit::Core
 				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
-				.message = "Invalid event type was assigned to 'send email' event!"
+				.message = "Only event type 'event_send_email' is allowed in 'Send email' event!"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_error, pd);
+			event->SendEvent(EventType::event_severity_error, pd);
 			return;
 		}
 		SendEmail(emailData);
@@ -58,7 +58,7 @@ static void SendEmail(const EmailData& emailData)
 			.message = reason
 		};
 		unique_ptr<Event> emailErrorEvent = make_unique<Event>();
-		emailErrorEvent->SendEvent(EventType::event_print_error, emailErrorData);
+		emailErrorEvent->SendEvent(EventType::event_severity_error, emailErrorData);
 	};
 
 	auto base64_encode = [](const string& input) -> string
@@ -185,7 +185,7 @@ static void SendEmail(const EmailData& emailData)
 		fail("SMTP MAIL FROM command failed!");
 		return;
 	}
-	for (const auto& r : emailData.receivers)
+	for (const auto& r : emailData.receivers_email)
 	{
 		if (!check("RCPT TO:<" + r + ">"))
 		{
@@ -203,10 +203,10 @@ static void SendEmail(const EmailData& emailData)
 	msg << "Subject: " << emailData.subject << "\r\n";
 	msg << "From: " << emailData.sender << "\r\n";
 	msg << "To: ";
-	for (size_t i = 0; i < emailData.receivers.size(); ++i)
+	for (size_t i = 0; i < emailData.receivers_email.size(); ++i)
 	{
-		msg << emailData.receivers[i];
-		if (i + 1 < emailData.receivers.size()) msg << ", ";
+		msg << emailData.receivers_email[i];
+		if (i + 1 < emailData.receivers_email.size()) msg << ", ";
 	}
 	msg << "\r\n\r\n" << emailData.body << "\r\n.\r\n";
 
@@ -226,5 +226,5 @@ static void SendEmail(const EmailData& emailData)
 		.message = "Email '" + emailData.subject + "' was successfully sent!"
 	};
 	unique_ptr<Event> emailSuccessEvent = make_unique<Event>();
-	emailSuccessEvent->SendEvent(EventType::event_print_message, emailSuccessData);
+	emailSuccessEvent->SendEvent(EventType::event_severity_message, emailSuccessData);
 }

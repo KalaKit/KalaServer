@@ -18,6 +18,15 @@ using KalaKit::Core::Server;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PrintData;
+using KalaKit::Core::PopupData;
+
+using KalaKit::Core::sev_m;
+using KalaKit::Core::sev_d;
+using KalaKit::Core::sev_w;
+using KalaKit::Core::sev_e;
+using KalaKit::Core::rec_c;
+using KalaKit::Core::rec_p;
+using KalaKit::Core::rec_e;
 
 using std::filesystem::current_path;
 using std::filesystem::exists;
@@ -36,11 +45,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "CUSTOM_DNS",
 				.message = "Cannot initialize dns if server has not yet been initialized!"
 			};
 			unique_ptr<Event> initEvent = make_unique<Event>();
-			initEvent->SendEvent(EventType::event_print_message, initData);
+			initEvent->SendEvent(rec_c, initData);
 			return false;
 		}
 
@@ -50,25 +60,30 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "CUSTOM_DNS",
 				.message = "Cannot initialize dns while it is already being initialized!"
 			};
 			unique_ptr<Event> init2Event = make_unique<Event>();
-			init2Event->SendEvent(EventType::event_print_message, init2Data);
+			init2Event->SendEvent(rec_c, init2Data);
 			return false;
 		}
 		isInitializing = true;
 		
 		if (CloudFlare::IsRunning())
 		{
-			string popup =
-				"Failed to start DNS!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Cannot run DNS and cloudflared together!";
+			PopupData cfData =
+			{
+				.message =
+					"Failed to start DNS!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Cannot run DNS and cloudflared together!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> cfEvent = make_unique<Event>();
-			cfEvent->SendEvent(EventType::event_popup_error, popup);
+			cfEvent->SendEvent(rec_p, cfData);
 			isInitializing = false;
 			return false;
 		}
@@ -80,11 +95,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_w,
 			.customTag = "CUSTOM_DNS",
 			.message = "DNS is currently a placeholder! This does nothing."
 		};
 		unique_ptr<Event> dnsEvent = make_unique<Event>();
-		dnsEvent->SendEvent(EventType::event_print_message, dnsData);
+		dnsEvent->SendEvent(rec_c, dnsData);
 
 		return true;
 	}
@@ -97,11 +113,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "CUSTOM_DNS",
 				.message = "Cannot shut down dns because it hasn't been started!"
 			};
 			unique_ptr<Event> sdEvent = make_unique<Event>();
-			sdEvent->SendEvent(EventType::event_print_message, sdData);
+			sdEvent->SendEvent(rec_c, sdData);
 			return;
 		}
 
@@ -109,10 +126,11 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CUSTOM_DNS",
 			.message = "DNS was successfully shut down!"
 		};
 		unique_ptr<Event> stEvent = make_unique<Event>();
-		stEvent->SendEvent(EventType::event_print_message, stData);
+		stEvent->SendEvent(rec_c, stData);
 	}
 }

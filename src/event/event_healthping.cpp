@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <variant>
 
 #include "core/core.hpp"
 #include "core/event.hpp"
@@ -15,9 +16,10 @@
 using KalaKit::Core::KalaServer;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
-using KalaKit::Core::EmailData;
 using KalaKit::Core::PrintData;
-using KalaKit::Core::MessageReceiver;
+using KalaKit::Core::PopupData;
+using KalaKit::Core::EmailData;
+using KalaKit::Core::HealthPingData;
 using KalaKit::Core::Server;
 using KalaKit::DNS::CloudFlare;
 
@@ -25,12 +27,13 @@ using std::string;
 using std::unique_ptr;
 using std::make_unique;
 using std::vector;
+using std::get_if;
 
-static void HealthPing(EventType type, const vector<MessageReceiver>& receivers);
+static void HealthPing(EventType type, HealthPingData healthPingData);
 
 namespace KalaKit::Core
 {
-	void Event::SendEvent(EventType type, const vector<MessageReceiver>& receivers)
+	void Event::SendEvent(EventType type, HealthPingData healthPingData)
 	{
 		if (type != EventType::event_server_health_ping)
 		{
@@ -39,17 +42,17 @@ namespace KalaKit::Core
 				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
-				.message = "Invalid event type was assigned to 'health ping' event!"
+				.message = "Only event type 'event_server_health_ping' is allowed in 'Health ping' event!"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_error, pd);
+			event->SendEvent(EventType::event_severity_error, pd);
 			return;
 		}
-		HealthPing(type, receivers);
+		HealthPing(type, healthPingData);
 	}
 }
 
-static void HealthPing(EventType type, const vector<MessageReceiver>& receivers)
+static void HealthPing(EventType type, HealthPingData healthPingData)
 {
 	bool hasInternet = Server::server->HasInternet();
 	bool isTunnelAlive = Server::server->IsTunnelAlive(CloudFlare::tunnelRunHandle);
@@ -61,28 +64,25 @@ static void HealthPing(EventType type, const vector<MessageReceiver>& receivers)
 		"Server status: " + internetStatus
 		+ ", " + tunnelStatus;
 
-	PrintData fsData =
+	for (auto& payload : healthPingData.receivers)
 	{
-		.indentationLength = 2,
-		.addTimeStamp = true,
-		.customTag = "SERVER",
-		.message = fullStatus + "\n"
-	};
-	unique_ptr<Event> fsEvent = make_unique<Event>();
-	fsEvent->SendEvent(EventType::event_print_message, fsData);
-
-	vector<string> theReceivers = { Server::server->emailSenderData.username };
-	EmailData emailData =
-	{
-		.smtpServer = "smtp.gmail.com",
-		.username = Server::server->emailSenderData.username,
-		.password = Server::server->emailSenderData.password,
-		.sender = Server::server->emailSenderData.username,
-		.receivers = theReceivers,
-		.subject = Server::server->GetServerName() + " health status",
-		.body = fullStatus
-	};
-
-	//unique_ptr<Event> event = make_unique<Event>();
-	//event->SendEvent(EventType::event_server_health_ping, server->emailData);
+		if (PrintData* data = get_if<PrintData>(&payload))
+		{
+			data->message = fullStatus;
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_console_message, *data);
+		}
+		else if (PopupData* data = get_if<PopupData>(&payload))
+		{
+			data->message = fullStatus;
+			unique_ptr<Event> fsEvent = make_unique<Event>();
+			fsEvent->SendEvent(EventType::event_create_popup, *data);
+		}
+		else if (EmailData* data = get_if<EmailData>(&payload))
+		{
+			data->body = fullStatus;
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_send_email, *data);
+		}
+	}
 }

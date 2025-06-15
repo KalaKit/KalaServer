@@ -27,6 +27,14 @@ namespace KalaKit::Core
 	using std::pair;
 	//using KalaKit::KalaTypes::u16;
 
+	static inline EventType sev_m = EventType::event_severity_message;
+	static inline EventType sev_d = EventType::event_severity_debug;
+	static inline EventType sev_w = EventType::event_severity_warning;
+	static inline EventType sev_e = EventType::event_severity_error;
+	static inline EventType rec_c = EventType::event_print_console_message;
+	static inline EventType rec_p = EventType::event_create_popup;
+	static inline EventType rec_e = EventType::event_send_email;
+
 	enum class AccessLevel
 	{
 		access_user,
@@ -75,12 +83,6 @@ namespace KalaKit::Core
 		datafile_blacklistedKeyword
 	};
 
-	struct HealthPingData
-	{
-		unsigned int rateLimitTimer;       //How often should the health ping occur
-		vector<MessageReceiver> receivers; //Who can receive the health ping
-	};
-
 	//keeps track of user attempts to routes per second
 	static inline unordered_map<string, unordered_map<string, int>> requestCounter;
 
@@ -101,9 +103,6 @@ namespace KalaKit::Core
 		
 		//Your email username and app password to be able to send emails
 		EmailSenderData emailSenderData;
-		
-		//The contents of the email + sender and receivers of the email
-		EmailData emailData;
 
 		HealthPingData healthPingData;
 
@@ -273,7 +272,6 @@ namespace KalaKit::Core
 		mutable uintptr_t serverSocket{}; //Current active socket
 
 		unsigned int port; //Local server port
-		unsigned int healthTimer; //Countdown until server reports health check.
 		string serverName; //The server name used for cloudflare/dns calls
 		string domainName; //The domain name that is launched
 	};

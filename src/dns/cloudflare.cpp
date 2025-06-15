@@ -26,6 +26,15 @@ using KalaKit::Core::Server;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PrintData;
+using KalaKit::Core::PopupData;
+
+using KalaKit::Core::sev_m;
+using KalaKit::Core::sev_d;
+using KalaKit::Core::sev_w;
+using KalaKit::Core::sev_e;
+using KalaKit::Core::rec_c;
+using KalaKit::Core::rec_p;
+using KalaKit::Core::rec_e;
 
 using std::filesystem::current_path;
 using std::filesystem::exists;
@@ -60,11 +69,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
 				.message = "Cannot initialize cloudflared if server has not yet been initialized!"
 			};
 			unique_ptr<Event> csEvent = make_unique<Event>();
-			csEvent->SendEvent(EventType::event_print_error, csData);
+			csEvent->SendEvent(rec_c, csData);
 			return false;
 		}
 
@@ -74,11 +84,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
 				.message = "Cannot initialize cloudflared while it is already being initialized!"
 			};
 			unique_ptr<Event> ciEvent = make_unique<Event>();
-			ciEvent->SendEvent(EventType::event_print_error, ciData);
+			ciEvent->SendEvent(rec_c, ciData);
 			return false;
 		}
 		
@@ -93,14 +104,18 @@ namespace KalaKit::DNS
 		
 		if (CustomDNS::IsRunning())
 		{
-			string crMessage =
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Cannot run DNS and cloudflared together!";
+			PopupData crData =
+			{
+				.message =
+					"Failed to start cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Cannot run DNS and cloudflared together!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> crEvent = make_unique<Event>();
-			crEvent->SendEvent(EventType::event_print_error, crMessage);
+			crEvent->SendEvent(rec_p, crData);
 			isInitializing = false;
 			return false;
 		}
@@ -109,14 +124,18 @@ namespace KalaKit::DNS
 		string cloudflaredPath = path(current_path() / cloudFlaredName).string();
 		if (!exists(cloudflaredPath))
 		{
-			string fcMessage =
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to find cloudflared.exe!";
+			PopupData fcData =
+			{
+				.message =
+					"Failed to start cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to find cloudflared.exe!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> fcEvent = make_unique<Event>();
-			fcEvent->SendEvent(EventType::event_popup_error, fcMessage);
+			fcEvent->SendEvent(rec_p, fcData);
 			isInitializing = false;
 			return false;
 		}
@@ -130,11 +149,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared cert file already exists at '" + certPath + "'. Skipping creation."
 			};
 			unique_ptr<Event> ccEvent = make_unique<Event>();
-			ccEvent->SendEvent(EventType::event_print_message, ccData);
+			ccEvent->SendEvent(rec_c, ccData);
 		}
 
 		if (tunnelID == "") CreateTunnelCredentials();
@@ -151,11 +171,12 @@ namespace KalaKit::DNS
 				{
 					.indentationLength = 0,
 					.addTimeStamp = true,
+					.severity = sev_m,
 					.customTag = "CLOUDFLARE",
 					.message = "Cloudflared json file already exists at '" + tunnelIDFilePath + "'. Skipping creation."
 				};
 				unique_ptr<Event> cjEvent = make_unique<Event>();
-				cjEvent->SendEvent(EventType::event_print_message, cjData);
+				cjEvent->SendEvent(rec_c, cjData);
 			}	
 		}
 		
@@ -168,11 +189,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Cloudflared initialization completed."
 		};
 		unique_ptr<Event> ciEvent = make_unique<Event>();
-		ciEvent->SendEvent(EventType::event_print_message, ciData);
+		ciEvent->SendEvent(rec_c, ciData);
 
 		return true;
 	}
@@ -184,23 +206,31 @@ namespace KalaKit::DNS
 
 		if (newTunnelName == "")
 		{
-			string csMessage = "Cannot start cloudflared with empty tunnel name!";
+			PopupData csData =
+			{
+				.message = "Cannot start cloudflared with empty tunnel name!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> csEvent = make_unique<Event>();
-			csEvent->SendEvent(EventType::event_popup_error, csMessage);
+			csEvent->SendEvent(rec_p, csData);
 			return false;
 		}
 		size_t tunnelNameLength = newTunnelName.length();
 		if (tunnelNameLength < 3
 			|| tunnelNameLength > 32)
 		{
-			string tnMessage =
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Tunnel name length '" + to_string(tunnelNameLength) + "' is out of range! Must be between 3 and 32 characters.";
+			PopupData tnData =
+			{
+				.message = 
+					"Failed to start cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Tunnel name length '" + to_string(tunnelNameLength) + "' is out of range! Must be between 3 and 32 characters.",
+				.severity = sev_e
+			};
 			unique_ptr<Event> tnEvent = make_unique<Event>();
-			tnEvent->SendEvent(EventType::event_popup_error, tnMessage);
+			tnEvent->SendEvent(rec_p, tnData);
 			return false;
 		}
 		tunnelName = newTunnelName;
@@ -243,14 +273,18 @@ namespace KalaKit::DNS
 		ifstream file(textFilePath);
 		if (!file)
 		{
-			string otMessage =
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to open text file '" + textFilePath + "'!";
+			PopupData otData =
+			{
+				.message =
+					"Failed to start cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to open text file '" + textFilePath + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> otEvent = make_unique<Event>();
-			otEvent->SendEvent(EventType::event_popup_error, otMessage);
+			otEvent->SendEvent(rec_p, otData);
 			return "";
 		}
 
@@ -263,27 +297,35 @@ namespace KalaKit::DNS
 		if (textLength < minLength
 			|| textLength > maxLength)
 		{
-			string tfMessage =
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Text file '" + textFilePath + "' text length '" + to_string(textLength) + "' is too small or too big! You probably didn't copy the text correctly.";
+			PopupData tfData =
+			{
+				.message =
+					"Failed to start cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Text file '" + textFilePath + "' text length '" + to_string(textLength) + "' is too small or too big! You probably didn't copy the text correctly.",
+				.severity = sev_e
+			};
 			unique_ptr<Event> tfEvent = make_unique<Event>();
-			tfEvent->SendEvent(EventType::event_popup_error, tfMessage);
+			tfEvent->SendEvent(rec_p, tfData);
 			return "";
 		}
 
 		if (fileResult.find(" ") != string::npos)
 		{
-			string ciMessage =
-				"Failed to start cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Text file '" + textFilePath + "' contains incorrect info! You probably didn't copy the text correctly.";
+			PopupData ciData =
+			{
+				.message =
+					"Failed to start cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Text file '" + textFilePath + "' contains incorrect info! You probably didn't copy the text correctly.",
+				.severity = sev_e
+			};
 			unique_ptr<Event> ciEvent = make_unique<Event>();
-			ciEvent->SendEvent(EventType::event_popup_error, ciMessage);
+			ciEvent->SendEvent(rec_p, ciData);
 			return "";
 		}
 
@@ -301,11 +343,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared cert file already exists at '" + certPath + "'. Skipping creation."
 			};
 			unique_ptr<Event> caEvent = make_unique<Event>();
-			caEvent->SendEvent(EventType::event_print_message, caData);
+			caEvent->SendEvent(rec_c, caData);
 			return;
 		}
 
@@ -313,11 +356,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Creating new tunnel cert file at '" + certPath + "'."
 		};
 		unique_ptr<Event> ntEvent = make_unique<Event>();
-		ntEvent->SendEvent(EventType::event_print_message, ntData);
+		ntEvent->SendEvent(rec_c, ntData);
 
 		string currentPath = current_path().string();
 		wstring wParentFolderPath(currentPath.begin(), currentPath.end());
@@ -334,11 +378,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 2,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command
 		};
 		unique_ptr<Event> ccEvent = make_unique<Event>();
-		ccEvent->SendEvent(EventType::event_print_message, ccData);
+		ccEvent->SendEvent(rec_c, ccData);
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
@@ -355,14 +400,18 @@ namespace KalaKit::DNS
 			&pi                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			string cpMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create process for creating cert for tunnel '" + tunnelName + "'!";
+			PopupData cpData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create process for creating cert for tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> cpEvent = make_unique<Event>();
-			cpEvent->SendEvent(EventType::event_popup_error, cpMessage);
+			cpEvent->SendEvent(rec_p, cpData);
 			return;
 		}
 
@@ -374,35 +423,41 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Launched browser to authorize with CloudFlare. PID: " + to_string(pi.dwProcessId)
 		};
 		unique_ptr<Event> lbEvent = make_unique<Event>();
-		lbEvent->SendEvent(EventType::event_print_message, lbData);
+		lbEvent->SendEvent(rec_c, lbData);
 
 		CloseHandle(pi.hProcess);
 
 		if (!exists(certPath))
 		{
-			string cfMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create tunnel cert file for tunnel '" + tunnelName + "' in '" + cloudFlareFolder + "'!";
+			PopupData cfData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create tunnel cert file for tunnel '" + tunnelName + "' in '" + cloudFlareFolder + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> cfEvent = make_unique<Event>();
-			cfEvent->SendEvent(EventType::event_popup_error, cfMessage);
+			cfEvent->SendEvent(rec_p, cfData);
 		}
 		
 		PrintData ncData =
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Sucessfully created new cloudflared cert file for tunnel '" + tunnelName + "'."
 		};
 		unique_ptr<Event> ncEvent = make_unique<Event>();
-		ncEvent->SendEvent(EventType::event_print_message, ncData);
+		ncEvent->SendEvent(rec_c, ncData);
 	}
 
 	void CloudFlare::CreateTunnelCredentials()
@@ -416,11 +471,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared credentials json file for tunnel '" + tunnelName + "' already exists at '" + tunnelIDFilePath + "'. Skipping creation."
 			};
 			unique_ptr<Event> cjEvent = make_unique<Event>();
-			cjEvent->SendEvent(EventType::event_print_message, cjData);
+			cjEvent->SendEvent(rec_c, cjData);
 			return;
 		}
 		
@@ -443,11 +499,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 2,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command1
 		};
 		unique_ptr<Event> c1Event = make_unique<Event>();
-		c1Event->SendEvent(EventType::event_print_message, c1Data);
+		c1Event->SendEvent(rec_c, c1Data);
 
 		wstring wideCommand1(command1.begin(), command1.end());
 		if (!CreateProcessW
@@ -464,14 +521,18 @@ namespace KalaKit::DNS
 			&pi1                       //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			string dtMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create process for deleting tunnel '" + tunnelName + "'!";
+			PopupData dtData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create process for deleting tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> dtEvent = make_unique<Event>();
-			dtEvent->SendEvent(EventType::event_popup_error, dtMessage);
+			dtEvent->SendEvent(rec_p, dtData);
 			return;
 		}
 
@@ -496,11 +557,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 2,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command2
 		};
 		unique_ptr<Event> c2Event = make_unique<Event>();
-		c2Event->SendEvent(EventType::event_print_message, c2Data);
+		c2Event->SendEvent(rec_c, c2Data);
 
 		wstring wideCommand2(command2.begin(), command2.end());
 		if (!CreateProcessW
@@ -517,14 +579,18 @@ namespace KalaKit::DNS
 			&pi2                       //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			string ctMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create process for creating tunnel '" + tunnelName + "'!";
+			PopupData ctData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create process for creating tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> ctEvent = make_unique<Event>();
-			ctEvent->SendEvent(EventType::event_popup_error, ctMessage);
+			ctEvent->SendEvent(rec_p, ctData);
 			return;
 		}
 
@@ -541,14 +607,18 @@ namespace KalaKit::DNS
 			&& path(tunnelIDFilePath).extension().string() == ".json"
 			&& !exists(tunnelIDFilePath))
 		{
-			string cjMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create tunnel credentials json file for tunnel '" + tunnelName + "' at '" + tunnelIDFilePath + "'!";
+			PopupData cjData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create tunnel credentials json file for tunnel '" + tunnelName + "' at '" + tunnelIDFilePath + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> cjEvent = make_unique<Event>();
-			cjEvent->SendEvent(EventType::event_popup_error, cjMessage);
+			cjEvent->SendEvent(rec_p, cjData);
 			return;
 		}
 		
@@ -556,20 +626,27 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Created new cloudflared credentials json file for tunnel '" + tunnelName + "'."
 		};
 		unique_ptr<Event> jfEvent = make_unique<Event>();
-		jfEvent->SendEvent(EventType::event_print_message, jfData);
+		jfEvent->SendEvent(rec_c, jfData);
 			
-		string bcMessage =
-			"Before continuing to route DNS, you must manually insert the tunnel ID into config.yml.\n\n"
-			"Please update the following fields:\n"
-			"  tunnel: <insert tunnel ID here>\n"
-			"  credentials-file: <insert full path to .json file>\n\n"
-			"Press OK to continue once you've updated config.yml. If the tunnel ID is incorrect, DNS routing will fail and 'cloudflared tunnel run' will not work.";
+		PopupData bcData =
+		{
+			.message =
+				"Before continuing to route DNS, you must manually insert the tunnel ID into config.yml.\n\n"
+				"Please update the following fields:\n"
+				"  tunnel: <insert tunnel ID here>\n"
+				"  credentials-file: <insert full path to .json file>\n\n"
+				""
+				"  Make sure to also update the DNS name for your tunnel ID in cloudflare if have already done this procedure before!"
+				"Press OK to continue once you've updated config.yml. If the tunnel ID is incorrect, DNS routing will fail and 'cloudflared tunnel run' will not work.",
+			.severity = sev_w
+		};
 		unique_ptr<Event> bcEvent = make_unique<Event>();
-		bcEvent->SendEvent(EventType::event_popup_warning, bcMessage);
+		bcEvent->SendEvent(rec_p, bcData);
 			
 		RouteTunnel();
 	}
@@ -595,11 +672,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 2,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command1
 		};
 		unique_ptr<Event> c1Event = make_unique<Event>();
-		c1Event->SendEvent(EventType::event_print_message, c1Data);
+		c1Event->SendEvent(rec_c, c1Data);
 
 		wstring wideCommand1(command1.begin(), command1.end());
 		if (!CreateProcessW
@@ -616,14 +694,18 @@ namespace KalaKit::DNS
 			&p1                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			string rdMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create process for routing dns for tunnel '" + tunnelName + "'!";
+			PopupData rdData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create process for routing dns for tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> rdEvent = make_unique<Event>();
-			rdEvent->SendEvent(EventType::event_popup_error, rdMessage);
+			rdEvent->SendEvent(rec_p, rdData);
 			return;
 		}
 
@@ -648,11 +730,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 2,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command2
 		};
 		unique_ptr<Event> c2Event = make_unique<Event>();
-		c2Event->SendEvent(EventType::event_print_message, c2Data);
+		c2Event->SendEvent(rec_c, c2Data);
 
 		wstring wideCommand2(command2.begin(), command2.end());
 		if (!CreateProcessW
@@ -669,14 +752,18 @@ namespace KalaKit::DNS
 			&pi2                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			string rdMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create process for routing dns for tunnel '" + tunnelName + "'!";
+			PopupData rdData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create process for routing dns for tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> rdEvent = make_unique<Event>();
-			rdEvent->SendEvent(EventType::event_popup_error, rdMessage);
+			rdEvent->SendEvent(rec_p, rdData);
 			return;
 		}
 
@@ -689,11 +776,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Successfully routed cloudflared dns for tunnel '" + tunnelName + "'."
 		};
 		unique_ptr<Event> rcEvent = make_unique<Event>();
-		rcEvent->SendEvent(EventType::event_print_message, rcData);
+		rcEvent->SendEvent(rec_c, rcData);
 	}
 
 	void CloudFlare::RunTunnel()
@@ -715,14 +803,18 @@ namespace KalaKit::DNS
 			&sa,
 			0))
 		{
-			string rwMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create read/write pipe for tunnel '" + tunnelName + "'!";
+			PopupData rdData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to create read/write pipe for tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> rwEvent = make_unique<Event>();
-			rwEvent->SendEvent(EventType::event_popup_error, rwMessage);
+			rwEvent->SendEvent(rec_p, rdData);
 			return;
 		}
 		if (!SetHandleInformation(
@@ -730,14 +822,18 @@ namespace KalaKit::DNS
 			HANDLE_FLAG_INHERIT,
 			0))
 		{
-			string phMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to set up pipe handle inheritance for tunnel '" + tunnelName + "'!";
+			PopupData phData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+					"Failed to set up pipe handle inheritance for tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> phEvent = make_unique<Event>();
-			phEvent->SendEvent(EventType::event_popup_error, phMessage);
+			phEvent->SendEvent(rec_p, phData);
 			return;
 		}
 
@@ -771,11 +867,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
 			.message = command
 		};
 		unique_ptr<Event> ccEvent = make_unique<Event>();
-		ccEvent->SendEvent(EventType::event_print_message, ccData);
+		ccEvent->SendEvent(rec_c, ccData);
 
 		wstring wideCommand(command.begin(), command.end());
 		if (!CreateProcessW
@@ -792,14 +889,18 @@ namespace KalaKit::DNS
 			&pi                        //pointer to PROCESS_INFORMATION structure
 		))
 		{
-			string rtMessage =
-				"Failed to set up cloudflared!"
-				"\n\n"
-				"Reason:"
-				"\n"
-				"Failed to create process for running tunnel '" + tunnelName + "'!";
+			PopupData rtData =
+			{
+				.message =
+					"Failed to set up cloudflared!"
+					"\n\n"
+					"Reason:"
+					"\n"
+				"Failed to create process for running tunnel '" + tunnelName + "'!",
+				.severity = sev_e
+			};
 			unique_ptr<Event> rtEvent = make_unique<Event>();
-			rtEvent->SendEvent(EventType::event_popup_error, rtMessage);
+			rtEvent->SendEvent(rec_p, rtData);
 			return;
 		}
 
@@ -812,11 +913,12 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Running cloudflared tunnel."
 		};
 		unique_ptr<Event> rcEvent = make_unique<Event>();
-		rcEvent->SendEvent(EventType::event_print_message, rcData);
+		rcEvent->SendEvent(rec_c, rcData);
 
 		void* convertedHandle = reinterpret_cast<void*>(hReadPipe);
 		PipeCloudflareMessages(convertedHandle);
@@ -832,11 +934,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
 				.message = "Piping cloudflare messages to internal console."
 			};
 			unique_ptr<Event> pcEvent = make_unique<Event>();
-			pcEvent->SendEvent(EventType::event_print_message, pcData);
+			pcEvent->SendEvent(rec_c, pcData);
 
 			char buffer[2048]{};
 			DWORD bytesRead = 0;
@@ -870,11 +973,12 @@ namespace KalaKit::DNS
 							{
 								.indentationLength = 0,
 								.addTimeStamp = true,
+								.severity = sev_w,
 								.customTag = "CLOUDFLARE",
 								.message = "Connection '" + to_string(index) + "' has been marked healthy!"
 							};
 							unique_ptr<Event> chEvent = make_unique<Event>();
-							chEvent->SendEvent(EventType::event_print_warning, chData);
+							chEvent->SendEvent(rec_p, chData);
 						}
 
 						if (isConn0Healthy
@@ -902,13 +1006,14 @@ namespace KalaKit::DNS
 						{
 							.indentationLength = 0,
 							.addTimeStamp = true,
+							.severity = sev_w,
 							.customTag = "CLOUDFLARE",
 							.message = 
 								"Connection '" + to_string(index) + "' has been marked unhealthy."
 								"Cloudflare could not maintain a tunnel through it."
 						};
 						unique_ptr<Event> ccEvent = make_unique<Event>();
-						ccEvent->SendEvent(EventType::event_print_message, ccData);
+						ccEvent->SendEvent(rec_c, ccData);
 					}
 
 					//strip cloudflare timestamp
@@ -920,21 +1025,22 @@ namespace KalaKit::DNS
 						{
 							.indentationLength = 0,
 							.addTimeStamp = true,
+							.severity = sev_m,
 							.customTag = "CLOUDFLARE_LOG",
 							.message = line
 						};
 						unique_ptr<Event> clEvent = make_unique<Event>();
-						clEvent->SendEvent(EventType::event_print_message, clData);
+						clEvent->SendEvent(rec_c, clData);
 						continue;
 					}
 
 					//extract message type
 
 					string typeStr = line.substr(21, 3);
-					EventType type = EventType::event_print_message;
-					if (typeStr == "ERR") type = EventType::event_print_error;
-					else if (typeStr == "WRN") type = EventType::event_print_warning;
-					else if (typeStr == "DBG") type = EventType::event_print_debug;
+					EventType type = sev_m;
+					if (typeStr == "ERR") type = sev_e;
+					else if (typeStr == "WRN") type = sev_w;
+					else if (typeStr == "DBG") type = sev_d;
 
 					//extract rest of message after message type
 
@@ -944,11 +1050,12 @@ namespace KalaKit::DNS
 					{
 						.indentationLength = 0,
 						.addTimeStamp = true,
+						.severity = sev_m,
 						.customTag = "CLOUDFLARE_LOG",
 						.message = message
 					};
 					unique_ptr<Event> cl2Event = make_unique<Event>();
-					cl2Event->SendEvent(EventType::event_print_message, cl2Data);
+					cl2Event->SendEvent(rec_c, cl2Data);
 				}
 			}
 			CloseHandle(hReadPipe);
@@ -963,11 +1070,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
 				.message = "Cannot shut down cloudflared because it hasn't been started!"
 			};
 			unique_ptr<Event> sdEvent = make_unique<Event>();
-			sdEvent->SendEvent(EventType::event_print_error, sdData);
+			sdEvent->SendEvent(rec_c, sdData);
 			return;
 		}
 
@@ -991,11 +1099,12 @@ namespace KalaKit::DNS
 			{
 				.indentationLength = 0,
 				.addTimeStamp = true,
+				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
 				.message = "Cloudflared was shut down."
 			};
 			unique_ptr<Event> sdEvent = make_unique<Event>();
-			sdEvent->SendEvent(EventType::event_print_message, sdData);
+			sdEvent->SendEvent(rec_c, sdData);
 		}
 		
 		isRunning = false;
@@ -1004,10 +1113,11 @@ namespace KalaKit::DNS
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
 			.message = "Cloudflared was successfully shut down!"
 		};
 		unique_ptr<Event> cwEvent = make_unique<Event>();
-		cwEvent->SendEvent(EventType::event_print_message, cwData);
+		cwEvent->SendEvent(rec_c, cwData);
 	}
 }

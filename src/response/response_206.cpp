@@ -54,7 +54,7 @@ namespace KalaKit::ResponseSystem
 				.message = "206 response file body was empty!"
 			};
 			unique_ptr<Event> rEvent = make_unique<Event>();
-			rEvent->SendEvent(EventType::event_print_message, rData);
+			rEvent->SendEvent(EventType::event_severity_message, rData);
 
 			string newBody =
 				"<html>"

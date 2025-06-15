@@ -10,6 +10,7 @@
 
 #include "core/event.hpp"
 
+using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PrintData;
 
@@ -37,25 +38,22 @@ namespace KalaKit::Core
 			.customTag = "",
 			.message = ""
 		};
-		PrintConsoleMessage(EventType::event_print_message, emptyData);
+		PrintConsoleMessage(EventType::event_severity_message, emptyData);
 	}
 
 	void Event::SendEvent(EventType type, const PrintData& printData)
 	{
-		if (type != EventType::event_print_message
-			&& type != EventType::event_print_debug
-			&& type != EventType::event_print_warning
-			&& type != EventType::event_print_error)
+		if (type != EventType::event_print_console_message)
 		{
 			PrintData pd =
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
 				.customTag = "SERVER",
-				.message = "Invalid event type was assigned to 'print message' event!"
+				.message = "Only event type 'event_print_console_message' is allowed in 'Print to console' event!"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_error, pd);
+			event->SendEvent(EventType::event_severity_error, pd);
 			return;
 		}
 		PrintConsoleMessage(type, printData);
@@ -71,7 +69,7 @@ static void PrintConsoleMessage(EventType eventType, const PrintData& printData)
 	string targetTypeContent{};
 
 #ifndef _DEBUG
-	if (eventType == EventType::event_print_debug) return;
+	if (eventType == EventType::event_severity_debug) return;
 #endif
 
 	if (printData.indentationLength > 0)
@@ -104,13 +102,13 @@ static void PrintConsoleMessage(EventType eventType, const PrintData& printData)
 
 	switch (eventType)
 	{
-	case EventType::event_print_error:
+	case EventType::event_severity_error:
 		targetTypeContent = "[ERROR] ";
 		break;
-	case EventType::event_print_warning:
+	case EventType::event_severity_warning:
 		targetTypeContent = "[WARNING] ";
 		break;
-	case EventType::event_print_debug:
+	case EventType::event_severity_debug:
 		targetTypeContent = "[DEBUG] ";
 		break;
 	}
