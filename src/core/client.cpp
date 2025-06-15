@@ -346,9 +346,19 @@ namespace KalaKit::Core
 			ciEvent->SendEvent(rec_c, ciData);
 			clientIP = "host";
 
-			//always update routes and their access levels if host joins any route
-			Server::server->canUpdateWhitelistedRoutes = true;
-			Server::server->canUpdateRouteAccess = true;
+			//always update available data when host joins homepage
+			if (cleanRoute == "/")
+			{
+				Server::server->canUpdateWhitelistedRoutes = true;
+				Server::server->canUpdateRouteAccess = true;
+				Server::server->canUpdateWhitelistedIPs = true;
+				Server::server->canUpdateBannedIPs = true;
+
+				Server::server->GetWhitelistedRoutes();
+				Server::server->SetRouteAccessLevels();
+				Server::server->GetFileData(DataFileType::datafile_whitelistedIP);
+				Server::server->GetFileData(DataFileType::datafile_bannedIP);
+			}
 		}
 
 		pair<string, string> whitelistedClient = Server::server->IsWhitelistedClient(clientIP);

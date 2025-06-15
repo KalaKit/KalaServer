@@ -22,31 +22,6 @@ using std::string;
 using std::find;
 using std::pair;
 
-//Looks for one of the target data parameters to replace it with the ip, reason and target email to send an email to for ban lift appeal.
-static string ReplaceData(const string& body, const string& placeholder, const string& replacement)
-{
-	string result = body;
-	size_t pos = result.find(placeholder);
-	if (pos == string::npos)
-	{
-		PrintData oData = 
-		{
-			.indentationLength = 2,
-			.addTimeStamp = false,
-			.severity = EventType::event_severity_error,
-			.customTag = "RESPONSE",
-			.message = "Placeholder '" + placeholder + "' not found in 418 page!"
-		};
-		unique_ptr<Event> oEvent = make_unique<Event>();
-		oEvent->SendEvent(EventType::event_print_console_message, oData);
-
-		return result;
-	}
-
-	result.replace(pos, placeholder.length(), replacement);
-	return result;
-}
-
 namespace KalaKit::ResponseSystem
 {
 	void Response_418::Init(
@@ -91,34 +66,6 @@ namespace KalaKit::ResponseSystem
 				"	</body>"
 				"</html>";
 			body = vector(newBody.begin(), newBody.end());
-		}
-		else if (!body.empty()
-				 && contentType == "text/html")
-		{
-			//convert binary to string to adjust data parameterss
-			string html(body.begin(), body.end());
-
-			//replace HTML-safe placeholders
-
-			html = ReplaceData(html, "REPLACEME_IP", clientIP);
-
-			string reason{};
-			vector<pair<string, string>> bannedIPs = Server::server->bannedIPs;
-			for (const auto& target : bannedIPs)
-			{
-				if (target.first == clientIP)
-				{
-					reason = target.second;
-					break;
-				}
-			}
-			if (reason.empty()) reason = route;
-
-			html = ReplaceData(html, "REPLACEME_REASON", reason);
-			html = ReplaceData(html, "REPLACEME_EMAIL", Server::server->emailSenderData.username);
-
-			//convert back to binary for sending
-			body = vector<char>(html.begin(), html.end());
 		}
 
 		Send(

@@ -72,10 +72,6 @@ namespace KalaKit::Core
 	//Routes only admins and host can access
 	vector<string> adminRoutes{};
 
-	atomic<bool> canUpdateWhitelistedIPs{ true };
-
-	atomic<bool> canUpdateBannedIPs{ true };
-
 	atomic<bool> canUpdateMachineIPs{ true };
 	//All host IPs to check which one host currently uses
 	//to confirm if IP really belongs to host or not
@@ -365,11 +361,11 @@ namespace KalaKit::Core
 
 		if (bannedIPs.size() == 0)
 		{
-			canUpdateBannedIPs = true;
+			server->canUpdateBannedIPs = true;
 			server->GetBannedIPs();
 		}
 
-		if (canUpdateBannedIPs) server->GetBannedIPs();
+		if (server->canUpdateBannedIPs) server->GetBannedIPs();
 
 		for (const pair<string, string>& bannedClient : bannedIPs)
 		{
@@ -1182,7 +1178,7 @@ namespace KalaKit::Core
 		{
 			while (KalaServer::isRunning)
 			{
-				if (!canUpdateWhitelistedIPs) canUpdateWhitelistedIPs = true;
+				if (!server->canUpdateWhitelistedIPs) server->canUpdateWhitelistedIPs = true;
 
 				sleep_for(seconds(60));
 			}
@@ -1192,7 +1188,7 @@ namespace KalaKit::Core
 		{
 			while (KalaServer::isRunning)
 			{
-				if (!canUpdateBannedIPs) canUpdateBannedIPs = true;
+				if (!server->canUpdateBannedIPs) server->canUpdateBannedIPs = true;
 
 				sleep_for(seconds(60));
 			}
@@ -1411,11 +1407,11 @@ namespace KalaKit::Core
 
 		if (whitelistedIPs.size() == 0)
 		{
-			canUpdateWhitelistedIPs = true;
+			server->canUpdateWhitelistedIPs = true;
 			server->GetWhitelistedIPs();
 		}
 
-		if (canUpdateWhitelistedIPs) server->GetWhitelistedIPs();
+		if (server->canUpdateWhitelistedIPs) server->GetWhitelistedIPs();
 
 		for (const pair<string, string>& whitelistedClient : whitelistedIPs)
 		{

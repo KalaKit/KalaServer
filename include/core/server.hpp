@@ -106,6 +106,8 @@ namespace KalaKit::Core
 
 		HealthPingData healthPingData;
 
+		atomic<bool> canUpdateWhitelistedIPs{ true };
+		atomic<bool> canUpdateBannedIPs{ true };
 		atomic<bool> canUpdateWhitelistedRoutes{ true };
 		atomic<bool> canUpdateRouteAccess{ true };
 
@@ -245,6 +247,8 @@ namespace KalaKit::Core
 
 		void GetFileData(DataFileType dataFileType) const;
 		void GetWhitelistedRoutes() const;
+		//Assign route access level dynamically based off of registered and admin route vectors.
+		void SetRouteAccessLevels();
 
 		/// <summary>
 		/// Closes the server. Use Core::Quit instead of this.
@@ -267,11 +271,6 @@ namespace KalaKit::Core
 		/// Reads 'whitelisted-ips.txt' and stores all IPs and reasons in whitelistedIPs pair.
 		/// </summary>
 		void GetWhitelistedIPs();
-
-		/// <summary>
-		/// Assign route access level dynamically based off of registered and admin route vectors.
-		/// </summary>
-		void SetRouteAccessLevels();
 
 		bool isServerReady = false; //Used to check if server is ready to start.
 
