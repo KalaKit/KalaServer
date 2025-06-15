@@ -73,12 +73,8 @@ namespace KalaKit::Core
 	vector<string> adminRoutes{};
 
 	atomic<bool> canUpdateWhitelistedIPs{ true };
-	//All IPs that will always bypass ban filter
-	vector<pair<string, string>> whitelistedIPs{};
 
 	atomic<bool> canUpdateBannedIPs{ true };
-	//All IPs banned permanently from server unless manually removed
-	vector<pair<string, string>> bannedIPs{};
 
 	atomic<bool> canUpdateMachineIPs{ true };
 	//All host IPs to check which one host currently uses
@@ -438,7 +434,7 @@ namespace KalaKit::Core
 		}
 
 		writeFile << target.first << " | " << target.second << "\n";
-		bannedIPs.push_back(target);
+		server->bannedIPs.push_back(target);
 
 		writeFile.close();
 
@@ -550,7 +546,7 @@ namespace KalaKit::Core
 			break;
 		case DataFileType::datafile_whitelistedIP:
 			resultType = "whitelisted IPs";
-			whitelistedIPs.clear();
+			server->whitelistedIPs.clear();
 			filePath = server->dataFile.whitelistedIPsFile;
 			fullFilePath = path(current_path() / server->dataFile.whitelistedIPsFile).string();
 			break;
@@ -577,7 +573,7 @@ namespace KalaKit::Core
 			return;
 		}
 
-		if (dataFileType == DataFileType::datafile_bannedIP) bannedIPs.clear();
+		if (dataFileType == DataFileType::datafile_bannedIP) server->bannedIPs.clear();
 
 		ifstream file(fullFilePath);
 		if (!file)
@@ -654,13 +650,13 @@ namespace KalaKit::Core
 		case DataFileType::datafile_whitelistedIP:
 			for (const pair<string, string> resultValue : result)
 			{
-				whitelistedIPs.push_back(resultValue);
+				server->whitelistedIPs.push_back(resultValue);
 			}
 			break;
 		case DataFileType::datafile_bannedIP:
 			for (const pair<string, string> resultValue : result)
 			{
-				bannedIPs.push_back(resultValue);
+				server->bannedIPs.push_back(resultValue);
 			}
 			break;
 		case DataFileType::datafile_blacklistedKeyword:

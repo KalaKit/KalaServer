@@ -37,13 +37,13 @@ static void PrintType(EventType type, const string& msg)
 	unique_ptr<Event> event = make_unique<Event>();
 	event->SendEvent(EventType::event_print_console_message, pd);
 };
-static bool IsStringEmpty(const string& paramName, const string& paramValue)
+static bool IsStringEmpty(const string& paramName, const string& paramValue, const string& body)
 {
 	if (paramValue.empty())
 	{
 		PrintType(
 			EventType::event_severity_error,
-			"Parameter '" + paramName + "' is not allowed to be empty for 'Send email' event!");
+			"Parameter '" + paramName + "' is not allowed to be empty for 'Send email' event!\nOrigin was '" + body + "'");
 		return true;
 	}
 	return false;
@@ -57,19 +57,19 @@ namespace KalaKit::Core
 		{
 			PrintType(
 				EventType::event_severity_error,
-				"Only event type 'event_send_email' is allowed in 'Send email' event!");
+				"Only event type 'event_send_email' is allowed in 'Send email' event!\nOrigin was '" + emailData.body + "'");
 			return;
 		}
 
-		if (IsStringEmpty("smtpServer", emailData.smtpServer)) return;
-		if (IsStringEmpty("username", emailData.username)) return;
-		if (IsStringEmpty("password", emailData.password)) return;
-		if (IsStringEmpty("sender", emailData.sender)) return;
+		if (IsStringEmpty("smtpServer", emailData.smtpServer, emailData.body)) return;
+		if (IsStringEmpty("username", emailData.username, emailData.body)) return;
+		if (IsStringEmpty("password", emailData.password, emailData.body)) return;
+		if (IsStringEmpty("sender", emailData.sender, emailData.body)) return;
 		if (emailData.receivers_email.empty())
 		{
 			PrintType(
 				EventType::event_severity_error,
-				"Parameter 'receivers_email' is not allowed to be empty for 'Send email' event!");
+				"Parameter 'receivers_email' is not allowed to be empty for 'Send email' event!\nOrigin was '" + emailData.body + "'");
 			return;
 		}
 

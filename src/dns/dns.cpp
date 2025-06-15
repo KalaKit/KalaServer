@@ -43,7 +43,7 @@ namespace KalaKit::DNS
 		{
 			PrintData initData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CUSTOM_DNS",
@@ -58,7 +58,7 @@ namespace KalaKit::DNS
 		{
 			PrintData init2Data =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CUSTOM_DNS",
@@ -111,7 +111,7 @@ namespace KalaKit::DNS
 		{
 			PrintData sdData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CUSTOM_DNS",

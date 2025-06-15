@@ -15,6 +15,7 @@ using KalaKit::KalaCrash::Crash;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PopupData;
+using KalaKit::Core::PrintData;
 using KalaKit::Core::Server;
 
 using std::string;
@@ -23,51 +24,43 @@ using std::make_unique;
 
 static void CreatePopup(EventType type, const PopupData& popupData);
 
+static void PrintType(EventType type, const string& msg)
+{
+	PrintData pd = {
+		.indentationLength = 2,
+		.addTimeStamp = true,
+		.severity = type,
+		.customTag = "CREATE_POPUP",
+		.message = msg
+	};
+	unique_ptr<Event> event = make_unique<Event>();
+	event->SendEvent(EventType::event_print_console_message, pd);
+};
+
 namespace KalaKit::Core
 {
 	void Event::SendEvent(EventType type, const PopupData& popupData)
 	{
 		if (type != EventType::event_print_console_message)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "Only event type 'event_print_console_message' is allowed in 'Create popup' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"Only event type 'event_print_console_message' is allowed in 'Create popup' event!\nOrigin was '" + popupData.message + "'");
 			return;
 		}
 		if (popupData.severity == EventType::event_none)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "No severity type was passed to 'Create popup' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"No severity type was passed to 'Create popup' event!\nOrigin was '" + popupData.message + "'");
 			return;
 		}
 		if (popupData.severity != EventType::event_severity_warning
 			&& popupData.severity != EventType::event_severity_error)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "Invalid severity type was passed to 'Create popup' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"Invalid severity type was passed to 'Create popup' event!\nOrigin was '" + popupData.message + "'");
 			return;
 		}
 		CreatePopup(type, popupData);

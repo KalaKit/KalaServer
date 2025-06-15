@@ -112,6 +112,12 @@ namespace KalaKit::Core
 		mutex clientSocketsMutex;
 		unordered_set<uintptr_t> activeClientSockets;
 
+		//All IPs that will always bypass ban filter
+		vector<pair<string, string>> whitelistedIPs{};
+
+		//All IPs banned permanently from server unless manually removed
+		vector<pair<string, string>> bannedIPs{};
+
 		//All keywords that trigger a ban
 		vector<string> blacklistedKeywords{};
 

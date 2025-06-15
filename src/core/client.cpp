@@ -316,7 +316,7 @@ namespace KalaKit::Core
 
 			PrintData frData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CLIENT",
@@ -396,8 +396,6 @@ namespace KalaKit::Core
 				};
 				unique_ptr<Event> buEvent = make_unique<Event>();
 				buEvent->SendEvent(rec_c, buData);
-
-				sleep_for(seconds(30));
 
 				vector<EventType> ev = Server::server->emailSenderData.events;
 				EventType e = EventType::event_already_banned_client_connected;

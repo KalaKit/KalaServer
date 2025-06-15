@@ -27,13 +27,26 @@ using std::make_unique;
 
 static void PrintConsoleMessage(EventType eventType, const PrintData& printData);
 
+static void PrintType(EventType type, const string& msg)
+{
+	PrintData pd = {
+		.indentationLength = 2,
+		.addTimeStamp = true,
+		.severity = type,
+		.customTag = "CONSOLE_MESSAGE",
+		.message = msg
+	};
+	unique_ptr<Event> event = make_unique<Event>();
+	event->SendEvent(EventType::event_print_console_message, pd);
+};
+
 namespace KalaKit::Core
 {
 	void Event::PrintNewLine()
 	{
 		PrintData emptyData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 2,
 			.addTimeStamp = false,
 			.severity = EventType::event_severity_error,
 			.customTag = "",
@@ -46,30 +59,16 @@ namespace KalaKit::Core
 	{
 		if (type != EventType::event_print_console_message)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "Only event type 'event_print_console_message' is allowed in 'Print to console' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"Only event type 'event_print_console_message' is allowed in 'Print to console' event!\nOrigin was '" + printData.message + "'");
 			return;
 		}
 		if (printData.severity == EventType::event_none)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "No severity type was passed to 'Print to console' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"No severity type was passed to 'Print to console' event!\nOrigin was '" + printData.message + "'");
 			return;
 		}
 		if (printData.severity != EventType::event_severity_message
@@ -77,16 +76,9 @@ namespace KalaKit::Core
 			&& printData.severity != EventType::event_severity_warning
 			&& printData.severity != EventType::event_severity_error)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "Invalid severity type was passed to 'Print to console' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"Invalid severity type was passed to 'Print to console' event!\nOrigin was '" + printData.message + "'");
 			return;
 		}
 		PrintConsoleMessage(type, printData);
@@ -133,7 +125,7 @@ static void PrintConsoleMessage(EventType eventType, const PrintData& printData)
 
 	if (printData.customTag != "") customTagContent = "[" + printData.customTag + "] ";
 
-	switch (eventType)
+	switch (printData.severity)
 	{
 	case EventType::event_severity_error:
 		targetTypeContent = "[ERROR] ";
@@ -149,8 +141,8 @@ static void PrintConsoleMessage(EventType eventType, const PrintData& printData)
 	result =
 		indentationContent
 		+ timeStampContent
-		+ customTagContent
 		+ targetTypeContent
+		+ customTagContent
 		+ printData.message;
 
 	cout << result + "\n";

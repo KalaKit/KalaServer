@@ -67,7 +67,7 @@ namespace KalaKit::DNS
 		{
 			PrintData csData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
@@ -82,7 +82,7 @@ namespace KalaKit::DNS
 		{
 			PrintData ciData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
@@ -896,7 +896,7 @@ namespace KalaKit::DNS
 					"\n\n"
 					"Reason:"
 					"\n"
-				"Failed to create process for running tunnel '" + tunnelName + "'!",
+					"Failed to create process for running tunnel '" + tunnelName + "'!",
 				.severity = sev_e
 			};
 			unique_ptr<Event> rtEvent = make_unique<Event>();
@@ -1050,7 +1050,7 @@ namespace KalaKit::DNS
 					{
 						.indentationLength = 0,
 						.addTimeStamp = true,
-						.severity = sev_m,
+						.severity = type,
 						.customTag = "CLOUDFLARE_LOG",
 						.message = message
 					};
@@ -1068,7 +1068,7 @@ namespace KalaKit::DNS
 		{
 			PrintData sdData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
