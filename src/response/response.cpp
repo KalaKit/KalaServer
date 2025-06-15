@@ -69,6 +69,7 @@ namespace KalaKit::ResponseSystem
 		{
 			.indentationLength = 0,
 			.addTimeStamp = false,
+			.severity = EventType::event_severity_message,
 			.customTag = "RESPONSE",
 			.message =
 				"[" + to_string(clientSocket) + " - '" + clientIP + "']"

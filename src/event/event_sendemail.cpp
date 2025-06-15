@@ -25,43 +25,60 @@ using std::string;
 
 static void SendEmail(const EmailData& emailData);
 
+static void PrintType(EventType type, const string& msg)
+{
+	PrintData pd = {
+		.indentationLength = 2,
+		.addTimeStamp = true,
+		.severity = type,
+		.customTag = "SEND_EMAIL",
+		.message = msg
+	};
+	unique_ptr<Event> event = make_unique<Event>();
+	event->SendEvent(EventType::event_print_console_message, pd);
+};
+static bool IsStringEmpty(const string& paramName, const string& paramValue)
+{
+	if (paramValue.empty())
+	{
+		PrintType(
+			EventType::event_severity_error,
+			"Parameter '" + paramName + "' is not allowed to be empty for 'Send email' event!");
+		return true;
+	}
+	return false;
+}
+
 namespace KalaKit::Core
 {
 	void Event::SendEvent(EventType type, const EmailData& emailData)
 	{
 		if (type != EventType::event_send_email)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "Only event type 'event_send_email' is allowed in 'Send email' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"Only event type 'event_send_email' is allowed in 'Send email' event!");
 			return;
 		}
+
+		if (IsStringEmpty("smtpServer", emailData.smtpServer)) return;
+		if (IsStringEmpty("username", emailData.username)) return;
+		if (IsStringEmpty("password", emailData.password)) return;
+		if (IsStringEmpty("sender", emailData.sender)) return;
+		if (emailData.receivers_email.empty())
+		{
+			PrintType(
+				EventType::event_severity_error,
+				"Parameter 'receivers_email' is not allowed to be empty for 'Send email' event!");
+			return;
+		}
+
 		SendEmail(emailData);
 	}
 }
 
 static void SendEmail(const EmailData& emailData)
 {
-	auto fail = [&](const string& reason)
-	{
-		PrintData emailErrorData =
-		{
-			.indentationLength = 2,
-			.addTimeStamp = true,
-			.customTag = "SEND_EMAIL",
-			.message = reason
-		};
-		unique_ptr<Event> emailErrorEvent = make_unique<Event>();
-		emailErrorEvent->SendEvent(EventType::event_severity_error, emailErrorData);
-	};
-
 	auto base64_encode = [](const string& input) -> string
 	{
 		BIO* bio = BIO_new(BIO_s_mem());
@@ -93,7 +110,7 @@ static void SendEmail(const EmailData& emailData)
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
-		fail("WSAStartup failed!");
+		PrintType(EventType::event_severity_error, "WSAStartup failed!");
 		return;
 	}
 
@@ -103,7 +120,7 @@ static void SendEmail(const EmailData& emailData)
 
 	if (getaddrinfo(emailData.smtpServer.c_str(), "587", &hints, &res) != 0)
 	{
-		fail("Failed to resolve SMTP server!");
+		PrintType(EventType::event_severity_error, "Failed to resolve SMTP server!");
 		WSACleanup();
 		return;
 	}
@@ -111,7 +128,7 @@ static void SendEmail(const EmailData& emailData)
 	SOCKET sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (connect(sock, res->ai_addr, static_cast<int>(res->ai_addrlen)) == SOCKET_ERROR)
 	{
-		fail("Connection to SMTP server failed!");
+		PrintType(EventType::event_severity_error, "Connection to SMTP server failed!");
 		closesocket(sock);
 		WSACleanup();
 		return;
@@ -135,7 +152,7 @@ static void SendEmail(const EmailData& emailData)
 	auto ctx = unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)>(SSL_CTX_new(TLS_client_method()), SSL_CTX_free);
 	if (!ctx)
 	{
-		fail("Failed to create SSL context!");
+		PrintType(EventType::event_severity_error, "Failed to create SSL context!");
 		return;
 	}
 
@@ -143,7 +160,7 @@ static void SendEmail(const EmailData& emailData)
 	SSL_set_fd(ssl, static_cast<int>(sock));
 	if (SSL_connect(ssl) != 1)
 	{
-		fail("SSL handshake failed!");
+		PrintType(EventType::event_severity_error, "SSL handshake failed!");
 		SSL_free(ssl);
 		closesocket(sock);
 		WSACleanup();
@@ -155,7 +172,7 @@ static void SendEmail(const EmailData& emailData)
 	{
 		if (!send_ssl(ssl, cmd) || recv_ssl(ssl).starts_with("5"))
 		{
-			fail("SMTP command failed: " + cmd);
+			PrintType(EventType::event_severity_error, "SMTP command failed: " + cmd);
 			success = false;
 		}
 		return success;
@@ -163,40 +180,40 @@ static void SendEmail(const EmailData& emailData)
 
 	if (!check("EHLO localhost"))
 	{
-		fail("SMTP EHLO command failed!");
+		PrintType(EventType::event_severity_error, "SMTP EHLO command failed!");
 		return;
 	}
 	if (!check("AUTH LOGIN"))
 	{
-		fail("SMTP AUTH LOGIN failed!");
+		PrintType(EventType::event_severity_error, "SMTP AUTH LOGIN failed!");
 		return;
 	}
 	if (!check(base64_encode(emailData.username)))
 	{
-		fail("SMTP username authentication failed!");
+		PrintType(EventType::event_severity_error, "SMTP username authentication failed!");
 		return;
 	}
 	if (!check(base64_encode(emailData.password)))
 	{
-		fail("SMTP password authentication failed!");
+		PrintType(EventType::event_severity_error, "SMTP password authentication failed!");
 		return;
 	}
 	if (!check("MAIL FROM:<" + emailData.sender + ">"))
 	{
-		fail("SMTP MAIL FROM command failed!");
+		PrintType(EventType::event_severity_error, "SMTP MAIL FROM command failed!");
 		return;
 	}
 	for (const auto& r : emailData.receivers_email)
 	{
 		if (!check("RCPT TO:<" + r + ">"))
 		{
-			fail("SMTP RCPT TO failed for: " + r);
+			PrintType(EventType::event_severity_error, "SMTP RCPT TO failed for: " + r);
 			return;
 		}
 	}
 	if (!check("DATA"))
 	{
-		fail("SMTP DATA command failed!");
+		PrintType(EventType::event_severity_error, "SMTP DATA command failed!");
 		return;
 	}
 
@@ -219,13 +236,7 @@ static void SendEmail(const EmailData& emailData)
 	closesocket(sock);
 	WSACleanup();
 
-	PrintData emailSuccessData =
-	{
-		.indentationLength = 0,
-		.addTimeStamp = true,
-		.customTag = "SEND_EMAIL",
-		.message = "Email '" + emailData.subject + "' was successfully sent!"
-	};
-	unique_ptr<Event> emailSuccessEvent = make_unique<Event>();
-	emailSuccessEvent->SendEvent(EventType::event_severity_message, emailSuccessData);
+	PrintType(
+		EventType::event_severity_message,
+		"Email '" + emailData.subject + "' was successfully sent!");
 }

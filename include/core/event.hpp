@@ -81,7 +81,6 @@ namespace KalaKit::Core
 		string password;   //Required for SMTP authentication
 		string sender;     //Who sends the email
 		vector<string> receivers_email; //Every email recipient who receives the email
-		vector<ReceiverPayload> receivers_internal; //Each internal receiver who receives the log about this email
 		string subject;    //The title of the email
 		string body;       //The contents of the email
 	};

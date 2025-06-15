@@ -46,6 +46,7 @@ namespace KalaKit::ResponseSystem
 			{
 				.indentationLength = 0,
 				.addTimeStamp = false,
+				.severity = EventType::event_severity_message,
 				.customTag = "RESPONSE",
 				.message = "404 response file body was empty!"
 			};

@@ -113,6 +113,7 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = false,
+			.severity = sev_m,
 			.customTag = "",
 			.message = 
 				"=============================="
@@ -202,6 +203,7 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "SERVER",
 			.message = "Server is running on port '" + to_string(server->port) + "'."
 		};
@@ -214,6 +216,7 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = false,
+			.severity = sev_m,
 			.customTag = "",
 			.message = 
 				"\n"
@@ -394,6 +397,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVER",
 				.message = "Failed to read 'banned-ips.txt' to ban IP!"
 			};
@@ -424,6 +428,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVER",
 				.message = "Failed to write into 'banned-ips.txt' to ban IP!"
 			};
@@ -517,6 +522,7 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "SERVER",
 			.message = "Refreshed whitelisted routes"
 		};
@@ -580,6 +586,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_m,
 				.customTag = "SERVER",
 				.message = "Failed to open '" + path(filePath).filename().string() + "'!"
 			};
@@ -668,6 +675,7 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "SERVER",
 			.message = "Refreshed " + resultType
 		};
@@ -689,6 +697,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_m,
 				.customTag = "SERVER",
 				.message = "Page path '" + filePath + "' does not exist!."
 			};
@@ -717,8 +726,12 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "SERVER",
-			.message = "\n  Added route '" + route + "'\n  file path   '" + filePath + "'\n  mime type   '" + s_newMimeType + "'!"
+			.message = 
+				"\n  Added route '" + route + 
+				"'\n  file path   '" + filePath +
+				"'\n  mime type   '" + s_newMimeType + "'!"
 		};
 		unique_ptr<Event> arEvent = make_unique<Event>();
 		arEvent->SendEvent(rec_c, arData);
@@ -735,6 +748,7 @@ namespace KalaKit::Core
 		{
 			.indentationLength = 0,
 			.addTimeStamp = true,
+			.severity = sev_m,
 			.customTag = "SERVER",
 			.message = "Added new extension '" + newExtension + "'"
 		};
@@ -813,6 +827,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVE-FILE",
 				.message = "Serve received empty route!"
 			};
@@ -838,6 +853,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVE-FILE",
 				.message = "Route '" + route + "' is not whitelisted!"
 			};
@@ -856,6 +872,7 @@ namespace KalaKit::Core
 				{
 					.indentationLength = 2,
 					.addTimeStamp = true,
+					.severity = sev_e,
 					.customTag = "SERVE-FILE",
 					.message = "Failed to open file '" + fullFilePath.generic_string() + "'!"
 				};
@@ -876,6 +893,7 @@ namespace KalaKit::Core
 				{
 					.indentationLength = 2,
 					.addTimeStamp = true,
+					.severity = sev_e,
 					.customTag = "SERVE-FILE",
 					.message = 
 						"Range start (" + to_string(rangeStart) +
@@ -931,6 +949,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVE-FILE",
 				.message = "Exception while serving route '" + route + "':\n" + e.what()
 			};
@@ -950,6 +969,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVER",
 				.message = "Cannot check for internet access because tunnel name has not been assigned."
 			};
@@ -992,6 +1012,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVER",
 				.message = "Cannot check for tunnel state because tunnel '" + CloudFlare::tunnelName + "' is not running."
 			};
@@ -1008,6 +1029,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVER",
 				.message = "Cannot check for tunnel state because handle for tunnel '" + CloudFlare::tunnelName + "' is invalid."
 			};
@@ -1030,6 +1052,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVER",
 				.message = "Server '" + server->serverName + "' is not ready to start! Do not call this manually."
 			};
@@ -1045,6 +1068,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
+				.severity = sev_e,
 				.customTag = "SERVER",
 				.message = "Neither cloudflared or dns was started! Please run atleast one of them."
 			};
@@ -1059,6 +1083,7 @@ namespace KalaKit::Core
 			{
 				.indentationLength = 0,
 				.addTimeStamp = false,
+				.severity = sev_m,
 				.customTag = "",
 				.message = 
 					"\n"
@@ -1099,6 +1124,7 @@ namespace KalaKit::Core
 					{
 						.indentationLength = 2,
 						.addTimeStamp = true,
+						.severity = sev_e,
 						.customTag = "SERVER",
 						.message = "Accept failed: " + to_string(WSAGetLastError())
 					};
@@ -1137,20 +1163,6 @@ namespace KalaKit::Core
 						.subject = Server::server->serverName + " health status",
 						.body = ""
 					};
-					PrintData printData =
-					{
-						.indentationLength = 2,
-						.addTimeStamp = true,
-						.severity = sev_m,
-						.customTag = "SERVER",
-						.message = ""
-					};
-
-					vector<ReceiverPayload> receivers_internal =
-					{
-						printData
-					};
-					emailData.receivers_internal = receivers_internal;
 					
 					unique_ptr<Event> healthPingEvent = make_unique<Event>();
 					healthPingEvent->SendEvent(EventType::event_send_email, emailData);

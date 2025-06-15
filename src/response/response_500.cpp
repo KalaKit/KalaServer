@@ -48,6 +48,7 @@ namespace KalaKit::ResponseSystem
 			{
 				.indentationLength = 0,
 				.addTimeStamp = false,
+				.severity = EventType::event_severity_message,
 				.customTag = "RESPONSE",
 				.message = "500 response file body was empty!"
 			};

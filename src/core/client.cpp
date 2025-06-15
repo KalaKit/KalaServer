@@ -148,6 +148,7 @@ namespace KalaKit::Core
 				{
 					.indentationLength = 2,
 					.addTimeStamp = true,
+					.severity = sev_e,
 					.customTag = "CLIENT",
 					.message = "Start byte in ParseByeRange is missing for header '" + header + "'!"
 				};

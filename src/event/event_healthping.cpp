@@ -31,23 +31,42 @@ using std::get_if;
 
 static void HealthPing(EventType type, HealthPingData healthPingData);
 
+static void PrintType(EventType type, const string& msg)
+{
+	PrintData pd = {
+		.indentationLength = 2,
+		.addTimeStamp = true,
+		.severity = type,
+		.customTag = "HEALTH_PING",
+		.message = msg
+	};
+	unique_ptr<Event> event = make_unique<Event>();
+	event->SendEvent(EventType::event_print_console_message, pd);
+};
+
 namespace KalaKit::Core
 {
 	void Event::SendEvent(EventType type, HealthPingData healthPingData)
 	{
 		if (type != EventType::event_server_health_ping)
 		{
-			PrintData pd =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = EventType::event_severity_error,
-				.customTag = "SERVER",
-				.message = "Only event type 'event_server_health_ping' is allowed in 'Health ping' event!"
-			};
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, pd);
+			PrintType(
+				EventType::event_severity_error,
+				"Only event type 'event_server_health_ping' is allowed in 'Health ping' event!");
 			return;
+		}
+		if (healthPingData.healthTimer == 0)
+		{
+			PrintType(
+				EventType::event_severity_error,
+				"Health timer must be higher than 0 in 'Health ping' event!");
+			return;
+		}
+		if (healthPingData.healthTimer < 0.5f)
+		{
+			PrintType(
+				EventType::event_severity_warning,
+				"Health timer is extremely low in 'Health ping' event! Please consider setting it as a value of 0.5 or higher.");
 		}
 		HealthPing(type, healthPingData);
 	}
