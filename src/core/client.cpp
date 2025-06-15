@@ -153,7 +153,7 @@ namespace KalaKit::Core
 					.message = "Start byte in ParseByeRange is missing for header '" + header + "'!"
 				};
 				unique_ptr<Event> sbEvent = make_unique<Event>();
-				sbEvent->SendEvent(EventType::event_severity_error, sbData);
+				sbEvent->SendEvent(rec_c, sbData);
 				return;
 			}
 
@@ -174,7 +174,7 @@ namespace KalaKit::Core
 					+ "'!\nReason: " + e.what()
 			};
 			unique_ptr<Event> hbEvent = make_unique<Event>();
-			hbEvent->SendEvent(EventType::event_severity_error, hbData);
+			hbEvent->SendEvent(rec_c, hbData);
 			return;
 		}
 	}
@@ -194,7 +194,7 @@ namespace KalaKit::Core
 			.message = "Socket [" + to_string(socket) + "] entered handle client thread..."
 		};
 		unique_ptr<Event> seEvent = make_unique<Event>();
-		seEvent->SendEvent(EventType::event_severity_debug, seData);
+		seEvent->SendEvent(rec_c, seData);
 
 		SOCKET rawClientSocket = static_cast<SOCKET>(socket);
 		uintptr_t clientSocket = static_cast<uintptr_t>(rawClientSocket);
@@ -233,7 +233,7 @@ namespace KalaKit::Core
 					.message = "Socket [" + to_string(socket) + "] timed out after 5 seconds without sending any data."
 				};
 				unique_ptr<Event> stEvent = make_unique<Event>();
-				stEvent->SendEvent(EventType::event_severity_warning, stData);
+				stEvent->SendEvent(rec_c, stData);
 			}
 			else
 			{
@@ -246,7 +246,7 @@ namespace KalaKit::Core
 					.message = "Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err)
 				};
 				unique_ptr<Event> srEvent = make_unique<Event>();
-				srEvent->SendEvent(EventType::event_severity_warning, srData);
+				srEvent->SendEvent(rec_c, srData);
 			}
 
 			this->SocketCleanup(socket);
@@ -268,7 +268,7 @@ namespace KalaKit::Core
 				.message = "Socket [" + to_string(socket) + "] disconnected without sending any data."
 			};
 			unique_ptr<Event> sdEvent = make_unique<Event>();
-			sdEvent->SendEvent(EventType::event_severity_warning, sdData);
+			sdEvent->SendEvent(rec_c, sdData);
 
 			this->SocketCleanup(socket);
 			closesocket(rawClientSocket);
@@ -287,7 +287,7 @@ namespace KalaKit::Core
 			.message = "Socket [" + to_string(socket) + "] raw HTTP request:\n" + request
 		};
 		unique_ptr<Event> shEvent = make_unique<Event>();
-		shEvent->SendEvent(EventType::event_severity_debug, shData);
+		shEvent->SendEvent(rec_c, shData);
 
 		if (request.starts_with("GET "))
 		{
@@ -328,7 +328,7 @@ namespace KalaKit::Core
 					request
 			};
 			unique_ptr<Event> frEvent = make_unique<Event>();
-			frEvent->SendEvent(EventType::event_severity_warning, frData);
+			frEvent->SendEvent(rec_c, frData);
 		}
 
 		bool isHost = Server::server->IsHost(clientIP);
@@ -343,7 +343,7 @@ namespace KalaKit::Core
 				.message = "Client [" + to_string(socket) + " - '" + clientIP + "'] is server host."
 			};
 			unique_ptr<Event> ciEvent = make_unique<Event>();
-			ciEvent->SendEvent(EventType::event_severity_message, ciData);
+			ciEvent->SendEvent(rec_c, ciData);
 			clientIP = "host";
 
 			//always update routes and their access levels if host joins any route
@@ -375,7 +375,7 @@ namespace KalaKit::Core
 					"====================================================\n"
 			};
 			unique_ptr<Event> wcEvent = make_unique<Event>();
-			wcEvent->SendEvent(EventType::event_severity_message, wcData);
+			wcEvent->SendEvent(rec_c, wcData);
 		}
 		else
 		{
@@ -395,7 +395,7 @@ namespace KalaKit::Core
 						"====================================================\n"
 				};
 				unique_ptr<Event> buEvent = make_unique<Event>();
-				buEvent->SendEvent(EventType::event_severity_message, buData);
+				buEvent->SendEvent(rec_c, buData);
 
 				sleep_for(seconds(30));
 
@@ -448,7 +448,7 @@ namespace KalaKit::Core
 						"====================================================\n"
 				};
 				unique_ptr<Event> bcEvent = make_unique<Event>();
-				bcEvent->SendEvent(EventType::event_severity_message, bcData);
+				bcEvent->SendEvent(rec_c, bcData);
 
 				sleep_for(milliseconds(5));
 
@@ -521,7 +521,7 @@ namespace KalaKit::Core
 						"====================================================\n"
 				};
 				unique_ptr<Event> srEvent = make_unique<Event>();
-				srEvent->SendEvent(EventType::event_severity_message, srData);
+				srEvent->SendEvent(rec_c, srData);
 
 				sleep_for(milliseconds(5));
 
@@ -578,7 +578,7 @@ namespace KalaKit::Core
 			.message = "New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!"
 		};
 		unique_ptr<Event> scEvent = make_unique<Event>();
-		scEvent->SendEvent(EventType::event_severity_message, scData);
+		scEvent->SendEvent(rec_c, scData);
 
 		string body{};
 		string statusLine = "HTTP/1.1 200 OK";
@@ -613,7 +613,7 @@ namespace KalaKit::Core
 					+ cleanRoute + "'!"
 			};
 			unique_ptr<Event> caEvent = make_unique<Event>();
-			caEvent->SendEvent(EventType::event_severity_message, caData);
+			caEvent->SendEvent(rec_c, caData);
 
 			auto resp404 = make_unique<Response_404>();
 			resp404->Init(
@@ -660,7 +660,7 @@ namespace KalaKit::Core
 					+ "' from path '" + foundRoute.route + "'."
 			};
 			unique_ptr<Event> ttEvent = make_unique<Event>();
-			ttEvent->SendEvent(EventType::event_severity_warning, ttData);
+			ttEvent->SendEvent(rec_c, ttData);
 
 			auto resp403 = make_unique<Response_403>();
 			resp403->Init(
@@ -726,7 +726,7 @@ namespace KalaKit::Core
 					+ "' with auth level " + routeAuth + "!"
 			};
 			unique_ptr<Event> alEvent = make_unique<Event>();
-			alEvent->SendEvent(EventType::event_severity_warning, alData);
+			alEvent->SendEvent(rec_c, alData);
 
 			auto resp403 = make_unique<Response_403>();
 			resp403->Init(
@@ -760,7 +760,7 @@ namespace KalaKit::Core
 					"====================================================\n"
 			};
 			unique_ptr<Event> prEvent = make_unique<Event>();
-			prEvent->SendEvent(EventType::event_severity_message, prData);
+			prEvent->SendEvent(rec_c, prData);
 		}
 
 		if ((isClientAdmin
@@ -782,7 +782,7 @@ namespace KalaKit::Core
 					"====================================================\n"
 			};
 			unique_ptr<Event> ccEvent = make_unique<Event>();
-			ccEvent->SendEvent(EventType::event_severity_message, ccData);
+			ccEvent->SendEvent(rec_c, ccData);
 		}
 
 		try
@@ -821,7 +821,7 @@ namespace KalaKit::Core
 						+ cleanRoute + "'."
 				};
 				unique_ptr<Event> abEvent = make_unique<Event>();
-				abEvent->SendEvent(EventType::event_severity_error, abData);
+				abEvent->SendEvent(rec_c, abData);
 
 				auto resp500 = make_unique<Response_500>();
 				resp500->Init(
@@ -892,7 +892,7 @@ namespace KalaKit::Core
 					+ cleanRoute + "'.\nError:\n" + e.what()
 			};
 			unique_ptr<Event> taEvent = make_unique<Event>();
-			taEvent->SendEvent(EventType::event_severity_error, taData);
+			taEvent->SendEvent(rec_c, taData);
 
 			auto resp500 = make_unique<Response_500>();
 			resp500->Init(
