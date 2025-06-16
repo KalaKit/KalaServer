@@ -37,7 +37,7 @@ static void PrintType(EventType type, const string& msg)
 		.indentationLength = 2,
 		.addTimeStamp = true,
 		.severity = type,
-		.customTag = "BAN_CLIENT",
+		.customTag = "BAN-CLIENT",
 		.message = msg
 	};
 	unique_ptr<Event> event = make_unique<Event>();
@@ -156,6 +156,7 @@ static void BanClient(EventType type, BanClientData banClientData)
 	{
 		if (PrintData* data = get_if<PrintData>(&pl))
 		{
+			data->customTag = "BAN-CLIENT";
 			data->message = fullData;
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_print_console_message, *data);
@@ -168,6 +169,10 @@ static void BanClient(EventType type, BanClientData banClientData)
 		}
 		else if (EmailData* data = get_if<EmailData>(&pl))
 		{
+			data->subject =
+				type == EventType::event_already_banned_client_connected
+				? "Already banned client attempted to reconnect"
+				: "Client was banned";
 			data->body = fullData;
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_send_email, *data);

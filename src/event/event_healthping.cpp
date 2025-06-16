@@ -84,6 +84,7 @@ static void HealthPing(EventType type, HealthPingData healthPingData)
 	{
 		if (PrintData* data = get_if<PrintData>(&payload))
 		{
+			data->customTag = "HEALTH-PING";
 			data->message = fullStatus;
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_print_console_message, *data);
@@ -96,6 +97,7 @@ static void HealthPing(EventType type, HealthPingData healthPingData)
 		}
 		else if (EmailData* data = get_if<EmailData>(&payload))
 		{
+			data->subject = "Health ping for " + Server::server->GetServerName();
 			data->body = fullStatus;
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_send_email, *data);
