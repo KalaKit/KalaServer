@@ -61,8 +61,8 @@ namespace KalaKit::ResponseSystem
 			string newBody =
 				"<html>"
 				"	<body>"
-				"		<h1>418 I'm a teapot</h1>"
-				"		<p>Your requests are so obvious and robotic, we decided to ban you with a joke status code.</p>"
+				"		<h1>You've been banned</h1>"
+				"		<p>Users get banned for various reasons like accessing blacklisted routes or exceeding the rate limit.</p>"
 				"	</body>"
 				"</html>";
 			body = vector(newBody.begin(), newBody.end());

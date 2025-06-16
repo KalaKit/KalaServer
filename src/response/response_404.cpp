@@ -56,8 +56,8 @@ namespace KalaKit::ResponseSystem
 			string newBody =
 				"<html>"
 				"	<body>"
-				"		<h1>404 Not Found</h1>"
-				"		<p>The requested resource could not be found.</p>"
+				"		<h1>Invalid page</h1>"
+				"		<p>The page or file you requested does not exist!</p>"
 				"	</body>"
 				"</html>";
 			body = vector(newBody.begin(), newBody.end());

@@ -16,15 +16,15 @@
 #include "core/event.hpp"
 #include "response/response_200.hpp"
 #include "response/response_206.hpp"
+#include "response/response_401.hpp"
 #include "response/response_404.hpp"
-#include "response/response_403.hpp"
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
 
 using KalaKit::ResponseSystem::Response_200;
 using KalaKit::ResponseSystem::Response_206;
+using KalaKit::ResponseSystem::Response_401;
 using KalaKit::ResponseSystem::Response_404;
-using KalaKit::ResponseSystem::Response_403;
 using KalaKit::ResponseSystem::Response_500;
 using KalaKit::ResponseSystem::Response_418;
 
@@ -462,11 +462,8 @@ namespace KalaKit::Core
 
 				vector<EventType> ev = Server::server->emailSenderData.events;
 				EventType e = EventType::event_client_was_banned;
-#pragma warning(push)
-#pragma warning(disable: 26117)
 				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end(); //"Releasing unheld lock" false positive
-#pragma warning(pop)
+					find(ev.begin(), ev.end(), e) != ev.end();
 
 				if (clientWasBannedEvent)
 				{
@@ -535,11 +532,8 @@ namespace KalaKit::Core
 
 				vector<EventType> ev = Server::server->emailSenderData.events;
 				EventType e = EventType::event_client_was_banned;
-#pragma warning(push)
-#pragma warning(disable: 26110)
 				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end(); //"Releasing unheld lock" false positive
-#pragma warning(pop)
+					find(ev.begin(), ev.end(), e) != ev.end();
 
 				if (clientWasBannedEvent)
 				{
@@ -630,10 +624,7 @@ namespace KalaKit::Core
 				cleanRoute,
 				"text/html");
 			this->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 			return;
-#pragma warning(pop)
 		}
 
 		bool extentionExists = false;
@@ -664,23 +655,20 @@ namespace KalaKit::Core
 				.customTag = "CLIENT",
 				.message =
 					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] tried to access forbidden route '" + cleanRoute
+					+ to_string(socket) + " - '" + clientIP + "'] tried to access unauthorized route '" + cleanRoute
 					+ "' from path '" + foundRoute.route + "'."
 			};
 			unique_ptr<Event> ttEvent = make_unique<Event>();
 			ttEvent->SendEvent(rec_c, ttData);
 
-			auto resp403 = make_unique<Response_403>();
-			resp403->Init(
+			auto resp401 = make_unique<Response_401>();
+			resp401->Init(
 				rawClientSocket,
 				clientIP,
 				cleanRoute,
 				"text/html");
 			this->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 			return;
-#pragma warning(pop)
 		}
 
 		//
@@ -736,17 +724,14 @@ namespace KalaKit::Core
 			unique_ptr<Event> alEvent = make_unique<Event>();
 			alEvent->SendEvent(rec_c, alData);
 
-			auto resp403 = make_unique<Response_403>();
-			resp403->Init(
+			auto resp401 = make_unique<Response_401>();
+			resp401->Init(
 				rawClientSocket,
 				clientIP,
 				cleanRoute,
 				"text/html");
 			this->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 			return;
-#pragma warning(pop)
 		}
 
 		if ((isClientRegistered
@@ -838,10 +823,7 @@ namespace KalaKit::Core
 					cleanRoute,
 					"text/html");
 				this->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 				return;
-#pragma warning(pop)
 			}
 			else
 			{
@@ -865,10 +847,7 @@ namespace KalaKit::Core
 						cleanRoute,
 						foundRoute.mimeType);
 					this->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 					return;
-#pragma warning(pop)
 				}
 				else
 				{
@@ -879,10 +858,7 @@ namespace KalaKit::Core
 						cleanRoute,
 						foundRoute.mimeType);
 					this->SocketCleanup(socket);
-#pragma warning(push)
-#pragma warning(disable: 26117) //"Releasing unheld lock" false positive
 					return;
-#pragma warning(pop)
 				}
 			}
 		}

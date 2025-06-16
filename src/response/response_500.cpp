@@ -58,8 +58,8 @@ namespace KalaKit::ResponseSystem
 			string newBody =
 				"<html>"
 				"	<body>"
-				"		<h1>500 Internal Server Error</h1>"
-				"		<p>An unexpected error occurred on the server.</p>"
+				"		<h1>Internal server error</h1>"
+				"		<p>This page or file failed to load! Try again by reloading.</p>"
 				"	</body>"
 				"</html>";
 			body = vector(newBody.begin(), newBody.end());

@@ -978,7 +978,7 @@ namespace KalaKit::DNS
 								.message = "Connection '" + to_string(index) + "' has been marked healthy!"
 							};
 							unique_ptr<Event> chEvent = make_unique<Event>();
-							chEvent->SendEvent(rec_p, chData);
+							chEvent->SendEvent(rec_c, chData);
 						}
 
 						if (isConn0Healthy

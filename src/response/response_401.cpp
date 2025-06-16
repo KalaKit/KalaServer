@@ -5,7 +5,7 @@
 
 #include "core/core.hpp"
 #include "core/server.hpp"
-#include "response/response_403.hpp"
+#include "response/response_401.hpp"
 #include "core/event.hpp"
 
 using KalaKit::Core::Server;
@@ -19,7 +19,7 @@ using std::make_unique;
 
 namespace KalaKit::ResponseSystem
 {
-	void Response_403::Init(
+	void Response_401::Init(
 		uintptr_t targetClientSocket,
 		const string& targetClientIP,
 		const string& targetRoute,
@@ -29,12 +29,12 @@ namespace KalaKit::ResponseSystem
 		string clientIP = targetClientIP;
 		string route = targetRoute;
 		string contentType = targetContentType;
-		string statusLine = "HTTP/1.1 403 Forbidden";
+		string statusLine = "HTTP/1.1 401 Unauthorized";
 
 		size_t totalSize = 0;
 		bool sliced = false;
 		vector<char> body = Server::server->ServeFile(
-			Server::server->errorMessage.error403,
+			Server::server->errorMessage.error401,
 			0,
 			0,
 			totalSize,
@@ -48,7 +48,7 @@ namespace KalaKit::ResponseSystem
 				.addTimeStamp = false,
 				.severity = EventType::event_severity_message,
 				.customTag = "RESPONSE",
-				.message = "403 response file body was empty!"
+				.message = "401 response file body was empty!"
 			};
 			unique_ptr<Event> rEvent = make_unique<Event>();
 			rEvent->SendEvent(EventType::event_print_console_message, rData);
@@ -56,8 +56,8 @@ namespace KalaKit::ResponseSystem
 			string newBody =
 				"<html>"
 				"	<body>"
-				"		<h1>403 Forbidden</h1>"
-				"		<p>You do not have permission to access this resource.</p>"
+				"		<h1>Unauthorized access</h1>"
+				"		<p>You must be logged in to access this page or file!</p>"
 				"	</body>"
 				"</html>";
 			body = vector(newBody.begin(), newBody.end());
