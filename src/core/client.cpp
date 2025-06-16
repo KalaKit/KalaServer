@@ -391,50 +391,28 @@ namespace KalaKit::Core
 		{
 			if (bannedClient.first != "")
 			{
-				PrintData buData =
+				BanClientData abcData =
 				{
-					.indentationLength = 0,
-					.addTimeStamp = false,
-					.severity = sev_m,
-					.customTag = "",
-					.message =
-						"======= BANNED USER REPEATED ACCESS ATTEMPT ========\n"
-						" IP     : " + clientIP + "\n"
-						" Socket : " + to_string(clientSocket) + "\n"
-						" Reason : " + bannedClient.second + "\n"
-						"====================================================\n"
+					.ip = clientIP,
+					.socket = socket,
+					.reason = bannedClient.second,
+					.events = Server::server->banClientData.events
 				};
-				unique_ptr<Event> buEvent = make_unique<Event>();
-				buEvent->SendEvent(rec_c, buData);
+				unique_ptr<Event> abcEvent = make_unique<Event>();
+				bool result = abcEvent->SendEvent(EventType::event_already_banned_client_connected, abcData);
 
-				vector<EventType> ev = Server::server->emailSenderData.events;
-				EventType e = EventType::event_already_banned_client_connected;
-				bool bannedClientReconnectedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end();
-
-				if (bannedClientReconnectedEvent)
+				//fallback for if any parameters are invalid for already banned user,
+				//prevents entire socket hang
+				if (!result)
 				{
-					vector<string> receivers_email = { Server::server->emailSenderData.username };
-					EmailData emailData =
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = Server::server->emailSenderData.username,
-						.password = Server::server->emailSenderData.password,
-						.sender = Server::server->emailSenderData.username,
-						.receivers_email = receivers_email,
-						.subject = "Banned client reconnected",
-						.body = "Already banned client " + clientIP + " tried to reconnect to  '" + cleanRoute + "'!"
-					};
-					unique_ptr<Event> event = make_unique<Event>();
-					event->SendEvent(rec_e, emailData);
+					auto respBanned = make_unique<Response_418>();
+					respBanned->Init(
+						socket,
+						clientIP,
+						bannedClient.second,
+						"text/html");
 				}
 
-				auto respBanned = make_unique<Response_418>();
-				respBanned->Init(
-					rawClientSocket,
-					clientIP,
-					cleanRoute,
-					"text/html");
 				this->SocketCleanup(socket);
 				return;
 			}
@@ -442,55 +420,23 @@ namespace KalaKit::Core
 				&& !Server::server->blacklistedKeywords.empty()
 				&& Server::server->IsBlacklistedRoute(cleanRoute))
 			{
-				PrintData bcData =
+				BanClientData abcData =
 				{
-					.indentationLength = 0,
-					.addTimeStamp = false,
-					.severity = sev_m,
-					.customTag = "",
-					.message =
-						"=============== BANNED CLIENT ======================\n"
-						" IP     : " + clientIP + "\n"
-						" Socket : " + to_string(clientSocket) + "\n"
-						" Reason : " + cleanRoute + "\n"
-						"====================================================\n"
+					.ip = clientIP,
+					.socket = socket,
+					.reason = cleanRoute,
+					.events = Server::server->banClientData.events
 				};
-				unique_ptr<Event> bcEvent = make_unique<Event>();
-				bcEvent->SendEvent(rec_c, bcData);
+				unique_ptr<Event> abcEvent = make_unique<Event>();
+				bool result = abcEvent->SendEvent(EventType::event_client_was_banned_for_blacklisted_route, abcData);
 
-				sleep_for(milliseconds(5));
-
-				vector<EventType> ev = Server::server->emailSenderData.events;
-				EventType e = EventType::event_client_was_banned;
-				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end();
-
-				if (clientWasBannedEvent)
-				{
-					vector<string> receivers_email = { Server::server->emailSenderData.username };
-					EmailData emailData =
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = Server::server->emailSenderData.username,
-						.password = Server::server->emailSenderData.password,
-						.sender = Server::server->emailSenderData.username,
-						.receivers_email = receivers_email,
-						.subject = "Client connected to blacklisted route",
-						.body = "client " + clientIP + " was banned because they tried to access route '" + cleanRoute + "'!"
-					};
-					unique_ptr<Event> event = make_unique<Event>();
-					event->SendEvent(rec_e, emailData);
-				}
-
-				pair<string, string> bannedClient{};
-				bannedClient.first = clientIP;
-				bannedClient.second = cleanRoute;
-
-				if (Server::server->BanClient(bannedClient))
+				//fallback for if any parameters are invalid for banned user,
+				//prevents entire socket hang
+				if (!result)
 				{
 					auto respBanned = make_unique<Response_418>();
 					respBanned->Init(
-						clientSocket,
+						socket,
 						clientIP,
 						cleanRoute,
 						"text/html");
@@ -512,57 +458,25 @@ namespace KalaKit::Core
 			if (count > Server::server->rateLimitTimer)
 			{
 				string reason = "Exceeded allowed connection rate limit of " + to_string(Server::server->rateLimitTimer) + " times per second";
-				PrintData srData =
+				BanClientData abcData =
 				{
-					.indentationLength = 0,
-					.addTimeStamp = false,
-					.severity = sev_m,
-					.customTag = "",
-					.message = 
-						"=============== BANNED CLIENT ======================\n"
-						" IP     : " + clientIP + "\n"
-						" Socket : " + to_string(clientSocket) + "\n"
-						" Reason : " + reason + "\n"
-						"====================================================\n"
+					.ip = clientIP,
+					.socket = socket,
+					.reason = reason,
+					.events = Server::server->banClientData.events
 				};
-				unique_ptr<Event> srEvent = make_unique<Event>();
-				srEvent->SendEvent(rec_c, srData);
+				unique_ptr<Event> abcEvent = make_unique<Event>();
+				bool result = abcEvent->SendEvent(EventType::event_client_was_banned_for_rate_limit, abcData);
 
-				sleep_for(milliseconds(5));
-
-				vector<EventType> ev = Server::server->emailSenderData.events;
-				EventType e = EventType::event_client_was_banned;
-				bool clientWasBannedEvent =
-					find(ev.begin(), ev.end(), e) != ev.end();
-
-				if (clientWasBannedEvent)
-				{
-					vector<string> receivers_email = { Server::server->emailSenderData.username };
-					EmailData emailData =
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = Server::server->emailSenderData.username,
-						.password = Server::server->emailSenderData.password,
-						.sender = Server::server->emailSenderData.username,
-						.receivers_email = receivers_email,
-						.subject = "Client exceeded rate limit in KalaKit website",
-						.body = "client " + clientIP + " was banned because they exceeded the rate limit of '" + to_string(Server::server->rateLimitTimer) + "'!"
-					};
-					unique_ptr<Event> event = make_unique<Event>();
-					event->SendEvent(rec_e, emailData);
-				}
-
-				pair<string, string> bannedClient{};
-				bannedClient.first = clientIP;
-				bannedClient.second = reason;
-
-				if (Server::server->BanClient(bannedClient))
+				//fallback for if any parameters are invalid for banned user,
+				//prevents entire socket hang
+				if (!result)
 				{
 					auto respBanned = make_unique<Response_418>();
 					respBanned->Init(
-						clientSocket,
+						socket,
 						clientIP,
-						cleanRoute,
+						reason,
 						"text/html");
 				}
 

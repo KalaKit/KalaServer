@@ -82,10 +82,10 @@ namespace KalaKit::Core
 		unsigned int rateLimitTimer,
 		const string& serverName,
 		const string& domainName,
+		const BanClientData& banClientData,
 		const HealthPingData& healthPingData,
 		const ErrorMessage& errorMessage,
 		const DataFile& dataFile,
-		const EmailSenderData& emailSenderData,
 		const vector<string>& submittedRegisteredRoutes,
 		const vector<string>& submittedAdminRoutes)
 	{
@@ -94,10 +94,10 @@ namespace KalaKit::Core
 			rateLimitTimer,
 			serverName,
 			domainName,
+			banClientData,
 			healthPingData,
 			errorMessage,
-			dataFile,
-			emailSenderData);
+			dataFile);
 
 		if (!server->PreInitializeCheck()) return false;
 
@@ -1144,22 +1144,14 @@ namespace KalaKit::Core
 			{
 				while (KalaServer::isRunning)
 				{
-					vector<string> receivers_email = { Server::server->emailSenderData.username };
-					EmailData emailData =
-					{
-						.smtpServer = "smtp.gmail.com",
-						.username = Server::server->emailSenderData.username,
-						.password = Server::server->emailSenderData.password,
-						.sender = Server::server->emailSenderData.username,
-						.receivers_email = receivers_email,
-						.subject = Server::server->serverName + " health status",
-						.body = ""
-					};
-					
-					unique_ptr<Event> healthPingEvent = make_unique<Event>();
-					healthPingEvent->SendEvent(EventType::event_send_email, emailData);
-
 					sleep_for(seconds(healthTimer));
+
+					if (Server::server->healthPingData.healthTimer > 0
+						&& !Server::server->healthPingData.receivers.empty())
+					{
+						unique_ptr<Event> healthPingEvent = make_unique<Event>();
+						healthPingEvent->SendEvent(EventType::event_server_health_ping, Server::server->healthPingData);
+					}
 				}
 			}).detach();
 		}

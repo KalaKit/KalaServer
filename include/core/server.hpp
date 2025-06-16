@@ -49,14 +49,6 @@ namespace KalaKit::Core
 		string mimeType;
 		AccessLevel accessLevel;
 	};
-	
-	//The account info of the email sender
-	struct EmailSenderData
-	{
-		vector<EventType> events; //Choose what events to send emails for
-		string username;          //Your email account
-		string password;          //Your app password (read docs/email-app-password.txt for more info)
-	};
 
 	struct ErrorMessage
 	{
@@ -100,10 +92,8 @@ namespace KalaKit::Core
 		//File paths for server admin provided data files
 		//for ips, extensions, keywords and others.
 		DataFile dataFile;
-		
-		//Your email username and app password to be able to send emails
-		EmailSenderData emailSenderData;
 
+		BanClientData banClientData;
 		HealthPingData healthPingData;
 
 		atomic<bool> canUpdateWhitelistedIPs{ true };
@@ -136,18 +126,18 @@ namespace KalaKit::Core
 			unsigned int rateLimitTimer,
 			const string& serverName,
 			const string& domainName,
+			const BanClientData& banClientData,
 			const HealthPingData& healthPingData,
 			const ErrorMessage& errorMessage,
-			const DataFile& dataFile,
-			const EmailSenderData& emailSenderData) :
+			const DataFile& dataFile) :
 			port(port),
 			rateLimitTimer(rateLimitTimer),
 			serverName(serverName),
 			domainName(domainName),
+			banClientData(banClientData),
 			healthPingData(healthPingData),
 			errorMessage(errorMessage),
-			dataFile(dataFile),
-			emailSenderData(emailSenderData) {}
+			dataFile(dataFile) {}
 
 		/// <summary>
 		/// Initializes the server. Must be ran first before any other components.
@@ -157,10 +147,10 @@ namespace KalaKit::Core
 			unsigned int rateLimitTimer,
 			const string& serverName,
 			const string& domainName,
+			const BanClientData& banClientData,
 			const HealthPingData& healthPingData,
 			const ErrorMessage& errorMessage,
 			const DataFile& datafile,
-			const EmailSenderData& emailSenderData,
 			const vector<string>& registeredRoutes,
 			const vector<string>& adminRoutes);
 

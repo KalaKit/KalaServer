@@ -5,15 +5,12 @@
 
 #include <string>
 #include <memory>
-#include <vector>
-#include <variant>
 
 #include "core/core.hpp"
 #include "core/event.hpp"
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 
-using KalaKit::Core::KalaServer;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PrintData;
@@ -26,7 +23,6 @@ using KalaKit::DNS::CloudFlare;
 using std::string;
 using std::unique_ptr;
 using std::make_unique;
-using std::vector;
 using std::get_if;
 
 static void HealthPing(EventType type, HealthPingData healthPingData);

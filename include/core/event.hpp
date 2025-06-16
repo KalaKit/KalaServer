@@ -8,18 +8,22 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include <unordered_map>
 
 namespace KalaKit::Core
 {
 	using std::string;
 	using std::vector;
 	using std::variant;
+	using std::unordered_map;
 
 	struct PrintData;
 	struct PopupData;
 	struct EmailData;
 
 	//A variant type representing any possible message receiver that can log this event info.
+	//You can always pass an empty PrintData because it will be overwritten,
+	//but PopupData and EmailData must be filled except message, body and subject.
 	using ReceiverPayload = variant
 	<
 		PrintData,
@@ -32,6 +36,7 @@ namespace KalaKit::Core
 		event_none,
 
 		//server log events
+
 		event_print_console_message,
 		event_create_popup,
 		event_severity_message,
@@ -51,7 +56,8 @@ namespace KalaKit::Core
 
 		//client events
 
-		event_client_was_banned,
+		event_client_was_banned_for_blacklisted_route,
+		event_client_was_banned_for_rate_limit,
 		event_already_banned_client_connected,
 		event_client_connected_to_registered_route,
 		event_client_connected_to_admin_route
@@ -76,25 +82,32 @@ namespace KalaKit::Core
 	//Uses STARTTLS on port 587
 	struct EmailData
 	{
-		string smtpServer; //Target email server name (smpt.gmail.com)
-		string username;   //Required for SMTP authentication
-		string password;   //Required for SMTP authentication
-		string sender;     //Who sends the email
+		string smtpServer;              //Target email server name (smpt.gmail.com)
+		string username;                //Required for SMTP authentication
+		string password;                //Required for SMTP authentication
+		string sender;                  //Who sends the email
 		vector<string> receivers_email; //Every email recipient who receives the email
-		string subject;    //The title of the email
-		string body;       //The contents of the email
+		string subject;                 //The title of the email
+		string body;                    //The contents of the email
 	};
 
-	struct Client_Banned_Data
+	//Only sends any receiver events for any ban events
+	//if a ban event with its own group of receiver types
+	//has been added to the events pair
+	struct BanClientData
 	{
 		string ip;                         //What IP got banned
+		uintptr_t socket;                  //The clients socket that will be closed
 		string reason;                     //Why did they get banned
-		vector<ReceiverPayload> receivers; //Who will get a message about this IP being banned
+		//Each ban event that you want to receive logs for
+		//and all the receivers for this ban type
+		unordered_map<EventType, vector<ReceiverPayload>> events;
 	};
 
+	//Only sends a receiver event if a receiver is added to receivers vector
 	struct HealthPingData
 	{
-		unsigned int healthTimer;
+		unsigned int healthTimer;          //How often should the health timer ping one of the receivers
 		vector<ReceiverPayload> receivers; //Who will get a message about the server health ping
 	};
 
@@ -113,5 +126,8 @@ namespace KalaKit::Core
 
 		//Get a server health update
 		void SendEvent(EventType type, HealthPingData healthPingData);
+
+		//Ban a client
+		bool SendEvent(EventType type, BanClientData banClientData);
 	};
 }
