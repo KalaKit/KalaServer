@@ -880,6 +880,14 @@ namespace KalaKit::Core
 			file.seekg(0, ios::beg);
 			outTotalSize = static_cast<size_t>(fileSize);
 
+			if (forceFull)
+			{
+				vector<char> buffer(static_cast<size_t>(fileSize));
+				file.read(buffer.data(), fileSize);
+				outSliced = false;
+				return buffer;
+			}
+
 			if (rangeStart >= outTotalSize)
 			{
 				PrintData rsData =
@@ -913,8 +921,7 @@ namespace KalaKit::Core
 			bool isLarge = fileSize > static_cast<long long>(10 * 1024) * 1024; //> 10MB
 
 			if (!isAlwaysFull
-				&& isLarge
-				&& !forceFull)
+				&& isLarge)
 			{
 				if (rangeEnd == 0
 					|| rangeEnd >= outTotalSize)

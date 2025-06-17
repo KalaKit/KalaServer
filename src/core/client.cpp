@@ -823,6 +823,22 @@ namespace KalaKit::Core
 			{
 				if (wantsToDownload)
 				{
+					PrintData prData =
+					{
+						.indentationLength = 0,
+						.addTimeStamp = false,
+						.severity = sev_m,
+						.customTag = "",
+						.message =
+							"======== APPROVED CLIENT IS DOWNLOADING FILE =======\n"
+							" IP     : " + clientIP + "\n"
+							" Socket : " + to_string(clientSocket) + "\n"
+							" Reason : " + cleanRoute + "\n"
+							"====================================================\n"
+					};
+					unique_ptr<Event> prEvent = make_unique<Event>();
+					prEvent->SendEvent(rec_c, prData);
+
 					auto respDownload = make_unique<Response_Download>();
 					respDownload->Init(
 						rawClientSocket,
