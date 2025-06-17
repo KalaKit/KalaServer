@@ -157,7 +157,9 @@ static void BanClient(EventType type, BanClientData banClientData)
 	{
 		if (PrintData* data = get_if<PrintData>(&pl))
 		{
-			data->customTag = "BAN-CLIENT";
+			data->indentationLength = 0;
+			data->addTimeStamp = false;
+			data->customTag = "";
 			data->message = fullData;
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_print_console_message, *data);
