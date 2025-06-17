@@ -9,8 +9,10 @@
 
 #include "core/core.hpp"
 #include "core/event.hpp"
+#include "core/server.hpp"
 #include "response/response_418.hpp"
 
+using KalaKit::Core::Server;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PrintData;
@@ -113,6 +115,12 @@ namespace KalaKit::Core
 
 static void BanClient(EventType type, BanClientData banClientData)
 {
+	pair<string, string> bannedClient =
+	{
+		banClientData.ip, banClientData.reason
+	};
+	Server::server->BanClient(bannedClient);
+
 	auto respBanned = make_unique<Response_418>();
 	respBanned->Init(
 		banClientData.socket,
