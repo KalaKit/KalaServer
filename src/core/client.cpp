@@ -1,4 +1,4 @@
-//Copyright(C) 2025 Lost Empire Entertainment
+﻿//Copyright(C) 2025 Lost Empire Entertainment
 //This program comes with ABSOLUTELY NO WARRANTY.
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
@@ -20,13 +20,15 @@
 #include "response/response_404.hpp"
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
+#include "response/response_download.hpp"
 
 using KalaKit::ResponseSystem::Response_200;
 using KalaKit::ResponseSystem::Response_206;
 using KalaKit::ResponseSystem::Response_401;
 using KalaKit::ResponseSystem::Response_404;
-using KalaKit::ResponseSystem::Response_500;
 using KalaKit::ResponseSystem::Response_418;
+using KalaKit::ResponseSystem::Response_500;
+using KalaKit::ResponseSystem::Response_Download;
 
 using std::istringstream;
 using std::exception;
@@ -304,6 +306,19 @@ namespace KalaKit::Core
 		if (q != string::npos)
 		{
 			cleanRoute = cleanRoute.substr(0, q);
+		}
+
+		bool wantsToDownload = false;
+		if (q != string::npos)
+		{
+			string query = cleanRoute.substr(q + 1);
+			cleanRoute = cleanRoute.substr(0, q);
+
+			//check if download is requested
+			if (query.find("download") != string::npos)
+			{
+				wantsToDownload = true;
+			}
 		}
 
 		string clientIP = this->ExtractHeader(
@@ -612,6 +627,11 @@ namespace KalaKit::Core
 			|| canAccessRegisteredRoute
 			|| canAccessAdminRoute;
 
+		bool allowDownload =
+			isClientRegistered
+			|| isClientAdmin
+			|| isHost;
+
 		string routeAuth = "[USER]";
 		string clientAuth = "[USER]";
 
@@ -633,6 +653,34 @@ namespace KalaKit::Core
 					"Client ["
 					+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
 					+ " tried to access route '" + cleanRoute
+					+ "' with auth level " + routeAuth + "!"
+			};
+			unique_ptr<Event> alEvent = make_unique<Event>();
+			alEvent->SendEvent(rec_c, alData);
+
+			auto resp401 = make_unique<Response_401>();
+			resp401->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			this->SocketCleanup(socket);
+			return;
+		}
+
+		if (!allowDownload
+			&& wantsToDownload)
+		{
+			PrintData alData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_w,
+				.customTag = "CLIENT",
+				.message =
+					"Client ["
+					+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
+					+ " tried to download file '" + cleanRoute
 					+ "' with auth level " + routeAuth + "!"
 			};
 			unique_ptr<Event> alEvent = make_unique<Event>();
@@ -673,7 +721,7 @@ namespace KalaKit::Core
 		if ((isClientAdmin
 			|| isHost)
 			&& (isRegisteredRoute
-				|| isAdminRoute))
+			|| isAdminRoute))
 		{
 			PrintData ccData =
 			{
@@ -712,7 +760,39 @@ namespace KalaKit::Core
 				rangeStart,
 				rangeEnd,
 				totalSize,
-				sliced);
+				sliced,
+				wantsToDownload);
+
+			if (wantsToDownload
+				&& !isClientAdmin
+				&& !isHost
+				&& totalSize > (static_cast<unsigned long long>(10 * 1024) * 1024))
+			{
+				string humanReadableSize = to_string(totalSize / (static_cast<unsigned long long>(1024) * 1024)) + " MB";
+				string blockReason =
+					"Client [" + to_string(socket) + " - '" + clientIP + "'] "
+					"attempted to download large file '" + cleanRoute + "' ("
+					+ to_string(totalSize) + " bytes = " + humanReadableSize + ") which exceeds the 10MB limit.";
+				PrintData dData =
+				{
+					.indentationLength = 2,
+					.addTimeStamp = true,
+					.severity = sev_w,
+					.customTag = "CLIENT",
+					.message = blockReason
+				};
+				unique_ptr<Event> dEvent = make_unique<Event>();
+				dEvent->SendEvent(rec_c, dData);
+
+				auto resp401 = make_unique<Response_401>();
+				resp401->Init(
+					rawClientSocket,
+					clientIP,
+					cleanRoute,
+					"text/html");
+				this->SocketCleanup(socket);
+				return;
+			}
 
 			if (result.empty())
 			{
@@ -741,21 +821,10 @@ namespace KalaKit::Core
 			}
 			else
 			{
-				if (sliced)
+				if (wantsToDownload)
 				{
-					auto resp206 = make_unique<Response_206>();
-
-					resp206->hasRange = true;
-					resp206->rangeStart = rangeStart;
-					resp206->rangeEnd = rangeStart + result.size() - 1;
-					resp206->totalSize = totalSize;
-					resp206->contentRange =
-						"bytes 0-"
-						+ to_string(result.size() - 1)
-						+ "/"
-						+ to_string(totalSize);
-
-					resp206->Init(
+					auto respDownload = make_unique<Response_Download>();
+					respDownload->Init(
 						rawClientSocket,
 						clientIP,
 						cleanRoute,
@@ -765,14 +834,39 @@ namespace KalaKit::Core
 				}
 				else
 				{
-					auto resp200 = make_unique<Response_200>();
-					resp200->Init(
-						rawClientSocket,
-						clientIP,
-						cleanRoute,
-						foundRoute.mimeType);
-					this->SocketCleanup(socket);
-					return;
+					if (sliced)
+					{
+						auto resp206 = make_unique<Response_206>();
+
+						resp206->hasRange = true;
+						resp206->rangeStart = rangeStart;
+						resp206->rangeEnd = rangeStart + result.size() - 1;
+						resp206->totalSize = totalSize;
+						resp206->contentRange =
+							"bytes 0-"
+							+ to_string(result.size() - 1)
+							+ "/"
+							+ to_string(totalSize);
+
+						resp206->Init(
+							rawClientSocket,
+							clientIP,
+							cleanRoute,
+							foundRoute.mimeType);
+						this->SocketCleanup(socket);
+						return;
+					}
+					else
+					{
+						auto resp200 = make_unique<Response_200>();
+						resp200->Init(
+							rawClientSocket,
+							clientIP,
+							cleanRoute,
+							foundRoute.mimeType);
+						this->SocketCleanup(socket);
+						return;
+					}
 				}
 			}
 		}

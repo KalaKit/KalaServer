@@ -179,7 +179,8 @@ namespace KalaKit::Core
 			size_t rangeStart,
 			size_t rangeEnd,
 			size_t& outTotalSize,
-			bool& outSliced);
+			bool& outSliced,
+			bool forceFull = false);
 
 		/// <summary>
 		/// Check whether this route is allowed to be accessed.

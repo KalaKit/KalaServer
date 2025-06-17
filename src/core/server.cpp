@@ -808,7 +808,8 @@ namespace KalaKit::Core
 		size_t rangeStart,
 		size_t rangeEnd,
 		size_t& outTotalSize,
-		bool& outSliced)
+		bool& outSliced,
+		bool forceFull)
 	{
 		outSliced = false;
 		outTotalSize = 0;
@@ -912,7 +913,8 @@ namespace KalaKit::Core
 			bool isLarge = fileSize > static_cast<long long>(10 * 1024) * 1024; //> 10MB
 
 			if (!isAlwaysFull
-				&& isLarge)
+				&& isLarge
+				&& !forceFull)
 			{
 				if (rangeEnd == 0
 					|| rangeEnd >= outTotalSize)

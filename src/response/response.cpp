@@ -4,6 +4,7 @@
 //Read LICENSE.md for more information.
 
 #include <WinSock2.h>
+#include <filesystem>
 
 #include "core/core.hpp"
 #include "response/response.hpp"
@@ -19,6 +20,7 @@ using KalaKit::Core::PrintData;
 using std::unique_ptr;
 using std::make_unique;
 using std::to_string;
+using std::filesystem::path;
 
 namespace KalaKit::ResponseSystem
 {
@@ -28,15 +30,23 @@ namespace KalaKit::ResponseSystem
 		const string& route,
 		const string& contentType,
 		const string& statusLine,
-		const vector<char> data) const
+		const vector<char> data,
+		SendAction sendAction) const
 	{
 		SOCKET socket = static_cast<SOCKET>(clientSocket);
 
 		string fullResponse =
 			statusLine + "\r\n"
 			"Content-Type: " + contentType + "\r\n"
-			"Content-Length: " + to_string(data.size()) + "\r\n"
-			"Connection: close\r\n";
+			"Content-Length: " + to_string(data.size()) + "\r\n";
+
+		if (sendAction == SendAction::send_download)
+		{
+			fullResponse += "Content-Disposition: attachment; filename=\""
+				+ path(route).filename().string() + "\"\r\n";
+		}
+
+		fullResponse += "Connection: close\r\n";
 
 		if (hasRange)
 		{

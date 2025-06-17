@@ -22,6 +22,12 @@ namespace KalaKit::ResponseSystem
 		size_t totalSize = 0;
 		string contentRange{};
 
+		enum class SendAction
+		{
+			send_default,
+			send_download
+		};
+
 		virtual ~Response() = default;
 
 		/// <summary>
@@ -43,6 +49,7 @@ namespace KalaKit::ResponseSystem
 			const string& route,
 			const string& contentType,
 			const string& statusLine,
-			const vector<char> data) const;
+			const vector<char> data,
+			SendAction sendAction = SendAction::send_default) const;
 	};
 }
