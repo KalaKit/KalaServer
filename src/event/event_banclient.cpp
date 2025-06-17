@@ -119,74 +119,75 @@ static void BanClient(EventType type, BanClientData banClientData)
 	{
 		banClientData.ip, banClientData.reason
 	};
-	Server::server->BanClient(bannedClient);
-
-	auto respBanned = make_unique<Response_418>();
-	respBanned->Init(
-		banClientData.socket,
-		banClientData.ip,
-		banClientData.reason,
-		"text/html");
-
-	bool foundThisEvent = false;
-	vector<ReceiverPayload> payload{};
-	for (const auto& e : banClientData.events)
+	if (Server::server->BanClient(bannedClient))
 	{
-		if (e.first == type
-			&& !e.second.empty())
+		auto respBanned = make_unique<Response_418>();
+		respBanned->Init(
+			banClientData.socket,
+			banClientData.ip,
+			banClientData.reason,
+			"text/html");
+
+		bool foundThisEvent = false;
+		vector<ReceiverPayload> payload{};
+		for (const auto& e : banClientData.events)
 		{
-			payload = e.second;
-			foundThisEvent = true;
-			break;
+			if (e.first == type
+				&& !e.second.empty())
+			{
+				payload = e.second;
+				foundThisEvent = true;
+				break;
+			}
 		}
-	}
-	if (!foundThisEvent) return; //silent return because this ban event was not asked for
+		if (!foundThisEvent) return; //silent return because this ban event was not asked for
 
-	string fullData{};
-	if (type == EventType::event_already_banned_client_connected)
-	{
-		fullData = "==== ALREADY BANNED USER ATTEMPTED TO CONNECT ======\n";
-	}
-	else if (type == EventType::event_client_was_banned_for_blacklisted_route)
-	{
-		fullData = "======= BANNED CLIENT FOR BLACKLISTED ROUTE ========\n";
-	}
-	else if (type == EventType::event_client_was_banned_for_rate_limit)
-	{
-		fullData = "=========== BANNED CLIENT FOR RATE LIMIT ===========\n";
-	}
-	fullData +=
-		" IP     : " + banClientData.ip + "\n"
-		" Socket : " + to_string(banClientData.socket) + "\n"
-		" Reason : " + banClientData.reason + "\n"
-		"====================================================\n";
+		string fullData{};
+		if (type == EventType::event_already_banned_client_connected)
+		{
+			fullData = "==== ALREADY BANNED USER ATTEMPTED TO CONNECT ======\n";
+		}
+		else if (type == EventType::event_client_was_banned_for_blacklisted_route)
+		{
+			fullData = "======= BANNED CLIENT FOR BLACKLISTED ROUTE ========\n";
+		}
+		else if (type == EventType::event_client_was_banned_for_rate_limit)
+		{
+			fullData = "=========== BANNED CLIENT FOR RATE LIMIT ===========\n";
+		}
+		fullData +=
+			" IP     : " + banClientData.ip + "\n"
+			" Socket : " + to_string(banClientData.socket) + "\n"
+			" Reason : " + banClientData.reason + "\n"
+			"====================================================\n";
 
-	for (auto& pl : payload)
-	{
-		if (PrintData* data = get_if<PrintData>(&pl))
+		for (auto& pl : payload)
 		{
-			data->indentationLength = 0;
-			data->addTimeStamp = false;
-			data->customTag = "";
-			data->message = fullData;
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_print_console_message, *data);
-		}
-		else if (PopupData* data = get_if<PopupData>(&pl))
-		{
-			data->message = fullData;
-			unique_ptr<Event> fsEvent = make_unique<Event>();
-			fsEvent->SendEvent(EventType::event_create_popup, *data);
-		}
-		else if (EmailData* data = get_if<EmailData>(&pl))
-		{
-			data->subject =
-				type == EventType::event_already_banned_client_connected
-				? "Already banned client attempted to reconnect"
-				: "Client was banned";
-			data->body = fullData;
-			unique_ptr<Event> event = make_unique<Event>();
-			event->SendEvent(EventType::event_send_email, *data);
+			if (PrintData* data = get_if<PrintData>(&pl))
+			{
+				data->indentationLength = 0;
+				data->addTimeStamp = false;
+				data->customTag = "";
+				data->message = fullData;
+				unique_ptr<Event> event = make_unique<Event>();
+				event->SendEvent(EventType::event_print_console_message, *data);
+			}
+			else if (PopupData* data = get_if<PopupData>(&pl))
+			{
+				data->message = fullData;
+				unique_ptr<Event> fsEvent = make_unique<Event>();
+				fsEvent->SendEvent(EventType::event_create_popup, *data);
+			}
+			else if (EmailData* data = get_if<EmailData>(&pl))
+			{
+				data->subject =
+					type == EventType::event_already_banned_client_connected
+					? "Already banned client attempted to reconnect"
+					: "Client was banned";
+				data->body = fullData;
+				unique_ptr<Event> event = make_unique<Event>();
+				event->SendEvent(EventType::event_send_email, *data);
+			}
 		}
 	}
 }
