@@ -51,18 +51,12 @@ namespace KalaKit::Core
 				"Only event type 'event_server_health_ping' is allowed in 'Health ping' event!");
 			return;
 		}
-		if (healthPingData.healthTimer == 0)
+		if (healthPingData.healthTimer < 1)
 		{
 			PrintType(
 				EventType::event_severity_error,
-				"Health timer must be higher than 0 in 'Health ping' event!");
+				"Health timer must be atleast 1 in 'Health ping' event!");
 			return;
-		}
-		if (healthPingData.healthTimer < 0.5f)
-		{
-			PrintType(
-				EventType::event_severity_warning,
-				"Health timer is extremely low in 'Health ping' event! Please consider setting it as a value of 0.5 or higher.");
 		}
 		HealthPing(type, healthPingData);
 	}

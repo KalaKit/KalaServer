@@ -127,6 +127,7 @@ static void BanClient(EventType type, BanClientData banClientData)
 		if (e.first == type
 			&& !e.second.empty())
 		{
+			payload = e.second;
 			foundThisEvent = true;
 			break;
 		}
