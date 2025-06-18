@@ -302,19 +302,14 @@ namespace KalaKit::Core
 		}
 
 		string cleanRoute = route;
-		size_t q = cleanRoute.find('?');
-		if (q != string::npos)
-		{
-			cleanRoute = cleanRoute.substr(0, q);
-		}
+		size_t q = route.find('?');
 
 		bool wantsToDownload = false;
 		if (q != string::npos)
 		{
-			string query = cleanRoute.substr(q + 1);
-			cleanRoute = cleanRoute.substr(0, q);
+			string query = route.substr(q + 1);
+			cleanRoute = route.substr(0, q);
 
-			//check if download is requested
 			if (query.find("download") != string::npos)
 			{
 				wantsToDownload = true;
