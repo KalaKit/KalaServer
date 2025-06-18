@@ -44,7 +44,8 @@ namespace KalaKit::Core
 			string& route,
 			string& cleanRoute,
 			bool& isHost,
-			bool& wantsToDownload);
+			bool& wantsToDownload,
+			bool& wantsToUpload);
 
 		//Checks for client whitelist status and client banned status
 		bool CanConnect(

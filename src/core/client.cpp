@@ -190,6 +190,7 @@ namespace KalaKit::Core
 
 		bool isHost{};
 		bool wantsToDownload{};
+		bool wantsToUpload{};
 
 		string request{};
 
@@ -199,7 +200,8 @@ namespace KalaKit::Core
 			route,
 			cleanRoute,
 			isHost,
-			wantsToDownload);
+			wantsToDownload,
+			wantsToUpload);
 
 		if (!connectStart)
 		{
@@ -608,7 +610,8 @@ namespace KalaKit::Core
 		string& route,
 		string& cleanRoute,
 		bool& isHost,
-		bool& wantsToDownload)
+		bool& wantsToDownload,
+		bool& wantsToUpload)
 	{
 		//
 		// START CLIENT CONNECTION
@@ -718,14 +721,56 @@ namespace KalaKit::Core
 		unique_ptr<Event> shEvent = make_unique<Event>();
 		shEvent->SendEvent(rec_c, shData);
 
-		if (request.starts_with("GET "))
+		string method{};
+		size_t methodEnd = request.find(' ');
+		if (methodEnd != string::npos)
 		{
-			size_t pathStart = 4;
+			method = request.substr(0, methodEnd);
+
+			size_t pathStart = methodEnd + 1;
 			size_t pathEnd = request.find(' ', pathStart);
 			if (pathEnd != string::npos)
 			{
 				route = request.substr(pathStart, pathEnd - pathStart);
 			}
+		}
+
+		if (method == "GET"
+			|| method == "POST")
+		{
+			PrintData pd =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_m,
+				.customTag = "CLIENT",
+				.message =
+					"Client [" + to_string(clientSocket) + " - '" + clientIP + "']"
+					"connected with method '" + method + "'"
+			};
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(rec_c, pd);
+
+			if (method == "POST") wantsToUpload = true;
+		}
+		else
+		{
+			PrintData pd =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "CLIENT",
+				.message = 
+					"Client [" + to_string(clientSocket) + " - '" + clientIP + "']"
+					"connected with unsupported method '" + method + "'! Closing connection..."
+			};
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(rec_c, pd);
+
+			this->SocketCleanup(clientSocket);
+			closesocket(rawClientSocket);
+			return false;
 		}
 
 		cleanRoute = route;
