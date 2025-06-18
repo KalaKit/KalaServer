@@ -41,11 +41,11 @@ namespace KalaKit::Core
 {
 	void Event::SendEvent(EventType type, const PopupData& popupData)
 	{
-		if (type != EventType::event_print_console_message)
+		if (type != EventType::event_create_popup)
 		{
 			PrintType(
 				EventType::event_severity_error,
-				"Only event type 'event_print_console_message' is allowed in 'Create popup' event!\nOrigin was '" + popupData.message + "'");
+				"Only event type 'event_create_popup' is allowed in 'Create popup' event!\nOrigin was '" + popupData.message + "'");
 			return;
 		}
 		if (popupData.severity == EventType::event_none)
