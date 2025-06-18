@@ -20,7 +20,6 @@
 #include "response/response_404.hpp"
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
-#include "response/response_download.hpp"
 
 using KalaKit::ResponseSystem::Response_200;
 using KalaKit::ResponseSystem::Response_206;
@@ -28,7 +27,6 @@ using KalaKit::ResponseSystem::Response_401;
 using KalaKit::ResponseSystem::Response_404;
 using KalaKit::ResponseSystem::Response_418;
 using KalaKit::ResponseSystem::Response_500;
-using KalaKit::ResponseSystem::Response_Download;
 
 using std::istringstream;
 using std::exception;
@@ -755,8 +753,7 @@ namespace KalaKit::Core
 				rangeStart,
 				rangeEnd,
 				totalSize,
-				sliced,
-				wantsToDownload);
+				sliced);
 
 			if (wantsToDownload
 				&& !isClientAdmin
@@ -816,26 +813,43 @@ namespace KalaKit::Core
 			}
 			else
 			{
-				if (wantsToDownload)
+				if (sliced)
 				{
-					PrintData prData =
-					{
-						.indentationLength = 0,
-						.addTimeStamp = false,
-						.severity = sev_m,
-						.customTag = "",
-						.message =
-							"======== APPROVED CLIENT IS DOWNLOADING FILE =======\n"
-							" IP     : " + clientIP + "\n"
-							" Socket : " + to_string(clientSocket) + "\n"
-							" Reason : " + cleanRoute + "\n"
-							"====================================================\n"
-					};
-					unique_ptr<Event> prEvent = make_unique<Event>();
-					prEvent->SendEvent(rec_c, prData);
+					auto resp206 = make_unique<Response_206>();
 
-					auto respDownload = make_unique<Response_Download>();
-					respDownload->Init(
+					resp206->hasRange = true;
+					resp206->rangeStart = rangeStart;
+					resp206->rangeEnd = rangeStart + result.size() - 1;
+					resp206->totalSize = totalSize;
+					resp206->contentRange =
+						"bytes 0-"
+						+ to_string(result.size() - 1)
+						+ "/"
+						+ to_string(totalSize);
+
+					if (wantsToDownload)
+					{	
+						PrintData prData =
+						{
+							.indentationLength = 0,
+							.addTimeStamp = false,
+							.severity = sev_m,
+							.customTag = "",
+							.message =
+								"======== APPROVED CLIENT IS DOWNLOADING FILE =======\n"
+								" IP     : " + clientIP + "\n"
+								" Socket : " + to_string(clientSocket) + "\n"
+								" Reason : " + cleanRoute + "\n"
+								"====================================================\n"
+						};
+						unique_ptr<Event> prEvent = make_unique<Event>();
+						prEvent->SendEvent(rec_c, prData);
+
+						resp206->sendAction = KalaKit::ResponseSystem::SendAction::send_download;
+					}
+					else resp206->sendAction = KalaKit::ResponseSystem::SendAction::send_default;
+
+					resp206->Init(
 						rawClientSocket,
 						clientIP,
 						cleanRoute,
@@ -845,39 +859,37 @@ namespace KalaKit::Core
 				}
 				else
 				{
-					if (sliced)
-					{
-						auto resp206 = make_unique<Response_206>();
+					auto resp200 = make_unique<Response_200>();
+					
+					if (wantsToDownload)
+					{	
+						PrintData prData =
+						{
+							.indentationLength = 0,
+							.addTimeStamp = false,
+							.severity = sev_m,
+							.customTag = "",
+							.message =
+								"======== APPROVED CLIENT IS DOWNLOADING FILE =======\n"
+								" IP     : " + clientIP + "\n"
+								" Socket : " + to_string(clientSocket) + "\n"
+								" Reason : " + cleanRoute + "\n"
+								"====================================================\n"
+						};
+						unique_ptr<Event> prEvent = make_unique<Event>();
+						prEvent->SendEvent(rec_c, prData);
 
-						resp206->hasRange = true;
-						resp206->rangeStart = rangeStart;
-						resp206->rangeEnd = rangeStart + result.size() - 1;
-						resp206->totalSize = totalSize;
-						resp206->contentRange =
-							"bytes 0-"
-							+ to_string(result.size() - 1)
-							+ "/"
-							+ to_string(totalSize);
+						resp200->sendAction = KalaKit::ResponseSystem::SendAction::send_download;
+					}
+					else resp200->sendAction = KalaKit::ResponseSystem::SendAction::send_default;
 
-						resp206->Init(
-							rawClientSocket,
-							clientIP,
-							cleanRoute,
-							foundRoute.mimeType);
-						this->SocketCleanup(socket);
-						return;
-					}
-					else
-					{
-						auto resp200 = make_unique<Response_200>();
-						resp200->Init(
-							rawClientSocket,
-							clientIP,
-							cleanRoute,
-							foundRoute.mimeType);
-						this->SocketCleanup(socket);
-						return;
-					}
+					resp200->Init(
+						rawClientSocket,
+						clientIP,
+						cleanRoute,
+						foundRoute.mimeType);
+					this->SocketCleanup(socket);
+					return;
 				}
 			}
 		}

@@ -13,6 +13,12 @@ namespace KalaKit::ResponseSystem
 	using std::string;
 	using std::vector;
 
+	enum class SendAction
+	{
+		send_default,
+		send_download
+	};
+
 	class Response
 	{
 	public:
@@ -21,12 +27,7 @@ namespace KalaKit::ResponseSystem
 		size_t rangeEnd = 0;
 		size_t totalSize = 0;
 		string contentRange{};
-
-		enum class SendAction
-		{
-			send_default,
-			send_download
-		};
+		SendAction sendAction;
 
 		virtual ~Response() = default;
 

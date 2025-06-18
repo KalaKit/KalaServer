@@ -69,6 +69,7 @@ namespace KalaKit::ResponseSystem
 			route,
 			contentType,
 			statusLine,
-			body);
+			body,
+			sendAction);
 	}
 }

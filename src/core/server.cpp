@@ -808,8 +808,7 @@ namespace KalaKit::Core
 		size_t rangeStart,
 		size_t rangeEnd,
 		size_t& outTotalSize,
-		bool& outSliced,
-		bool forceFull)
+		bool& outSliced)
 	{
 		outSliced = false;
 		outTotalSize = 0;
@@ -879,14 +878,6 @@ namespace KalaKit::Core
 			streamsize fileSize = file.tellg();
 			file.seekg(0, ios::beg);
 			outTotalSize = static_cast<size_t>(fileSize);
-
-			if (forceFull)
-			{
-				vector<char> buffer(static_cast<size_t>(fileSize));
-				file.read(buffer.data(), fileSize);
-				outSliced = false;
-				return buffer;
-			}
 
 			if (rangeStart >= outTotalSize)
 			{
