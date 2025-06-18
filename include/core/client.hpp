@@ -7,9 +7,13 @@
 
 #include <string>
 
+#include "core/server.hpp"
+
 namespace KalaKit::Core
 {
 	using std::string;
+	
+	using KalaKit::Core::Server;
 
 	class Client
 	{
@@ -33,7 +37,28 @@ namespace KalaKit::Core
 		//Handle each client in its own thread.
 		void HandleClient(uintptr_t socket);
 	private:
+		//First steps to initialize client connection
+		bool ConnectionStart(
+			uintptr_t& clientSocket,
+			string& clientIP,
+			string& route,
+			string& cleanRoute,
+			bool& isHost,
+			bool& wantsToDownload);
 
+		//Checks for client whitelist status and client banned status
+		bool CanConnect(
+			uintptr_t clientSocket,
+			string clientIP,
+			string cleanRoute,
+			bool& isHost);
+
+		//Checks if route and extension are allowed
+		bool IsValidRoute(
+			uintptr_t clientSocket,
+			string clientIP,
+			string cleanRoute,
+			Route& foundRoute);
 
 		void SocketCleanup(uintptr_t clientSocket);
 	};

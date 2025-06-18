@@ -181,328 +181,69 @@ namespace KalaKit::Core
 
 	void Client::HandleClient(uintptr_t socket)
 	{
-		//
-		// START CLIENT CONNECTION
-		//
+		SOCKET rawClientSocket{};
+		uintptr_t clientSocket{};
 
-		PrintData seData =
+		string clientIP{};
+		string route{};
+		string cleanRoute{};
+
+		bool isHost{};
+		bool wantsToDownload{};
+
+		string request{};
+
+		bool connectStart = ConnectionStart(
+			clientSocket,
+			clientIP,
+			route,
+			cleanRoute,
+			isHost,
+			wantsToDownload);
+
+		if (!connectStart)
 		{
-			.indentationLength = 0,
-			.addTimeStamp = true,
-			.severity = sev_d,
-			.customTag = "CLIENT",
-			.message = "Socket [" + to_string(socket) + "] entered handle client thread..."
-		};
-		unique_ptr<Event> seEvent = make_unique<Event>();
-		seEvent->SendEvent(rec_c, seData);
-
-		SOCKET rawClientSocket = static_cast<SOCKET>(socket);
-		uintptr_t clientSocket = static_cast<uintptr_t>(rawClientSocket);
-
-		DWORD timeout = 1000;
-		setsockopt(
-			rawClientSocket,
-			SOL_SOCKET,
-			SO_RCVTIMEO,
-			(char*)&timeout,
-			sizeof(timeout));
-
-		{
-			lock_guard socketInsertLock(Server::server->clientSocketsMutex);
-			Server::server->activeClientSockets.insert(socket);
-		}
-
-		char buffer[2048] = {};
-		int bytesReceived = recv(rawClientSocket, buffer, sizeof(buffer) - 1, 0);
-
-		if (bytesReceived == SOCKET_ERROR)
-		{
-			//
-			// INVALID SOCKET CONNECTION - CLOSE SOCKET
-			//
-
-			DWORD err = WSAGetLastError();
-			if (err == WSAETIMEDOUT)
-			{
-				PrintData stData =
-				{
-					.indentationLength = 2,
-					.addTimeStamp = true,
-					.severity = sev_w,
-					.customTag = "CLIENT",
-					.message = "Socket [" + to_string(socket) + "] timed out after 5 seconds without sending any data."
-				};
-				unique_ptr<Event> stEvent = make_unique<Event>();
-				stEvent->SendEvent(rec_c, stData);
-			}
-			else
-			{
-				PrintData srData =
-				{
-					.indentationLength = 2,
-					.addTimeStamp = true,
-					.severity = sev_w,
-					.customTag = "CLIENT",
-					.message = "Socket [" + to_string(socket) + "] recv() failed with error: " + to_string(err)
-				};
-				unique_ptr<Event> srEvent = make_unique<Event>();
-				srEvent->SendEvent(rec_c, srData);
-			}
-
-			this->SocketCleanup(socket);
-			closesocket(rawClientSocket);
-			return;
-		}
-		else if (bytesReceived == 0)
-		{
-			//
-			// EMPTY SOCKET - CLOSE SOCKET
-			//
-
-			PrintData sdData =
+			PrintData pd =
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
-				.severity = sev_w,
+				.severity = EventType::event_severity_error,
 				.customTag = "CLIENT",
-				.message = "Socket [" + to_string(socket) + "] disconnected without sending any data."
+				.message = "Server failed to handle client connection at 'connection start' stage!",
 			};
-			unique_ptr<Event> sdEvent = make_unique<Event>();
-			sdEvent->SendEvent(rec_c, sdData);
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_console_message, pd);
 
-			this->SocketCleanup(socket);
-			closesocket(rawClientSocket);
 			return;
 		}
 
-		string request(buffer);
-		string route = "/";
-
-		PrintData shData =
-		{
-			.indentationLength = 2,
-			.addTimeStamp = true,
-			.severity = sev_d,
-			.customTag = "CLIENT",
-			.message = "Socket [" + to_string(socket) + "] raw HTTP request:\n" + request
-		};
-		unique_ptr<Event> shEvent = make_unique<Event>();
-		shEvent->SendEvent(rec_c, shData);
-
-		if (request.starts_with("GET "))
-		{
-			size_t pathStart = 4;
-			size_t pathEnd = request.find(' ', pathStart);
-			if (pathEnd != string::npos)
-			{
-				route = request.substr(pathStart, pathEnd - pathStart);
-			}
-		}
-
-		string cleanRoute = route;
-		size_t q = route.find('?');
-
-		bool wantsToDownload = false;
-		if (q != string::npos)
-		{
-			string query = route.substr(q + 1);
-			cleanRoute = route.substr(0, q);
-
-			if (query.find("download") != string::npos)
-			{
-				wantsToDownload = true;
-			}
-		}
-
-		string clientIP = this->ExtractHeader(
-			request,
-			"Cf-Connecting-Ip");
-
-		if (clientIP.empty())
-		{
-			clientIP = "unknown-ip";
-
-			PrintData frData =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = sev_e,
-				.customTag = "CLIENT",
-				.message = 
-					"Failed to get client IP for socket [" + to_string(socket) + "]!"
-					"\n"
-					"Full request dump :"
-					"\n" +
-					request
-			};
-			unique_ptr<Event> frEvent = make_unique<Event>();
-			frEvent->SendEvent(rec_c, frData);
-		}
-
-		bool isHost = Server::server->IsHost(clientIP);
-		if (isHost)
-		{
-			PrintData ciData =
-			{
-				.indentationLength = 0,
-				.addTimeStamp = true,
-				.severity = sev_m,
-				.customTag = "CLIENT",
-				.message = "Client [" + to_string(socket) + " - '" + clientIP + "'] is server host."
-			};
-			unique_ptr<Event> ciEvent = make_unique<Event>();
-			ciEvent->SendEvent(rec_c, ciData);
-			clientIP = "host";
-
-			//always update available data when host joins homepage
-			if (cleanRoute == "/")
-			{
-				Server::server->canUpdateWhitelistedRoutes = true;
-				Server::server->canUpdateRouteAccess = true;
-				Server::server->canUpdateWhitelistedIPs = true;
-				Server::server->canUpdateBannedIPs = true;
-
-				Server::server->GetWhitelistedRoutes();
-				Server::server->SetRouteAccessLevels();
-				Server::server->GetFileData(DataFileType::datafile_whitelistedIP);
-				Server::server->GetFileData(DataFileType::datafile_bannedIP);
-			}
-		}
-
-		pair<string, string> whitelistedClient = Server::server->IsWhitelistedClient(clientIP);
-		pair<string, string> bannedClient = Server::server->IsBannedClient(clientIP);
+		rawClientSocket = static_cast<SOCKET>(clientSocket);
 
 		//
 		// CHECK IF CLIENT IS WHITELISTED OR BANNED
 		//
 
-		if (isHost
-			|| whitelistedClient.first != "")
+		bool canConnect = this->CanConnect(
+			clientSocket,
+			clientIP,
+			cleanRoute,
+			isHost);
+
+		if (!canConnect)
 		{
-			PrintData wcData =
+			PrintData pd =
 			{
-				.indentationLength = 0,
-				.addTimeStamp = false,
-				.severity = sev_m,
-				.customTag = "",
-				.message = 
-					"=============== WHITELISTED CLIENT =================\n"
-					" IP     : " + clientIP + "\n"
-					" Socket : " + to_string(clientSocket) + "\n"
-					" Reason : " + whitelistedClient.second + "\n"
-					"====================================================\n"
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = EventType::event_severity_error,
+				.customTag = "CLIENT",
+				.message = "Server failed to handle client connection at 'can connect' stage!",
 			};
-			unique_ptr<Event> wcEvent = make_unique<Event>();
-			wcEvent->SendEvent(rec_c, wcData);
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_console_message, pd);
+
+			return;
 		}
-		else
-		{
-			if (bannedClient.first != "")
-			{
-				BanClientData abcData =
-				{
-					.ip = clientIP,
-					.socket = socket,
-					.reason = bannedClient.second,
-					.events = Server::server->banClientData.events
-				};
-				unique_ptr<Event> abcEvent = make_unique<Event>();
-				bool result = abcEvent->SendEvent(EventType::event_already_banned_client_connected, abcData);
-
-				//fallback for if any parameters are invalid for already banned user,
-				//prevents entire socket hang
-				if (!result)
-				{
-					auto respBanned = make_unique<Response_418>();
-					respBanned->Init(
-						socket,
-						clientIP,
-						bannedClient.second,
-						"text/html");
-				}
-
-				this->SocketCleanup(socket);
-				return;
-			}
-			else if (bannedClient.first == ""
-				&& !Server::server->blacklistedKeywords.empty()
-				&& Server::server->IsBlacklistedRoute(cleanRoute))
-			{
-				BanClientData abcData =
-				{
-					.ip = clientIP,
-					.socket = socket,
-					.reason = cleanRoute,
-					.events = Server::server->banClientData.events
-				};
-				unique_ptr<Event> abcEvent = make_unique<Event>();
-				bool result = abcEvent->SendEvent(EventType::event_client_was_banned_for_blacklisted_route, abcData);
-
-				//fallback for if any parameters are invalid for banned user,
-				//prevents entire socket hang
-				if (!result)
-				{
-					auto respBanned = make_unique<Response_418>();
-					respBanned->Init(
-						socket,
-						clientIP,
-						cleanRoute,
-						"text/html");
-				}
-
-				this->SocketCleanup(socket);
-				return;
-			}
-		}
-
-		if (Server::server->rateLimitTimer > 0
-			&& !isHost
-			&& whitelistedClient.first == "")
-		{
-			lock_guard<mutex> counterLock(Server::server->counterMutex);
-			int& count = Server::server->requestCounter[clientIP][route];
-			count++;
-
-			if (count > Server::server->rateLimitTimer)
-			{
-				string reason = "Exceeded allowed connection rate limit of " + to_string(Server::server->rateLimitTimer) + " times per second";
-				BanClientData abcData =
-				{
-					.ip = clientIP,
-					.socket = socket,
-					.reason = reason,
-					.events = Server::server->banClientData.events
-				};
-				unique_ptr<Event> abcEvent = make_unique<Event>();
-				bool result = abcEvent->SendEvent(EventType::event_client_was_banned_for_rate_limit, abcData);
-
-				//fallback for if any parameters are invalid for banned user,
-				//prevents entire socket hang
-				if (!result)
-				{
-					auto respBanned = make_unique<Response_418>();
-					respBanned->Init(
-						socket,
-						clientIP,
-						reason,
-						"text/html");
-				}
-
-				this->SocketCleanup(socket);
-				return;
-			}
-		}
-
-		PrintData scData =
-		{
-			.indentationLength = 0,
-			.addTimeStamp = true,
-			.severity = sev_m,
-			.customTag = "CLIENT",
-			.message = "New client successfully connected [" + to_string(socket) + " - '" + clientIP + "']!"
-		};
-		unique_ptr<Event> scEvent = make_unique<Event>();
-		scEvent->SendEvent(rec_c, scData);
 
 		string body{};
 		string statusLine = "HTTP/1.1 200 OK";
@@ -511,85 +252,27 @@ namespace KalaKit::Core
 		// CHECK IF ROUTE EXISTS
 		//
 
-		Server::server->GetWhitelistedRoutes();
-
 		Route foundRoute{};
-		for (const auto& r : Server::server->whitelistedRoutes)
-		{
-			if (r.route == cleanRoute)
-			{
-				foundRoute = r;
-				break;
-			}
-		}
 
-		if (foundRoute.route.empty())
+		bool isValidRoute = this->IsValidRoute(
+			clientSocket,
+			clientIP,
+			cleanRoute,
+			foundRoute);
+
+		if (!isValidRoute)
 		{
-			PrintData caData =
+			PrintData pd =
 			{
 				.indentationLength = 2,
 				.addTimeStamp = true,
-				.severity = sev_w,
+				.severity = EventType::event_severity_error,
 				.customTag = "CLIENT",
-				.message = 
-					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] tried to access non-existing route '"
-					+ cleanRoute + "'!"
+				.message = "Server failed to handle client connection at 'is valid route' stage!",
 			};
-			unique_ptr<Event> caEvent = make_unique<Event>();
-			caEvent->SendEvent(rec_c, caData);
+			unique_ptr<Event> event = make_unique<Event>();
+			event->SendEvent(EventType::event_print_console_message, pd);
 
-			auto resp404 = make_unique<Response_404>();
-			resp404->Init(
-				rawClientSocket,
-				clientIP,
-				cleanRoute,
-				"text/html");
-			this->SocketCleanup(socket);
-			return;
-		}
-
-		bool extentionExists = false;
-		for (const auto& ext : Server::server->whitelistedExtensions)
-		{
-			if (path(cleanRoute).extension().generic_string() == ext)
-			{
-				extentionExists = true;
-				break;
-			}
-		}
-
-		//
-		// CHECK IF ROUTE EXTENSION IS ALLOWED
-		//
-
-		bool isAllowedFile =
-			cleanRoute.find_last_of('.') == string::npos
-			|| extentionExists;
-
-		if (!isAllowedFile)
-		{
-			PrintData ttData =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = sev_w,
-				.customTag = "CLIENT",
-				.message =
-					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] tried to access unauthorized route '" + cleanRoute
-					+ "' from path '" + foundRoute.route + "'."
-			};
-			unique_ptr<Event> ttEvent = make_unique<Event>();
-			ttEvent->SendEvent(rec_c, ttData);
-
-			auto resp401 = make_unique<Response_401>();
-			resp401->Init(
-				rawClientSocket,
-				clientIP,
-				cleanRoute,
-				"text/html");
-			this->SocketCleanup(socket);
 			return;
 		}
 
@@ -917,6 +600,445 @@ namespace KalaKit::Core
 				"text/html");
 			this->SocketCleanup(socket);
 		}
+	}
+
+	bool Client::ConnectionStart(
+		uintptr_t& clientSocket,
+		string& clientIP,
+		string& route,
+		string& cleanRoute,
+		bool& isHost,
+		bool& wantsToDownload)
+	{
+		//
+		// START CLIENT CONNECTION
+		//
+
+		PrintData seData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.severity = sev_d,
+			.customTag = "CLIENT",
+			.message = "Socket [" + to_string(clientSocket) + "] entered handle client thread..."
+		};
+		unique_ptr<Event> seEvent = make_unique<Event>();
+		seEvent->SendEvent(rec_c, seData);
+
+		SOCKET rawClientSocket = static_cast<SOCKET>(clientSocket);
+		clientSocket = static_cast<uintptr_t>(rawClientSocket);
+
+		DWORD timeout = 1000;
+		setsockopt(
+			rawClientSocket,
+			SOL_SOCKET,
+			SO_RCVTIMEO,
+			(char*)&timeout,
+			sizeof(timeout));
+
+		{
+			lock_guard socketInsertLock(Server::server->clientSocketsMutex);
+			Server::server->activeClientSockets.insert(clientSocket);
+		}
+
+		char buffer[2048] = {};
+		int bytesReceived = recv(rawClientSocket, buffer, sizeof(buffer) - 1, 0);
+
+		if (bytesReceived == SOCKET_ERROR)
+		{
+			//
+			// INVALID SOCKET CONNECTION - CLOSE SOCKET
+			//
+
+			DWORD err = WSAGetLastError();
+			if (err == WSAETIMEDOUT)
+			{
+				PrintData stData =
+				{
+					.indentationLength = 2,
+					.addTimeStamp = true,
+					.severity = sev_w,
+					.customTag = "CLIENT",
+					.message = "Socket [" + to_string(clientSocket) + "] timed out after 5 seconds without sending any data."
+				};
+				unique_ptr<Event> stEvent = make_unique<Event>();
+				stEvent->SendEvent(rec_c, stData);
+			}
+			else
+			{
+				PrintData srData =
+				{
+					.indentationLength = 2,
+					.addTimeStamp = true,
+					.severity = sev_w,
+					.customTag = "CLIENT",
+					.message = "Socket [" + to_string(clientSocket) + "] recv() failed with error: " + to_string(err)
+				};
+				unique_ptr<Event> srEvent = make_unique<Event>();
+				srEvent->SendEvent(rec_c, srData);
+			}
+
+			this->SocketCleanup(clientSocket);
+			closesocket(rawClientSocket);
+			return false;
+		}
+		else if (bytesReceived == 0)
+		{
+			//
+			// EMPTY SOCKET - CLOSE SOCKET
+			//
+
+			PrintData sdData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_w,
+				.customTag = "CLIENT",
+				.message = "Socket [" + to_string(clientSocket) + "] disconnected without sending any data."
+			};
+			unique_ptr<Event> sdEvent = make_unique<Event>();
+			sdEvent->SendEvent(rec_c, sdData);
+
+			this->SocketCleanup(clientSocket);
+			closesocket(rawClientSocket);
+			return false;
+		}
+
+		string request(buffer);
+		route = "/";
+
+		PrintData shData =
+		{
+			.indentationLength = 2,
+			.addTimeStamp = true,
+			.severity = sev_d,
+			.customTag = "CLIENT",
+			.message = "Socket [" + to_string(clientSocket) + "] raw HTTP request:\n" + request
+		};
+		unique_ptr<Event> shEvent = make_unique<Event>();
+		shEvent->SendEvent(rec_c, shData);
+
+		if (request.starts_with("GET "))
+		{
+			size_t pathStart = 4;
+			size_t pathEnd = request.find(' ', pathStart);
+			if (pathEnd != string::npos)
+			{
+				route = request.substr(pathStart, pathEnd - pathStart);
+			}
+		}
+
+		cleanRoute = route;
+		size_t q = route.find('?');
+
+		wantsToDownload = false;
+		if (q != string::npos)
+		{
+			string query = route.substr(q + 1);
+			cleanRoute = route.substr(0, q);
+
+			if (query.find("download") != string::npos)
+			{
+				wantsToDownload = true;
+			}
+		}
+
+		clientIP = this->ExtractHeader(
+			request,
+			"Cf-Connecting-Ip");
+
+		if (clientIP.empty())
+		{
+			clientIP = "unknown-ip";
+
+			PrintData frData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "CLIENT",
+				.message =
+					"Failed to get client IP for socket [" + to_string(clientSocket) + "]!"
+					"\n"
+					"Full request dump :"
+					"\n" +
+					request
+			};
+			unique_ptr<Event> frEvent = make_unique<Event>();
+			frEvent->SendEvent(rec_c, frData);
+		}
+
+		isHost = Server::server->IsHost(clientIP);
+		if (isHost)
+		{
+			PrintData ciData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = true,
+				.severity = sev_m,
+				.customTag = "CLIENT",
+				.message = "Client [" + to_string(clientSocket) + " - '" + clientIP + "'] is server host."
+			};
+			unique_ptr<Event> ciEvent = make_unique<Event>();
+			ciEvent->SendEvent(rec_c, ciData);
+			clientIP = "host";
+
+			//always update available data when host joins homepage
+			if (cleanRoute == "/")
+			{
+				Server::server->canUpdateWhitelistedRoutes = true;
+				Server::server->canUpdateRouteAccess = true;
+				Server::server->canUpdateWhitelistedIPs = true;
+				Server::server->canUpdateBannedIPs = true;
+
+				Server::server->GetWhitelistedRoutes();
+				Server::server->SetRouteAccessLevels();
+				Server::server->GetFileData(DataFileType::datafile_whitelistedIP);
+				Server::server->GetFileData(DataFileType::datafile_bannedIP);
+			}
+		}
+
+		return true;
+	}
+
+	bool Client::CanConnect(
+		uintptr_t clientSocket,
+		string clientIP,
+		string cleanRoute,
+		bool& isHost)
+	{
+		//
+		// CHECK IF CLIENT IS WHITELISTED OR BANNED
+		//
+
+		pair<string, string> whitelistedClient = Server::server->IsWhitelistedClient(clientIP);
+		pair<string, string> bannedClient = Server::server->IsBannedClient(clientIP);
+
+		if (isHost
+			|| whitelistedClient.first != "")
+		{
+			PrintData wcData =
+			{
+				.indentationLength = 0,
+				.addTimeStamp = false,
+				.severity = sev_m,
+				.customTag = "",
+				.message =
+					"=============== WHITELISTED CLIENT =================\n"
+					" IP     : " + clientIP + "\n"
+					" Socket : " + to_string(clientSocket) + "\n"
+					" Reason : " + whitelistedClient.second + "\n"
+					"====================================================\n"
+			};
+			unique_ptr<Event> wcEvent = make_unique<Event>();
+			wcEvent->SendEvent(rec_c, wcData);
+		}
+		else
+		{
+			if (bannedClient.first != "")
+			{
+				BanClientData abcData =
+				{
+					.ip = clientIP,
+					.socket = clientSocket,
+					.reason = bannedClient.second,
+					.events = Server::server->banClientData.events
+				};
+				unique_ptr<Event> abcEvent = make_unique<Event>();
+				bool result = abcEvent->SendEvent(EventType::event_already_banned_client_connected, abcData);
+
+				//fallback for if any parameters are invalid for already banned user,
+				//prevents entire socket hang
+				if (!result)
+				{
+					auto respBanned = make_unique<Response_418>();
+					respBanned->Init(
+						clientSocket,
+						clientIP,
+						bannedClient.second,
+						"text/html");
+				}
+
+				this->SocketCleanup(clientSocket);
+				return false;
+			}
+			else if (bannedClient.first == ""
+				&& !Server::server->blacklistedKeywords.empty()
+				&& Server::server->IsBlacklistedRoute(cleanRoute))
+			{
+				BanClientData abcData =
+				{
+					.ip = clientIP,
+					.socket = clientSocket,
+					.reason = cleanRoute,
+					.events = Server::server->banClientData.events
+				};
+				unique_ptr<Event> abcEvent = make_unique<Event>();
+				bool result = abcEvent->SendEvent(EventType::event_client_was_banned_for_blacklisted_route, abcData);
+
+				//fallback for if any parameters are invalid for banned user,
+				//prevents entire socket hang
+				if (!result)
+				{
+					auto respBanned = make_unique<Response_418>();
+					respBanned->Init(
+						clientSocket,
+						clientIP,
+						cleanRoute,
+						"text/html");
+				}
+
+				this->SocketCleanup(clientSocket);
+				return false;
+			}
+		}
+
+		if (Server::server->rateLimitTimer > 0
+			&& !isHost
+			&& whitelistedClient.first == "")
+		{
+			lock_guard<mutex> counterLock(Server::server->counterMutex);
+			int& count = Server::server->requestCounter[clientIP][cleanRoute];
+			count++;
+
+			if (count > Server::server->rateLimitTimer)
+			{
+				string reason = "Exceeded allowed connection rate limit of " + to_string(Server::server->rateLimitTimer) + " times per second";
+				BanClientData abcData =
+				{
+					.ip = clientIP,
+					.socket = clientSocket,
+					.reason = reason,
+					.events = Server::server->banClientData.events
+				};
+				unique_ptr<Event> abcEvent = make_unique<Event>();
+				bool result = abcEvent->SendEvent(EventType::event_client_was_banned_for_rate_limit, abcData);
+
+				//fallback for if any parameters are invalid for banned user,
+				//prevents entire socket hang
+				if (!result)
+				{
+					auto respBanned = make_unique<Response_418>();
+					respBanned->Init(
+						clientSocket,
+						clientIP,
+						reason,
+						"text/html");
+				}
+
+				this->SocketCleanup(clientSocket);
+				return false;
+			}
+		}
+
+		PrintData scData =
+		{
+			.indentationLength = 0,
+			.addTimeStamp = true,
+			.severity = sev_m,
+			.customTag = "CLIENT",
+			.message = "New client successfully connected [" + to_string(clientSocket) + " - '" + clientIP + "']!"
+		};
+		unique_ptr<Event> scEvent = make_unique<Event>();
+		scEvent->SendEvent(rec_c, scData);
+
+		return true;
+	}
+
+	bool Client::IsValidRoute(
+		uintptr_t clientSocket,
+		string clientIP,
+		string cleanRoute,
+		Route& foundRoute)
+	{
+		//
+		// CHECK IF ROUTE EXISTS
+		//
+
+		SOCKET rawClientSocket = static_cast<SOCKET>(clientSocket);
+
+		Server::server->GetWhitelistedRoutes();
+
+		for (const auto& r : Server::server->whitelistedRoutes)
+		{
+			if (r.route == cleanRoute)
+			{
+				foundRoute = r;
+				break;
+			}
+		}
+
+		if (foundRoute.route.empty())
+		{
+			PrintData caData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_w,
+				.customTag = "CLIENT",
+				.message =
+					"Client ["
+					+ to_string(clientSocket) + " - '" + clientIP + "'] tried to access non-existing route '"
+					+ cleanRoute + "'!"
+			};
+			unique_ptr<Event> caEvent = make_unique<Event>();
+			caEvent->SendEvent(rec_c, caData);
+
+			auto resp404 = make_unique<Response_404>();
+			resp404->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			this->SocketCleanup(clientSocket);
+			return false;
+		}
+
+		bool extentionExists = false;
+		for (const auto& ext : Server::server->whitelistedExtensions)
+		{
+			if (path(cleanRoute).extension().generic_string() == ext)
+			{
+				extentionExists = true;
+				break;
+			}
+		}
+
+		//
+		// CHECK IF ROUTE EXTENSION IS ALLOWED
+		//
+
+		bool isAllowedFile =
+			cleanRoute.find_last_of('.') == string::npos
+			|| extentionExists;
+
+		if (!isAllowedFile)
+		{
+			PrintData ttData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_w,
+				.customTag = "CLIENT",
+				.message =
+					"Client ["
+					+ to_string(clientSocket) + " - '" + clientIP + "'] tried to access unauthorized route '" + cleanRoute
+					+ "' from path '" + foundRoute.route + "'."
+			};
+			unique_ptr<Event> ttEvent = make_unique<Event>();
+			ttEvent->SendEvent(rec_c, ttData);
+
+			auto resp401 = make_unique<Response_401>();
+			resp401->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			this->SocketCleanup(clientSocket);
+			return false;
+		}
+
+		return true;
 	}
 
 	void Client::SocketCleanup(uintptr_t clientSocket)

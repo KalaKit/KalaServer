@@ -27,7 +27,7 @@ namespace KalaKit::ResponseSystem
 		size_t rangeEnd = 0;
 		size_t totalSize = 0;
 		string contentRange{};
-		SendAction sendAction;
+		SendAction sendAction = SendAction::send_default;
 
 		virtual ~Response() = default;
 
