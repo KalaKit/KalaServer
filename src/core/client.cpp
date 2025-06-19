@@ -305,7 +305,7 @@ namespace KalaKit::Core
 			|| canAccessRegisteredRoute
 			|| canAccessAdminRoute;
 
-		bool allowDownload =
+		bool allowDownloadUpload =
 			isClientRegistered
 			|| isClientAdmin
 			|| isHost;
@@ -346,7 +346,7 @@ namespace KalaKit::Core
 			return;
 		}
 
-		if (!allowDownload
+		if (!allowDownloadUpload
 			&& wantsToDownload)
 		{
 			PrintData alData =
@@ -363,6 +363,33 @@ namespace KalaKit::Core
 			};
 			unique_ptr<Event> alEvent = make_unique<Event>();
 			alEvent->SendEvent(rec_c, alData);
+
+			auto resp401 = make_unique<Response_401>();
+			resp401->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			this->SocketCleanup(socket);
+			return;
+		}
+
+		if (!allowDownloadUpload
+			&& wantsToUpload)
+		{
+			PrintData ulData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_w,
+				.customTag = "CLIENT",
+				.message =
+					"Client ["
+					+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
+					+ " tried to upload file '" + cleanRoute + "'!"
+			};
+			unique_ptr<Event> ulEvent = make_unique<Event>();
+			ulEvent->SendEvent(rec_c, ulData);
 
 			auto resp401 = make_unique<Response_401>();
 			resp401->Init(
