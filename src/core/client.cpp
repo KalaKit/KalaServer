@@ -384,7 +384,7 @@ namespace KalaKit::Core
 				.customTag = "CLIENT",
 				.message =
 					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
+					+ to_string(clientSocket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
 					+ " tried to upload file '" + cleanRoute + "'!"
 			};
 			unique_ptr<Event> ulEvent = make_unique<Event>();
@@ -396,7 +396,7 @@ namespace KalaKit::Core
 				clientIP,
 				cleanRoute,
 				"text/html");
-			this->SocketCleanup(socket);
+			this->SocketCleanup(clientSocket);
 			return;
 		}
 
