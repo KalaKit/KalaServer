@@ -179,10 +179,9 @@ namespace KalaKit::Core
 		}
 	}
 
-	void Client::HandleClient(uintptr_t socket)
+	void Client::HandleClient(uintptr_t clientSocket)
 	{
 		SOCKET rawClientSocket{};
-		uintptr_t clientSocket{};
 
 		string clientIP{};
 		string route{};
@@ -329,7 +328,7 @@ namespace KalaKit::Core
 				.customTag = "CLIENT",
 				.message =
 					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
+					+ to_string(clientSocket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
 					+ " tried to access route '" + cleanRoute
 					+ "' with auth level " + routeAuth + "!"
 			};
@@ -342,7 +341,7 @@ namespace KalaKit::Core
 				clientIP,
 				cleanRoute,
 				"text/html");
-			this->SocketCleanup(socket);
+			this->SocketCleanup(clientSocket);
 			return;
 		}
 
@@ -357,7 +356,7 @@ namespace KalaKit::Core
 				.customTag = "CLIENT",
 				.message =
 					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
+					+ to_string(clientSocket) + " - '" + clientIP + "'] with insufficient auth level " + clientAuth
 					+ " tried to download file '" + cleanRoute
 					+ "' with auth level " + routeAuth + "!"
 			};
@@ -370,7 +369,7 @@ namespace KalaKit::Core
 				clientIP,
 				cleanRoute,
 				"text/html");
-			this->SocketCleanup(socket);
+			this->SocketCleanup(clientSocket);
 			return;
 		}
 
@@ -474,7 +473,7 @@ namespace KalaKit::Core
 			{
 				string humanReadableSize = to_string(totalSize / (static_cast<unsigned long long>(1024) * 1024)) + " MB";
 				string blockReason =
-					"Client [" + to_string(socket) + " - '" + clientIP + "'] "
+					"Client [" + to_string(clientSocket) + " - '" + clientIP + "'] "
 					"attempted to download large file '" + cleanRoute + "' ("
 					+ to_string(totalSize) + " bytes = " + humanReadableSize + ") which exceeds the 10MB limit.";
 				PrintData dData =
@@ -494,7 +493,7 @@ namespace KalaKit::Core
 					clientIP,
 					cleanRoute,
 					"text/html");
-				this->SocketCleanup(socket);
+				this->SocketCleanup(clientSocket);
 				return;
 			}
 
@@ -508,7 +507,7 @@ namespace KalaKit::Core
 					.customTag = "CLIENT",
 					.message =
 						"Client ["
-						+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+						+ to_string(clientSocket) + " - '" + clientIP + "'] tried to access broken route '"
 						+ cleanRoute + "'."
 				};
 				unique_ptr<Event> abEvent = make_unique<Event>();
@@ -520,7 +519,7 @@ namespace KalaKit::Core
 					clientIP,
 					cleanRoute,
 					"text/html");
-				this->SocketCleanup(socket);
+				this->SocketCleanup(clientSocket);
 				return;
 			}
 			else
@@ -566,7 +565,7 @@ namespace KalaKit::Core
 						clientIP,
 						cleanRoute,
 						foundRoute.mimeType);
-					this->SocketCleanup(socket);
+					this->SocketCleanup(clientSocket);
 					return;
 				}
 				else
@@ -600,7 +599,7 @@ namespace KalaKit::Core
 						clientIP,
 						cleanRoute,
 						foundRoute.mimeType);
-					this->SocketCleanup(socket);
+					this->SocketCleanup(clientSocket);
 					return;
 				}
 			}
@@ -615,7 +614,7 @@ namespace KalaKit::Core
 				.customTag = "CLIENT",
 				.message =
 					"Client ["
-					+ to_string(socket) + " - '" + clientIP + "'] tried to access broken route '"
+					+ to_string(clientSocket) + " - '" + clientIP + "'] tried to access broken route '"
 					+ cleanRoute + "'.\nError:\n" + e.what()
 			};
 			unique_ptr<Event> taEvent = make_unique<Event>();
@@ -627,7 +626,7 @@ namespace KalaKit::Core
 				clientIP,
 				cleanRoute,
 				"text/html");
-			this->SocketCleanup(socket);
+			this->SocketCleanup(clientSocket);
 		}
 	}
 
