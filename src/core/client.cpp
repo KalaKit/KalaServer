@@ -766,12 +766,12 @@ namespace KalaKit::Core
 		{
 			PrintData pd =
 			{
-				.indentationLength = 2,
+				.indentationLength = 0,
 				.addTimeStamp = true,
 				.severity = sev_m,
 				.customTag = "CLIENT",
 				.message =
-					"Client [" + to_string(clientSocket) + " - '" + clientIP + "']"
+					"Client [" + to_string(clientSocket) + "] "
 					"connected with method '" + method + "'"
 			};
 			unique_ptr<Event> event = make_unique<Event>();
@@ -788,7 +788,7 @@ namespace KalaKit::Core
 				.severity = sev_e,
 				.customTag = "CLIENT",
 				.message = 
-					"Client [" + to_string(clientSocket) + " - '" + clientIP + "']"
+					"Client [" + to_string(clientSocket) + "] "
 					"connected with unsupported method '" + method + "'! Closing connection..."
 			};
 			unique_ptr<Event> event = make_unique<Event>();
