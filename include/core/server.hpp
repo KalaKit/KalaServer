@@ -52,8 +52,10 @@ namespace KalaKit::Core
 
 	struct ErrorMessage
 	{
+		string error400;
 		string error401;
 		string error404;
+		string error405;
 		string error418;
 		string error500;
 	};

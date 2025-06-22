@@ -16,15 +16,19 @@
 #include "core/event.hpp"
 #include "response/response_200.hpp"
 #include "response/response_206.hpp"
+#include "response/response_400.hpp"
 #include "response/response_401.hpp"
 #include "response/response_404.hpp"
+#include "response/response_405.hpp"
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
 
 using KalaKit::ResponseSystem::Response_200;
 using KalaKit::ResponseSystem::Response_206;
+using KalaKit::ResponseSystem::Response_400;
 using KalaKit::ResponseSystem::Response_401;
 using KalaKit::ResponseSystem::Response_404;
+using KalaKit::ResponseSystem::Response_405;
 using KalaKit::ResponseSystem::Response_418;
 using KalaKit::ResponseSystem::Response_500;
 
@@ -183,6 +187,8 @@ namespace KalaKit::Core
 	{
 		SOCKET rawClientSocket{};
 
+		string method{};
+
 		string clientIP{};
 		string route{};
 		string cleanRoute{};
@@ -194,6 +200,7 @@ namespace KalaKit::Core
 		string request{};
 
 		bool connectStart = ConnectionStart(
+			method,
 			clientSocket,
 			clientIP,
 			route,
@@ -274,6 +281,82 @@ namespace KalaKit::Core
 			unique_ptr<Event> event = make_unique<Event>();
 			event->SendEvent(EventType::event_print_console_message, pd);
 
+			return;
+		}
+
+		//
+		// CLIENT SENT EMAIL FROM CONTACT FORM
+		//
+
+		if (cleanRoute == "/client-sent-email")
+		{
+			size_t bodyPos = request.find("\r\n\r\n");
+			if (bodyPos == string::npos)
+			{
+				PrintData emData =
+				{
+					.indentationLength = 2,
+					.addTimeStamp = true,
+					.severity = sev_e,
+					.customTag = "CLIENT",
+					.message =
+						"Client ["
+						+ to_string(clientSocket) + " - '" + clientIP + "'] sent malformed email POST body!"
+				};
+				unique_ptr<Event> emEvent = make_unique<Event>();
+				emEvent->SendEvent(rec_c, emData);
+
+				auto resp400 = make_unique<Response_400>();
+				resp400->Init(
+					rawClientSocket,
+					clientIP,
+					cleanRoute,
+					"text/html");
+
+				this->SocketCleanup(clientSocket);
+				return;
+			}
+			string postBody = request.substr(bodyPos + 4);
+
+			bool emailSendResult = this->SendEmail(
+				method,
+				postBody,
+				clientSocket,
+				clientIP,
+				cleanRoute,
+				foundRoute);
+			if (!emailSendResult)
+			{
+				PrintData emData =
+				{
+					.indentationLength = 2,
+					.addTimeStamp = true,
+					.severity = sev_w,
+					.customTag = "CLIENT",
+					.message =
+						"Client ["
+						+ to_string(clientSocket) + " - '" + clientIP + "'] failed to send email!"
+				};
+				unique_ptr<Event> emEvent = make_unique<Event>();
+				emEvent->SendEvent(rec_c, emData);
+			}
+			else
+			{
+				PrintData emData =
+				{
+					.indentationLength = 0,
+					.addTimeStamp = true,
+					.severity = sev_m,
+					.customTag = "CLIENT",
+					.message =
+						"Client ["
+						+ to_string(clientSocket) + " - '" + clientIP + "'] successfully sent email!"
+				};
+				unique_ptr<Event> emEvent = make_unique<Event>();
+				emEvent->SendEvent(rec_c, emData);
+			}
+
+			this->SocketCleanup(clientSocket);
 			return;
 		}
 
@@ -631,6 +714,7 @@ namespace KalaKit::Core
 	}
 
 	bool Client::ConnectionStart(
+		string& method,
 		uintptr_t& clientSocket,
 		string& clientIP,
 		string& route,
@@ -747,7 +831,6 @@ namespace KalaKit::Core
 		unique_ptr<Event> shEvent = make_unique<Event>();
 		shEvent->SendEvent(rec_c, shData);
 
-		string method{};
 		size_t methodEnd = request.find(' ');
 		if (methodEnd != string::npos)
 		{
@@ -1022,6 +1105,8 @@ namespace KalaKit::Core
 		string cleanRoute,
 		Route& foundRoute)
 	{
+		if (cleanRoute == "/client-sent-email") return true;
+
 		//
 		// CHECK IF ROUTE EXISTS
 		//
@@ -1108,6 +1193,79 @@ namespace KalaKit::Core
 			this->SocketCleanup(clientSocket);
 			return false;
 		}
+
+		return true;
+	}
+
+	bool Client::SendEmail(
+		string method,
+		const string& request,
+		uintptr_t clientSocket,
+		string clientIP,
+		string cleanRoute,
+		Route& foundRoute)
+	{
+		//
+		// CLIENT SENT EMAIL FROM CONTACT FORM
+		//
+
+		SOCKET rawClientSocket = static_cast<SOCKET>(clientSocket);
+
+		if (method != "POST")
+		{
+			PrintData emData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "SERVER",
+				.message = "Client passed invalid method '" + method + "' to '/client-sent-email' route!"
+			};
+			unique_ptr<Event> emEvent = make_unique<Event>();
+			emEvent->SendEvent(rec_c, emData);
+
+			auto resp405 = make_unique<Response_405>();
+			resp405->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			return false;
+		}
+
+		EmailData* edata{};
+		for (auto& payload : Server::server->healthPingData.receivers)
+		{
+			if (EmailData* data = get_if<EmailData>(&payload))
+			{
+				edata = data;
+				break;
+			}
+		}
+		if (edata == nullptr)
+		{
+			PrintData emData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "SERVER",
+				.message = "Failed to send client email via route '/client-sent-email' because host has not configured 'health ping' to receive emails!"
+			};
+			unique_ptr<Event> emEvent = make_unique<Event>();
+			emEvent->SendEvent(rec_c, emData);
+
+			auto resp500 = make_unique<Response_500>();
+			resp500->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			return false;
+		}
+
+		unique_ptr<Event> event = make_unique<Event>();
+		event->SendEvent(EventType::event_send_email, *edata);
 
 		return true;
 	}

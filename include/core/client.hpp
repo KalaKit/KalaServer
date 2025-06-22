@@ -39,6 +39,7 @@ namespace KalaKit::Core
 	private:
 		//First steps to initialize client connection
 		bool ConnectionStart(
+			string& method,
 			uintptr_t& clientSocket,
 			string& clientIP,
 			string& route,
@@ -56,6 +57,15 @@ namespace KalaKit::Core
 
 		//Checks if route and extension are allowed
 		bool IsValidRoute(
+			uintptr_t clientSocket,
+			string clientIP,
+			string cleanRoute,
+			Route& foundRoute);
+
+		//Client fills contact form -> server sends email to host
+		bool SendEmail(
+			string method,
+			const string& request,
 			uintptr_t clientSocket,
 			string clientIP,
 			string cleanRoute,
