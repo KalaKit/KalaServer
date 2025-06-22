@@ -31,7 +31,7 @@ namespace KalaKit::ResponseSystem
 		string contentType = targetContentType;
 		string statusLine = "HTTP/1.1 404 Not Found";
 
-		size_t totalSize = 0;
+		size_t totalSize = 2;
 		bool sliced = false;
 		vector<char> body = Server::server->ServeFile(
 			Server::server->errorMessage.error404,

@@ -46,7 +46,7 @@ namespace KalaKit::ResponseSystem
 		{
 			PrintData rData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 2,
 				.addTimeStamp = false,
 				.severity = EventType::event_severity_message,
 				.customTag = "RESPONSE",

@@ -67,7 +67,7 @@ namespace KalaKit::DNS
 		{
 			PrintData csData =
 			{
-				.indentationLength = 2,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
@@ -82,7 +82,7 @@ namespace KalaKit::DNS
 		{
 			PrintData ciData =
 			{
-				.indentationLength = 2,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
@@ -147,7 +147,7 @@ namespace KalaKit::DNS
 		{
 			PrintData ccData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
@@ -169,7 +169,7 @@ namespace KalaKit::DNS
 			{
 				PrintData cjData =
 				{
-					.indentationLength = 0,
+					.indentationLength = 4,
 					.addTimeStamp = true,
 					.severity = sev_m,
 					.customTag = "CLOUDFLARE",
@@ -187,7 +187,7 @@ namespace KalaKit::DNS
 
 		PrintData ciData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
@@ -341,7 +341,7 @@ namespace KalaKit::DNS
 		{
 			PrintData caData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
@@ -354,7 +354,7 @@ namespace KalaKit::DNS
 
 		PrintData ntData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
@@ -376,7 +376,7 @@ namespace KalaKit::DNS
 		string command = "cloudflared tunnel login";
 		PrintData ccData =
 		{
-			.indentationLength = 2,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
@@ -421,7 +421,7 @@ namespace KalaKit::DNS
 
 		PrintData lbData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
@@ -450,7 +450,7 @@ namespace KalaKit::DNS
 		
 		PrintData ncData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
@@ -469,7 +469,7 @@ namespace KalaKit::DNS
 		{
 			PrintData cjData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
@@ -497,7 +497,7 @@ namespace KalaKit::DNS
 		string command1 = "cloudflared tunnel delete " + tunnelName;
 		PrintData c1Data =
 		{
-			.indentationLength = 2,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
@@ -555,7 +555,7 @@ namespace KalaKit::DNS
 		string command2 = "cloudflared tunnel create " + tunnelName;
 		PrintData c2Data =
 		{
-			.indentationLength = 2,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
@@ -624,7 +624,7 @@ namespace KalaKit::DNS
 		
 		PrintData jfData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
@@ -670,7 +670,7 @@ namespace KalaKit::DNS
 		string command1 = "cloudflared tunnel route dns " + Server::server->GetDomainName() + " " + tunnelName;
 		PrintData c1Data =
 		{
-			.indentationLength = 2,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
@@ -728,7 +728,7 @@ namespace KalaKit::DNS
 		string command2 = "cloudflared tunnel route dns www." + Server::server->GetDomainName() + " " + tunnelName;
 		PrintData c2Data =
 		{
-			.indentationLength = 2,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
@@ -774,7 +774,7 @@ namespace KalaKit::DNS
 		
 		PrintData rcData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
@@ -865,7 +865,7 @@ namespace KalaKit::DNS
 
 		PrintData ccData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE_COMMAND",
@@ -911,7 +911,7 @@ namespace KalaKit::DNS
 		
 		PrintData rcData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
@@ -932,7 +932,7 @@ namespace KalaKit::DNS
 		{
 			PrintData pcData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
@@ -971,7 +971,7 @@ namespace KalaKit::DNS
 						{
 							PrintData chData =
 							{
-								.indentationLength = 0,
+								.indentationLength = 4,
 								.addTimeStamp = true,
 								.severity = sev_w,
 								.customTag = "CLOUDFLARE",
@@ -1004,7 +1004,7 @@ namespace KalaKit::DNS
 
 						PrintData ccData =
 						{
-							.indentationLength = 0,
+							.indentationLength = 4,
 							.addTimeStamp = true,
 							.severity = sev_w,
 							.customTag = "CLOUDFLARE",
@@ -1023,7 +1023,7 @@ namespace KalaKit::DNS
 					{
 						PrintData clData =
 						{
-							.indentationLength = 0,
+							.indentationLength = 4,
 							.addTimeStamp = true,
 							.severity = sev_m,
 							.customTag = "CLOUDFLARE_LOG",
@@ -1048,7 +1048,7 @@ namespace KalaKit::DNS
 
 					PrintData cl2Data =
 					{
-						.indentationLength = 0,
+						.indentationLength = 4,
 						.addTimeStamp = true,
 						.severity = type,
 						.customTag = "CLOUDFLARE_LOG",
@@ -1068,7 +1068,7 @@ namespace KalaKit::DNS
 		{
 			PrintData sdData =
 			{
-				.indentationLength = 2,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_e,
 				.customTag = "CLOUDFLARE",
@@ -1097,7 +1097,7 @@ namespace KalaKit::DNS
 		{
 			PrintData sdData =
 			{
-				.indentationLength = 0,
+				.indentationLength = 4,
 				.addTimeStamp = true,
 				.severity = sev_m,
 				.customTag = "CLOUDFLARE",
@@ -1111,7 +1111,7 @@ namespace KalaKit::DNS
 
 		PrintData cwData =
 		{
-			.indentationLength = 0,
+			.indentationLength = 4,
 			.addTimeStamp = true,
 			.severity = sev_m,
 			.customTag = "CLOUDFLARE",
