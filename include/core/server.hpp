@@ -56,6 +56,7 @@ namespace KalaKit::Core
 		string error401;
 		string error404;
 		string error405;
+		string error413;
 		string error418;
 		string error500;
 	};
@@ -82,10 +83,12 @@ namespace KalaKit::Core
 	public:
 		static inline unique_ptr<Server> server;
 
+		//If client connections to one route per second exceed this then that client gets banned.
+		unsigned int rateLimitTimer;
+
 		//keeps track of user attempts to routes per second
 		unordered_map<string, unordered_map<string, int>> requestCounter;
-
-		mutable mutex counterMutex;
+		mutable mutex requestMutex;
 
 		//File paths for server admin provided error pages,
 		//loads browser defaults otherwise.
@@ -120,8 +123,6 @@ namespace KalaKit::Core
 
 		//All extensions whose files are allowed to be opened
 		vector<string> whitelistedExtensions{};
-
-		unsigned int rateLimitTimer; //If client connections to one route per second exceed this then that client gets banned.
 
 		Server(
 			unsigned int port,

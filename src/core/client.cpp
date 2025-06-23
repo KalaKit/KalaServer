@@ -9,6 +9,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <charconv>
+#include <system_error>
 
 #include "core/client.hpp"
 #include "core/core.hpp"
@@ -20,6 +22,7 @@
 #include "response/response_401.hpp"
 #include "response/response_404.hpp"
 #include "response/response_405.hpp"
+#include "response/response_413.hpp"
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
 
@@ -29,6 +32,7 @@ using KalaKit::ResponseSystem::Response_400;
 using KalaKit::ResponseSystem::Response_401;
 using KalaKit::ResponseSystem::Response_404;
 using KalaKit::ResponseSystem::Response_405;
+using KalaKit::ResponseSystem::Response_413;
 using KalaKit::ResponseSystem::Response_418;
 using KalaKit::ResponseSystem::Response_500;
 
@@ -43,6 +47,9 @@ using std::chrono::seconds;
 using std::chrono::milliseconds;
 using std::this_thread::sleep_for;
 using std::filesystem::path;
+using std::stringstream;
+using std::from_chars;
+using std::errc;
 
 namespace KalaKit::Core
 {
@@ -317,6 +324,17 @@ namespace KalaKit::Core
 				return;
 			}
 			string postBody = request.substr(bodyPos + 4);
+
+			PrintData dbData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_w,
+				.customTag = "CLIENT",
+				.message = "raw post body '" + postBody + "'"
+			};
+			unique_ptr<Event> dbEvent = make_unique<Event>();
+			dbEvent->SendEvent(rec_c, dbData);
 
 			bool emailSendResult = this->SendEmail(
 				method,
@@ -1051,7 +1069,7 @@ namespace KalaKit::Core
 			&& !isHost
 			&& whitelistedClient.first == "")
 		{
-			lock_guard<mutex> counterLock(Server::server->counterMutex);
+			lock_guard<mutex> counterLock(Server::server->requestMutex);
 			int& count = Server::server->requestCounter[clientIP][cleanRoute];
 			count++;
 
@@ -1263,6 +1281,242 @@ namespace KalaKit::Core
 				"text/html");
 			return false;
 		}
+
+		size_t maxPostSize = 8192;
+		if (request.size() > maxPostSize)
+		{
+			PrintData emData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "SERVER",
+				.message = "Client attempted to send oversized POST body with size of '" + to_string(request.size()) + "' to '/client-sent-email' route!"
+			};
+			unique_ptr<Event> emEvent = make_unique<Event>();
+			emEvent->SendEvent(rec_c, emData);
+
+			auto resp413 = make_unique<Response_413>();
+			resp413->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			return false;
+		}
+
+		//
+		// EXTRACT SENDER, SUBJECT AND BODY
+		//
+
+		//decode percent-encoded url form data
+		auto urlDecode = [](const string& str) -> string
+		{
+			string ret{};
+			for (int i = 0; i < str.length(); ++i)
+			{
+				if (str[i] == '%')
+				{
+					unsigned long long li = static_cast<unsigned long long>(i);
+					if (li + 2 < str.length()
+						&& isxdigit(str[li + 1])
+						&& isxdigit(str[li + 2]))
+					{
+						int val{};
+						auto result = from_chars(str.data() + i + 1, str.data() + i + 3, val, 16);
+						if (result.ec == errc{})
+						{
+							ret += static_cast<char>(val);
+							i += 2;
+						}
+					}
+				}
+				else if (str[i] == '+') ret += ' ';
+				else ret += str[i];
+			}
+			return ret;
+		};
+
+		//parse url-encoded post body
+		unordered_map<string, string> formFields{};
+		stringstream ss(request);
+		string pair{};
+		while (getline(ss, pair, '&'))
+		{
+			size_t eq = pair.find('=');
+			if (eq != string::npos)
+			{
+				string key = urlDecode(pair.substr(0, eq));
+				string val = urlDecode(pair.substr(eq + 1));
+				formFields[key] = val;
+			}
+		}
+
+		string sender = formFields.contains("sender") ? formFields["sender"] : "";
+		string subject = formFields.contains("subject") ? formFields["subject"] : "";
+		string body = formFields.contains("body") ? formFields["body"] : "";
+
+		auto trim = [](const string& s) -> string
+		{
+			size_t start = s.find_first_not_of(" \t\r\n");
+			size_t end = s.find_last_not_of(" \t\r\n");
+			return (start == string::npos) ? "" : s.substr(start, end - start + 1);
+		};
+
+		sender = trim(sender);
+		subject = trim(subject);
+		body = trim(body);
+
+		//
+		// CONFIRM SENDER, SUBJECT AND BODY VALIDITY
+		//
+
+		if (sender.empty()
+			|| subject.empty()
+			|| body.empty())
+		{
+			PrintData emData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "SERVER",
+				.message = "Client passed one or more empty parameters to '/client-sent-email' route!"
+			};
+			unique_ptr<Event> emEvent = make_unique<Event>();
+			emEvent->SendEvent(rec_c, emData);
+
+			auto resp400 = make_unique<Response_400>();
+			resp400->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			return false;
+		}
+
+		auto isSafeText = [](const string& input) -> bool
+		{
+			for (size_t i = 0; i < input.size(); ++i)
+			{
+				unsigned char c = input[i];
+
+				//disallow ASCII control characters except \n, \r, \t
+				if (c < 0x20
+					&& c != '\n'
+					&& c != '\r'
+					&& c != '\t')
+				{
+					return false;
+				}
+
+				//disallow DEL
+				if (c == 0x7F) return false;
+
+				//disallow escape sequences (ESC, often used for terminal injections)
+				if (c == 0x1B) return false;
+			}
+
+			//additional string-level checks
+			const array<string, 7> dangerousSubStrings =
+			{
+				"..",  //path traversal
+				"%00", //null-byte injection
+				"<",   //html/script start
+				">",   //html/script end
+				"&",   //entity injection
+				"\"",  //quoted injection
+				"\\"   //windows paths or escapes
+			};
+			for (const auto& pattern : dangerousSubStrings)
+			{
+				if (input.find(pattern) != string::npos)
+				{
+					return false;
+				}
+			}
+
+			return true;
+		};
+
+		if (!isSafeText(sender)
+			|| !isSafeText(subject)
+			|| !isSafeText(body))
+		{
+			PrintData emData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "SERVER",
+				.message = "Client passed illegal characters or strings into one or more parameters to '/client-sent-email' route!"
+			};
+			unique_ptr<Event> emEvent = make_unique<Event>();
+			emEvent->SendEvent(rec_c, emData);
+
+			auto resp400 = make_unique<Response_400>();
+			resp400->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			return false;
+		}
+
+		auto isValidEmail = [](const string& email) -> bool
+		{
+			size_t atPos = email.find('@');
+			if (atPos == string::npos
+				|| atPos == 0
+				|| atPos == email.size() - 1)
+			{
+				return false;
+			}
+
+			string domain = email.substr(atPos + 1);
+			size_t dotPos = domain.find('.');
+			if (dotPos == string::npos
+				|| dotPos == 0
+				|| dotPos >= domain.size() - 1
+				|| domain.back() == '.')
+			{
+				return false;
+			}
+
+			return true;
+		};
+
+		if (!isValidEmail(sender))
+		{
+			PrintData emData =
+			{
+				.indentationLength = 2,
+				.addTimeStamp = true,
+				.severity = sev_e,
+				.customTag = "SERVER",
+				.message = "Client passed invalid email '" + sender + "' to '/client-sent-email' route!"
+			};
+			unique_ptr<Event> emEvent = make_unique<Event>();
+			emEvent->SendEvent(rec_c, emData);
+
+			auto resp400 = make_unique<Response_400>();
+			resp400->Init(
+				rawClientSocket,
+				clientIP,
+				cleanRoute,
+				"text/html");
+			return false;
+		}
+
+		string clientBody = body;
+		body =
+			"====================\n"
+			"Sender: " + sender + "\n"
+			"Subject: " + subject + "\n"
+			"====================\n\n" + clientBody;
+
+		edata->subject = "New email from client at " + Server::server->GetServerName();
+		edata->body = body;
 
 		unique_ptr<Event> event = make_unique<Event>();
 		event->SendEvent(EventType::event_send_email, *edata);

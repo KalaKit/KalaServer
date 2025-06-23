@@ -973,7 +973,7 @@ namespace KalaKit::DNS
 							{
 								.indentationLength = 4,
 								.addTimeStamp = true,
-								.severity = sev_w,
+								.severity = sev_m,
 								.customTag = "CLOUDFLARE",
 								.message = "Connection '" + to_string(index) + "' has been marked healthy!"
 							};
