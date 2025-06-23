@@ -359,7 +359,7 @@ namespace KalaKit::Core
 	{
 		pair<string, string> banReason{};
 
-		if (bannedIPs.size() == 0)
+		if (server->bannedIPs.size() == 0)
 		{
 			server->canUpdateBannedIPs = true;
 			server->GetBannedIPs();
@@ -367,7 +367,7 @@ namespace KalaKit::Core
 
 		if (server->canUpdateBannedIPs) server->GetBannedIPs();
 
-		for (const pair<string, string>& bannedClient : bannedIPs)
+		for (const pair<string, string>& bannedClient : server->bannedIPs)
 		{
 			if (bannedClient.first == targetIP
 				|| targetIP.rfind(bannedClient.first, 0) == 0)
@@ -440,7 +440,7 @@ namespace KalaKit::Core
 	void Server::GetWhitelistedRoutes() const
 	{
 		bool canContinue = 
-			whitelistedRoutes.size() == 0 
+			server->whitelistedRoutes.size() == 0 
 			|| canUpdateWhitelistedRoutes;
 
 		if (!canContinue) return;
@@ -560,7 +560,7 @@ namespace KalaKit::Core
 		}
 
 		bool canResetBannedIPs =
-			bannedIPs.size() == 0
+			server->bannedIPs.size() == 0
 			|| canUpdateBannedIPs;
 
 		if (dataFileType == DataFileType::datafile_bannedIP
@@ -1397,7 +1397,7 @@ namespace KalaKit::Core
 	{
 		pair<string, string> whitelistedReason{};
 
-		if (whitelistedIPs.size() == 0)
+		if (server->whitelistedIPs.size() == 0)
 		{
 			server->canUpdateWhitelistedIPs = true;
 			server->GetWhitelistedIPs();
