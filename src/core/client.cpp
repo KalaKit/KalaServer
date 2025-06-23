@@ -208,6 +208,7 @@ namespace KalaKit::Core
 
 		bool connectStart = ConnectionStart(
 			method,
+			request,
 			clientSocket,
 			clientIP,
 			route,
@@ -325,17 +326,6 @@ namespace KalaKit::Core
 			}
 			string postBody = request.substr(bodyPos + 4);
 
-			PrintData dbData =
-			{
-				.indentationLength = 2,
-				.addTimeStamp = true,
-				.severity = sev_w,
-				.customTag = "CLIENT",
-				.message = "raw post body '" + postBody + "'"
-			};
-			unique_ptr<Event> dbEvent = make_unique<Event>();
-			dbEvent->SendEvent(rec_c, dbData);
-
 			bool emailSendResult = this->SendEmail(
 				method,
 				postBody,
@@ -372,6 +362,13 @@ namespace KalaKit::Core
 				};
 				unique_ptr<Event> emEvent = make_unique<Event>();
 				emEvent->SendEvent(rec_c, emData);
+
+				auto resp200 = make_unique<Response_200>();
+				resp200->Init(
+					rawClientSocket,
+					clientIP,
+					"/",
+					"text/html");
 			}
 
 			this->SocketCleanup(clientSocket);
@@ -733,6 +730,7 @@ namespace KalaKit::Core
 
 	bool Client::ConnectionStart(
 		string& method,
+		string& request,
 		uintptr_t& clientSocket,
 		string& clientIP,
 		string& route,
@@ -835,7 +833,7 @@ namespace KalaKit::Core
 			return false;
 		}
 
-		string request(buffer);
+		request.append(buffer, bytesReceived);
 		route = "/";
 
 		PrintData shData =
@@ -1308,7 +1306,7 @@ namespace KalaKit::Core
 		//
 		// EXTRACT SENDER, SUBJECT AND BODY
 		//
-
+		
 		//decode percent-encoded url form data
 		auto urlDecode = [](const string& str) -> string
 		{

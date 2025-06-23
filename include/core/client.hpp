@@ -40,6 +40,7 @@ namespace KalaKit::Core
 		//First steps to initialize client connection
 		bool ConnectionStart(
 			string& method,
+			string& request,
 			uintptr_t& clientSocket,
 			string& clientIP,
 			string& route,
