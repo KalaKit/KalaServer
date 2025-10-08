@@ -17,7 +17,7 @@
 #pragma comment(lib, "Wininet.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-#include "core/core.hpp"
+#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "core/client.hpp"
 #include "core/event.hpp"
@@ -27,13 +27,13 @@
 using KalaKit::DNS::CloudFlare;
 using KalaKit::DNS::CustomDNS;
 
-using KalaKit::Core::sev_m;
-using KalaKit::Core::sev_d;
-using KalaKit::Core::sev_w;
-using KalaKit::Core::sev_e;
-using KalaKit::Core::rec_c;
-using KalaKit::Core::rec_p;
-using KalaKit::Core::rec_e;
+using KalaServer::Core::sev_m;
+using KalaServer::Core::sev_d;
+using KalaServer::Core::sev_w;
+using KalaServer::Core::sev_e;
+using KalaServer::Core::rec_c;
+using KalaServer::Core::rec_p;
+using KalaServer::Core::rec_e;
 
 using std::unordered_map;
 using std::exit;
@@ -65,7 +65,7 @@ using std::streamoff;
 using std::min;
 using std::find;
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {	
 	//Routes only registered users can access
 	vector<string> registeredRoutes{};
@@ -202,7 +202,7 @@ namespace KalaKit::Core
 		unique_ptr<Event> pEvent = make_unique<Event>();
 		pEvent->SendEvent(rec_c, pData);
 
-		KalaServer::isRunning = true;
+		KalaServerCore::SetRunningState(true);
 
 		PrintData ifData =
 		{
@@ -227,18 +227,6 @@ namespace KalaKit::Core
 
 	bool Server::PreInitializeCheck() const
 	{
-		if (!KalaServer::IsRunningAsAdmin())
-		{
-			PopupData apData =
-			{
-				.message = "This program must be ran with admin privileges!",
-				.severity = sev_e
-			};
-			unique_ptr<Event> apEvent = make_unique<Event>();
-			apEvent->SendEvent(rec_p, apData);
-			return false;
-		}
-
 		if (serverName == "")
 		{
 			PopupData esnData =
@@ -1090,7 +1078,7 @@ namespace KalaKit::Core
 			acEvent->SendEvent(rec_c, acData);
 
 			SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
-			while (KalaServer::isRunning)
+			while (KalaServerCore::IsRunning())
 			{
 				bool isHealthy = CloudFlare::IsConnHealthy(0)
 					&& CloudFlare::IsConnHealthy(1)
@@ -1142,7 +1130,7 @@ namespace KalaKit::Core
 		{
 			thread([healthTimer]
 			{
-				while (KalaServer::isRunning)
+				while (KalaServerCore::IsRunning())
 				{
 					sleep_for(seconds(healthTimer));
 
@@ -1158,7 +1146,7 @@ namespace KalaKit::Core
 
 		thread([]
 		{
-			while (KalaServer::isRunning)
+			while (KalaServerCore::IsRunning())
 			{
 				if (!canUpdateMachineIPs) canUpdateMachineIPs = true;
 
@@ -1168,7 +1156,7 @@ namespace KalaKit::Core
 
 		thread([]
 		{
-			while (KalaServer::isRunning)
+			while (KalaServerCore::IsRunning())
 			{
 				if (!server->canUpdateWhitelistedIPs) server->canUpdateWhitelistedIPs = true;
 
@@ -1178,7 +1166,7 @@ namespace KalaKit::Core
 
 		thread([]
 		{
-			while (KalaServer::isRunning)
+			while (KalaServerCore::IsRunning())
 			{
 				if (!server->canUpdateBannedIPs) server->canUpdateBannedIPs = true;
 
@@ -1188,7 +1176,7 @@ namespace KalaKit::Core
 
 		thread([]
 		{
-			while (KalaServer::isRunning)
+			while (KalaServerCore::IsRunning())
 			{
 				if (!server->canUpdateWhitelistedRoutes) server->canUpdateWhitelistedRoutes = true;
 
@@ -1198,7 +1186,7 @@ namespace KalaKit::Core
 
 		thread([]
 		{
-			while (KalaServer::isRunning)
+			while (KalaServerCore::IsRunning())
 			{
 				if (!server->canUpdateRouteAccess) server->canUpdateRouteAccess = true;
 
@@ -1208,7 +1196,7 @@ namespace KalaKit::Core
 
 		thread([] 
 		{
-			while (KalaServer::isRunning)
+			while (KalaServerCore::IsRunning())
 			{
 				sleep_for(seconds(1));
 				lock_guard<mutex> lock(server->requestMutex);

@@ -10,9 +10,9 @@
 
 #include "core/event.hpp"
 
-using KalaKit::Core::Event;
-using KalaKit::Core::EventType;
-using KalaKit::Core::PrintData;
+using KalaServer::Core::Event;
+using KalaServer::Core::EventType;
+using KalaServer::Core::PrintData;
 
 using std::cout;
 using std::chrono::milliseconds;
@@ -40,7 +40,7 @@ static void PrintType(EventType type, const string& msg)
 	event->SendEvent(EventType::event_print_console_message, pd);
 };
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	void Event::PrintNewLine()
 	{

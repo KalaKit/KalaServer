@@ -16,7 +16,7 @@
 #include "core/mimetype.hpp"
 #include "core/event.hpp"
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	using std::string;
 	using std::unique_ptr;

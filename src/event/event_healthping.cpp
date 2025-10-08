@@ -11,13 +11,13 @@
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 
-using KalaKit::Core::Event;
-using KalaKit::Core::EventType;
-using KalaKit::Core::PrintData;
-using KalaKit::Core::PopupData;
-using KalaKit::Core::EmailData;
-using KalaKit::Core::HealthPingData;
-using KalaKit::Core::Server;
+using KalaServer::Core::Event;
+using KalaServer::Core::EventType;
+using KalaServer::Core::PrintData;
+using KalaServer::Core::PopupData;
+using KalaServer::Core::EmailData;
+using KalaServer::Core::HealthPingData;
+using KalaServer::Core::Server;
 using KalaKit::DNS::CloudFlare;
 
 using std::string;
@@ -40,7 +40,7 @@ static void PrintType(EventType type, const string& msg)
 	event->SendEvent(EventType::event_print_console_message, pd);
 };
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	void Event::SendEvent(EventType type, HealthPingData healthPingData)
 	{

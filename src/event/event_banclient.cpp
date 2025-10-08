@@ -7,21 +7,21 @@
 #include <memory>
 #include <vector>
 
-#include "core/core.hpp"
+#include "core/core_program.hpp"
 #include "core/event.hpp"
 #include "core/server.hpp"
 #include "response/response_418.hpp"
 
-using KalaKit::Core::Server;
-using KalaKit::Core::Event;
-using KalaKit::Core::EventType;
-using KalaKit::Core::PrintData;
-using KalaKit::Core::PopupData;
-using KalaKit::Core::EmailData;
-using KalaKit::Core::BanClientData;
+using KalaServer::Core::Server;
+using KalaServer::Core::Event;
+using KalaServer::Core::EventType;
+using KalaServer::Core::PrintData;
+using KalaServer::Core::PopupData;
+using KalaServer::Core::EmailData;
+using KalaServer::Core::BanClientData;
 using KalaKit::ResponseSystem::Response_418;
 
-using KalaKit::Core::ReceiverPayload;
+using KalaServer::Core::ReceiverPayload;
 
 using std::string;
 using std::to_string;
@@ -46,7 +46,7 @@ static void PrintType(EventType type, const string& msg)
 	event->SendEvent(EventType::event_print_console_message, pd);
 };
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	bool Event::SendEvent(EventType type, BanClientData banClientData)
 	{

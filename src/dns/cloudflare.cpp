@@ -15,26 +15,26 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#include "core/core.hpp"
+#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
 #include "core/event.hpp"
 
-using KalaKit::Core::KalaServer;
-using KalaKit::Core::Server;
-using KalaKit::Core::Event;
-using KalaKit::Core::EventType;
-using KalaKit::Core::PrintData;
-using KalaKit::Core::PopupData;
+using KalaServer::Core::KalaServerCore;
+using KalaServer::Core::Server;
+using KalaServer::Core::Event;
+using KalaServer::Core::EventType;
+using KalaServer::Core::PrintData;
+using KalaServer::Core::PopupData;
 
-using KalaKit::Core::sev_m;
-using KalaKit::Core::sev_d;
-using KalaKit::Core::sev_w;
-using KalaKit::Core::sev_e;
-using KalaKit::Core::rec_c;
-using KalaKit::Core::rec_p;
-using KalaKit::Core::rec_e;
+using KalaServer::Core::sev_m;
+using KalaServer::Core::sev_d;
+using KalaServer::Core::sev_w;
+using KalaServer::Core::sev_e;
+using KalaServer::Core::rec_c;
+using KalaServer::Core::rec_p;
+using KalaServer::Core::rec_e;
 
 using std::filesystem::current_path;
 using std::filesystem::exists;

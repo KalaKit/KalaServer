@@ -10,7 +10,7 @@
 #include <variant>
 #include <unordered_map>
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	using std::string;
 	using std::vector;

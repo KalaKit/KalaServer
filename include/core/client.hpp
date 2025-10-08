@@ -9,11 +9,11 @@
 
 #include "core/server.hpp"
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	using std::string;
 	
-	using KalaKit::Core::Server;
+	using KalaServer::Core::Server;
 
 	class Client
 	{

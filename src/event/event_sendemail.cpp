@@ -13,10 +13,10 @@
 
 #include "core/event.hpp"
 
-using KalaKit::Core::Event;
-using KalaKit::Core::EventType;
-using KalaKit::Core::EmailData;
-using KalaKit::Core::PrintData;
+using KalaServer::Core::Event;
+using KalaServer::Core::EventType;
+using KalaServer::Core::EmailData;
+using KalaServer::Core::PrintData;
 
 using std::unique_ptr;
 using std::make_unique;
@@ -49,7 +49,7 @@ static bool IsStringEmpty(const string& paramName, const string& paramValue, con
 	return false;
 }
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	void Event::SendEvent(EventType type, const EmailData& emailData)
 	{

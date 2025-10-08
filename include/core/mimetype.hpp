@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <string>
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	enum class MimeType
 	{
@@ -43,16 +43,16 @@ namespace KalaKit::Core
 namespace std
 {
 	template<>
-	struct hash<KalaKit::Core::MimeType>
+	struct hash<KalaServer::Core::MimeType>
 	{
-		size_t operator()(const KalaKit::Core::MimeType& k) const noexcept
+		size_t operator()(const KalaServer::Core::MimeType& k) const noexcept
 		{
 			return static_cast<size_t>(k);
 		}
 	};
 }
 
-namespace KalaKit::Core
+namespace KalaServer::Core
 {
 	using std::string;
 	using std::string_view;

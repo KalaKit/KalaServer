@@ -6,14 +6,14 @@
 #include <WinSock2.h>
 #include <filesystem>
 
-#include "core/core.hpp"
+#include "core/core_program.hpp"
 #include "response/response.hpp"
 #include "core/event.hpp"
 
-using KalaKit::Core::KalaServer;
-using KalaKit::Core::Event;
-using KalaKit::Core::EventType;
-using KalaKit::Core::PrintData;
+using KalaServer::Core::KalaServerCore;
+using KalaServer::Core::Event;
+using KalaServer::Core::EventType;
+using KalaServer::Core::PrintData;
 
 using std::unique_ptr;
 using std::make_unique;

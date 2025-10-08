@@ -3,16 +3,16 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include "core/core.hpp"
+#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "response/response_400.hpp"
 #include "core/event.hpp"
 
-using KalaKit::Core::Server;
-using KalaKit::Core::KalaServer;
-using KalaKit::Core::Event;
-using KalaKit::Core::EventType;
-using KalaKit::Core::PrintData;
+using KalaServer::Core::Server;
+using KalaServer::Core::KalaServerCore;
+using KalaServer::Core::Event;
+using KalaServer::Core::EventType;
+using KalaServer::Core::PrintData;
 
 using std::unique_ptr;
 using std::make_unique;

@@ -3,127 +3,13 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h>
-#endif
+#include "core/core_program.hpp"
 
-#include <iostream>
-
-#include "KalaHeaders/log_utils.hpp"
-#include "KalaWindow/include/core/core.hpp"
-
-using KalaWindow::Core::KalaWindowCore;
-
-using KalaHeaders::Log;
-using KalaHeaders::LogType;
-
-using std::cout;
-using std::cin;
-
-static bool IsAdmin();
-static bool RunAsAdmin();
+using KalaServer::Core::KalaServerCore;
 
 int main()
 {
-	if (!IsAdmin())
-	{
-		Log::Print(
-			"Not running as admin, requesting elevation.",
-			"KalaServer",
-			LogType::LOG_INFO);
-
-		if (!RunAsAdmin())
-		{
-			KalaWindowCore::ForceClose(
-				"KalaServer initalization error",
-				"Failed to start KalaServer! You must launch as admin to use this program.");
-
-			quick_exit(1);
-		}
-	}
-	else
-	{
-		Log::Print(
-			"Reached runtime loop. Press 'Enter' to exit.",
-			"KalaServer",
-			LogType::LOG_SUCCESS);
-
-		cin.get();
-	}
+	KalaServerCore::Initialize();
 
 	return 0;
-}
-
-bool IsAdmin()
-{
-#ifdef _WIN32
-	HANDLE token = nullptr;
-	BOOL isElevated = FALSE;
-
-	if (!OpenProcessToken(
-		GetCurrentProcess(), 
-		TOKEN_QUERY, 
-		&token))
-	{
-		return false;
-	}
-
-	TOKEN_ELEVATION elevation{};
-	DWORD returnedSize{};
-
-	if (GetTokenInformation(
-		token,
-		TokenElevation,
-		&elevation,
-		sizeof(elevation),
-		&returnedSize))
-	{
-		isElevated = elevation.TokenIsElevated;
-	}
-
-	CloseHandle(token);
-	return isElevated == TRUE;
-
-#endif
-
-	return false;
-}
-
-bool RunAsAdmin()
-{
-#ifdef _WIN32
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(nullptr, exePath, MAX_PATH);
-
-	SHELLEXECUTEINFOA sei{};
-	sei.cbSize = sizeof(sei);
-	sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-	sei.lpVerb = "runas";
-	sei.lpFile = exePath;
-	sei.nShow = SW_SHOWNORMAL;
-
-	if (!ShellExecuteExA(&sei))
-	{
-		DWORD err = GetLastError();
-		if (err == ERROR_CANCELLED)
-		{
-			Log::Print(
-				"User cancelled elevation request, aborting initialization!",
-				"KalaServer",
-				LogType::LOG_ERROR,
-				2);
-
-			KalaWindowCore::ForceClose(
-				"KalaServer initalization error",
-				"Failed to start KalaServer! You must launch as admin to use this program.");
-
-			return false;
-		}
-	}
-
-	return true;
-#endif
-
-	return false;
 }
