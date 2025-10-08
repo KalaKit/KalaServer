@@ -95,12 +95,12 @@ target_link_libraries(KalaServer PRIVATE
 	${OPENSSL_LIBCRYPTO})
 
 # Hide console in release mode
-if(IS_RELEASE)
-    set_target_properties(KalaServer PROPERTIES WIN32_EXECUTABLE TRUE)
-    if (MSVC)
-        set_target_properties(KalaServer PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
-    endif()
-endif()
+# if(IS_RELEASE)
+#     set_target_properties(KalaServer PROPERTIES WIN32_EXECUTABLE TRUE)
+#     if (MSVC)
+#         set_target_properties(KalaServer PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
+#    endif()
+# endif()
 
 # Set Windows Details tab data
 set(ICON_DIR "${CMAKE_SOURCE_DIR}/files/icon.ico")
