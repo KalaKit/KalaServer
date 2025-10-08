@@ -9,10 +9,10 @@
 
 //#include "external/ktypes.hpp"
 
-namespace KalaKit::DNS
+namespace KalaServer::DNS
 {
 	using std::string;
-	//using KalaKit::KalaTypes::i16;
+	//using KalaServer::KalaTypes::i16;
 
 	class CloudFlare
 	{

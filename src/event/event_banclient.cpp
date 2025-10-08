@@ -19,7 +19,7 @@ using KalaServer::Core::PrintData;
 using KalaServer::Core::PopupData;
 using KalaServer::Core::EmailData;
 using KalaServer::Core::BanClientData;
-using KalaKit::ResponseSystem::Response_418;
+using KalaServer::ResponseSystem::Response_418;
 
 using KalaServer::Core::ReceiverPayload;
 

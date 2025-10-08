@@ -22,7 +22,7 @@ using std::string;
 using std::find;
 using std::pair;
 
-namespace KalaKit::ResponseSystem
+namespace KalaServer::ResponseSystem
 {
 	void Response_418::Init(
 		uintptr_t targetClientSocket,

@@ -24,8 +24,8 @@
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
 
-using KalaKit::DNS::CloudFlare;
-using KalaKit::DNS::CustomDNS;
+using KalaServer::DNS::CloudFlare;
+using KalaServer::DNS::CustomDNS;
 
 using KalaServer::Core::sev_m;
 using KalaServer::Core::sev_d;

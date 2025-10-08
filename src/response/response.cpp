@@ -20,7 +20,7 @@ using std::make_unique;
 using std::to_string;
 using std::filesystem::path;
 
-namespace KalaKit::ResponseSystem
+namespace KalaServer::ResponseSystem
 {
 	void Response::Send(
 		uintptr_t clientSocket,

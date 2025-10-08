@@ -7,7 +7,7 @@
 
 #include "response/response.hpp"
 
-namespace KalaKit::ResponseSystem
+namespace KalaServer::ResponseSystem
 {
 	class Response_418 : public Response
 	{

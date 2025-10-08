@@ -25,7 +25,7 @@ namespace KalaServer::Core
 	using std::mutex;
 	using std::unordered_set;
 	using std::pair;
-	//using KalaKit::KalaTypes::u16;
+	//using KalaServer::KalaTypes::u16;
 
 	static inline EventType sev_m = EventType::event_severity_message;
 	static inline EventType sev_d = EventType::event_severity_debug;

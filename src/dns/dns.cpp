@@ -35,7 +35,7 @@ using std::string;
 using std::unique_ptr;
 using std::make_unique;
 
-namespace KalaKit::DNS
+namespace KalaServer::DNS
 {
 	bool CustomDNS::RunDNS()
 	{

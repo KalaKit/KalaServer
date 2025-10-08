@@ -17,7 +17,7 @@ using KalaServer::Core::PrintData;
 using std::unique_ptr;
 using std::make_unique;
 
-namespace KalaKit::ResponseSystem
+namespace KalaServer::ResponseSystem
 {
 	void Response_413::Init(
 		uintptr_t targetClientSocket,

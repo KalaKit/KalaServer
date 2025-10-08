@@ -54,7 +54,7 @@ using std::set;
 using std::unique_ptr;
 using std::make_unique;
 
-namespace KalaKit::DNS
+namespace KalaServer::DNS
 {
 	static string tunnelID{};
 	static string tunnelIDFilePath{};

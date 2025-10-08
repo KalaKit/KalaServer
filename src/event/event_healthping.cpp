@@ -18,7 +18,7 @@ using KalaServer::Core::PopupData;
 using KalaServer::Core::EmailData;
 using KalaServer::Core::HealthPingData;
 using KalaServer::Core::Server;
-using KalaKit::DNS::CloudFlare;
+using KalaServer::DNS::CloudFlare;
 
 using std::string;
 using std::unique_ptr;

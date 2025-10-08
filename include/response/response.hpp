@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace KalaKit::ResponseSystem
+namespace KalaServer::ResponseSystem
 {
 	using std::string;
 	using std::vector;

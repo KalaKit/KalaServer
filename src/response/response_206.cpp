@@ -18,7 +18,7 @@ using std::unique_ptr;
 using std::make_unique;
 using std::to_string;
 
-namespace KalaKit::ResponseSystem
+namespace KalaServer::ResponseSystem
 {
 	void Response_206::Init(
 		uintptr_t targetClientSocket,

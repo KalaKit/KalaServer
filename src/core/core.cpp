@@ -15,6 +15,7 @@
 #include "KalaWindow/include/core/core.hpp"
 
 #include "core/core_program.hpp"
+#include "graphics/render.hpp"
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
@@ -24,8 +25,9 @@ using KalaHeaders::LogType;
 
 using KalaWindow::Core::KalaWindowCore;
 
-using KalaKit::DNS::CloudFlare;
-using KalaKit::DNS::CustomDNS;
+using KalaServer::DNS::CloudFlare;
+using KalaServer::DNS::CustomDNS;
+using KalaServer::Graphics::Render;
 
 using std::cout;
 using std::cin;
@@ -37,6 +39,7 @@ namespace KalaServer::Core
 {
 	void KalaServerCore::Initialize()
 	{
+		/*
 		if (!IsAdmin())
 		{
 			Log::Print(
@@ -47,28 +50,30 @@ namespace KalaServer::Core
 			if (!RunAsAdmin())
 			{
 				KalaWindowCore::ForceClose(
-					"KalaServer initalization error",
-					"Failed to start KalaServer! You must launch as admin to use this program.");
+					"Initalization error",
+					"Kalaserver requires admin to run!");
 
 				quick_exit(1);
 			}
+			else quick_exit(0); //close the initializer program
 		}
-		else
-		{
-			isInitialized = true;
+		*/
 
-			Run();
-		}
+		Render::Initialize();
+		
+		isInitialized = true;
+
+		Run();
 	}
 
 	void KalaServerCore::Run()
 	{
-		Log::Print(
-			"Reached runtime loop. Press 'Enter' to exit.",
-			"KalaServer",
-			LogType::LOG_SUCCESS);
+		while (true)
+		{
+			Log::Print("entered run loop...");
 
-		cin.get();
+			Render::Run();
+		}
 	}
 
 	void KalaServerCore::Shutdown()
@@ -77,6 +82,8 @@ namespace KalaServer::Core
 
 		if (CloudFlare::IsRunning()) CloudFlare::Quit();
 		if (CustomDNS::IsRunning()) CustomDNS::Quit();
+
+		Render::Shutdown();
 	}
 }
 
@@ -140,8 +147,8 @@ bool RunAsAdmin()
 				2);
 
 			KalaWindowCore::ForceClose(
-				"KalaServer initalization error",
-				"Failed to start KalaServer! You must launch as admin to use this program.");
+				"Initalization error",
+				"Kalaserver requires admin to run!");
 
 			return false;
 		}

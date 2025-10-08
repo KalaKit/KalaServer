@@ -26,15 +26,15 @@
 #include "response/response_418.hpp"
 #include "response/response_500.hpp"
 
-using KalaKit::ResponseSystem::Response_200;
-using KalaKit::ResponseSystem::Response_206;
-using KalaKit::ResponseSystem::Response_400;
-using KalaKit::ResponseSystem::Response_401;
-using KalaKit::ResponseSystem::Response_404;
-using KalaKit::ResponseSystem::Response_405;
-using KalaKit::ResponseSystem::Response_413;
-using KalaKit::ResponseSystem::Response_418;
-using KalaKit::ResponseSystem::Response_500;
+using KalaServer::ResponseSystem::Response_200;
+using KalaServer::ResponseSystem::Response_206;
+using KalaServer::ResponseSystem::Response_400;
+using KalaServer::ResponseSystem::Response_401;
+using KalaServer::ResponseSystem::Response_404;
+using KalaServer::ResponseSystem::Response_405;
+using KalaServer::ResponseSystem::Response_413;
+using KalaServer::ResponseSystem::Response_418;
+using KalaServer::ResponseSystem::Response_500;
 
 using std::istringstream;
 using std::exception;
@@ -654,9 +654,9 @@ namespace KalaServer::Core
 						unique_ptr<Event> prEvent = make_unique<Event>();
 						prEvent->SendEvent(rec_c, prData);
 
-						resp206->sendAction = KalaKit::ResponseSystem::SendAction::send_download;
+						resp206->sendAction = KalaServer::ResponseSystem::SendAction::send_download;
 					}
-					else resp206->sendAction = KalaKit::ResponseSystem::SendAction::send_default;
+					else resp206->sendAction = KalaServer::ResponseSystem::SendAction::send_default;
 
 					resp206->Init(
 						rawClientSocket,
@@ -688,9 +688,9 @@ namespace KalaServer::Core
 						unique_ptr<Event> prEvent = make_unique<Event>();
 						prEvent->SendEvent(rec_c, prData);
 
-						resp200->sendAction = KalaKit::ResponseSystem::SendAction::send_download;
+						resp200->sendAction = KalaServer::ResponseSystem::SendAction::send_download;
 					}
-					else resp200->sendAction = KalaKit::ResponseSystem::SendAction::send_default;
+					else resp200->sendAction = KalaServer::ResponseSystem::SendAction::send_default;
 
 					resp200->Init(
 						rawClientSocket,
