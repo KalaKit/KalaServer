@@ -9,9 +9,7 @@
 
 #include "core/event.hpp"
 #include "core/server.hpp"
-#include "external/kcrash.hpp"
 
-using KalaKit::KalaCrash::Crash;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PopupData;
@@ -90,7 +88,7 @@ static void CreatePopup(EventType type, const PopupData& popupData)
 			| MB_OK);
 		*/
 
-		Crash(popupData.message);
+		//Crash(popupData.message);
 	}
 	else if (type == EventType::event_severity_warning)
 	{

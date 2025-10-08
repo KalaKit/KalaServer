@@ -8,11 +8,9 @@
 
 #include "core/core.hpp"
 #include "response/response.hpp"
-#include "external/kcrash.hpp"
 #include "core/event.hpp"
 
 using KalaKit::Core::KalaServer;
-using KalaKit::KalaCrash::Crash;
 using KalaKit::Core::Event;
 using KalaKit::Core::EventType;
 using KalaKit::Core::PrintData;

@@ -8,8 +8,8 @@
 #include <sstream>
 #include <string>
 
-#include "ssl.h" //openssl
-#include "err.h" //openssl
+#include "OpenSSL/include/ssl.h"
+#include "OpenSSL/include/err.h"
 
 #include "core/event.hpp"
 
