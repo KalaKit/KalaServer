@@ -83,20 +83,6 @@ namespace KalaServer::Graphics
 	{
 		window->Update();
 
-		Input* input = window->GetInput();
-		if (input->IsKeyPressed(Key::Space))
-		{
-			window->Flash(
-				FlashTarget::TARGET_WINDOW,
-				FlashType::FLASH_TIMED,
-				5);
-
-			window->Flash(
-				FlashTarget::TARGET_TASKBAR,
-				FlashType::FLASH_TIMED,
-				5);
-		}
-
 		if (!window->IsIdle()
 			&& !window->IsResizing())
 		{
