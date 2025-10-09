@@ -15,7 +15,4 @@ These libraries are used for various purposes, their licenses are included in th
 | [openSSL](https://github.com/openssl/openssl)                        | TSL/SSL and encryption library.                      |
 | [GLM](https://github.com/icaven/glm)                                 | Math library for vectors, matrices, and 3D graphics. |
 | [stb](https://github.com/nothings/stb)                               | Various image and text editing headers and others.   |
-| [ImGui](https://github.com/ocornut/imgui)                            | Creates debug and editor user interfaces.            |
 | [OpenGL headers](https://github.com/KhronosGroup/OpenGL-Registry)    | Headers used for OpenGL functionality                |
-
-> **Note:** The ImGui docking branch was used instead of the main branch to enable dockable windows.

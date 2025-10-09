@@ -8,11 +8,11 @@
 #include "KalaHeaders/log_utils.hpp"
 
 #include "KalaWindow/include/core/core.hpp"
+#include "KalaWindow/include/core/containers.hpp"
 #include "KalaWindow/include/graphics/window_global.hpp"
 #include "KalaWindow/include/graphics/window.hpp"
 #include "KalaWindow/include/core/glm_global.hpp"
 #include "KalaWindow/include/core/input.hpp"
-#include "KalaWindow/include/ui/debug_ui.hpp"
 #include "KalaWindow/include/graphics/opengl/opengl.hpp"
 #include "KalaWindow/include/graphics/opengl/opengl_functions_core.hpp"
 
@@ -24,69 +24,39 @@ using namespace KalaWindow::Core;
 using namespace KalaWindow::Graphics;
 using namespace KalaWindow::Graphics::OpenGL;
 using namespace KalaWindow::Graphics::OpenGLFunctions;
-using namespace KalaWindow::UI;
 
 using std::string;
 
-static Window* window{};
-
 static void Redraw();
 static void ResizeProjectionMatrix();
+
+static void CreateNewWindow(const string& name);
 
 namespace KalaServer::Graphics
 {
 	void Render::Initialize()
 	{
 		Window_Global::Initialize();
-
-		window = Window::Initialize(
-			"window 1",
-			vec2(1280, 720),
-			nullptr,
-			WindowState::WINDOW_HIDE);
-
-		if (!window)
-		{
-			KalaWindowCore::ForceClose(
-				"Initialization error",
-				"Failed to create a window!");
-
-			return;
-		}
-
-		u32 windowID = window->GetID();
-
-		Input* input = Input::Initialize(windowID);
-
-		if (!input)
-		{
-			KalaWindowCore::ForceClose(
-				"Initialization error",
-				"Failed to set up input!");
-
-			return;
-		}
+		Window_Global::SetVerboseLoggingState(true);
 
 		OpenGL_Global::Initialize();
-		OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
-		context->SetVSyncState(VSyncState::VSYNC_ON);
 
-		window->SetRedrawCallback(Redraw);
-		window->SetResizeCallback(ResizeProjectionMatrix);
-
-		DebugUI* UI = DebugUI::Initialize(windowID);
-
-		window->BringToFocus();
+		CreateNewWindow("test 1");
+		CreateNewWindow("test 2");
 	}
+
 
 	void Render::Run()
 	{
-		window->Update();
-
-		if (!window->IsIdle()
-			&& !window->IsResizing())
+		for (const auto& win : runtimeWindows)
 		{
-			Redraw();
+			win->Update();
+
+			if (!win->IsIdle()
+				&& !win->IsResizing())
+			{
+				Redraw();
+			}
 		}
 	}
 
@@ -98,19 +68,92 @@ namespace KalaServer::Graphics
 
 void Redraw()
 {
-	glClearColor(0.29f, 0.36f, 0.85f, 1.0f); //light blue
-	glClear(
-		GL_COLOR_BUFFER_BIT
-		| GL_DEPTH_BUFFER_BIT);
+	for (const auto& win : runtimeWindows)
+	{
+		if (!win
+			|| (win
+			&& !win->IsInitialized()))
+		{
+			continue;
+		}
 
-	window->GetDebugUI()->Render();
+		OpenGL_Context* context = win->GetOpenGLContext();
 
-	window->GetOpenGLContext()->SwapOpenGLBuffers();
+		if (context
+			&& context->IsInitialized())
+		{
+			context->MakeContextCurrent();
 
-	window->GetInput()->EndFrameUpdate();
+			glClearColor(0.29f, 0.36f, 0.85f, 1.0f); //light blue
+			glClear(
+				GL_COLOR_BUFFER_BIT
+				| GL_DEPTH_BUFFER_BIT);
+
+			context->SwapOpenGLBuffers();
+		}
+
+		
+	}
+
+	for (const auto& win : runtimeWindows)
+	{
+		if (!win
+			|| (win
+			&& !win->IsInitialized()))
+		{
+			continue;
+		}
+
+		Input* input = win->GetInput();
+
+		if (input
+			&& input->IsInitialized())
+		{
+			input->EndFrameUpdate();
+		}
+	}
 }
 
 void ResizeProjectionMatrix()
 {
 
+}
+
+void CreateNewWindow(const string& name)
+{
+	Window* window = Window::Initialize(
+		name,
+		vec2(1280, 720),
+		nullptr,
+		WindowState::WINDOW_HIDE);
+
+	if (!window)
+	{
+		KalaWindowCore::ForceClose(
+			"Initialization error",
+			"Failed to create a window!");
+
+		return;
+	}
+
+	u32 windowID = window->GetID();
+
+	Input* input = Input::Initialize(windowID);
+
+	if (!input)
+	{
+		KalaWindowCore::ForceClose(
+			"Initialization error",
+			"Failed to set up input!");
+
+		return;
+	}
+
+	OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
+	context->SetVSyncState(VSyncState::VSYNC_ON);
+
+	window->SetRedrawCallback(Redraw);
+	window->SetResizeCallback(ResizeProjectionMatrix);
+
+	window->BringToFocus();
 }
