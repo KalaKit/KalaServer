@@ -16,4 +16,4 @@ KalaServer is a lightweight C++ 20 library for Windows (no Linux support of any 
 
 Other documentation:
 
-[How to build from source](docs/build_from_source.md)
+[How to build from source](docs/build_from_source/readme.md)
