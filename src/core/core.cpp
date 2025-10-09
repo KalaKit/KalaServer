@@ -44,7 +44,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Not running as admin, requesting elevation.",
-				"KalaServer",
+				"KALASERVER",
 				LogType::LOG_INFO);
 
 			if (!RunAsAdmin())
@@ -62,16 +62,20 @@ namespace KalaServer::Core
 		Render::Initialize();
 		
 		isInitialized = true;
+		isRunning = true;
 
 		Run();
 	}
 
 	void KalaServerCore::Run()
 	{
-		while (true)
-		{
-			Log::Print("entered run loop...");
+		Log::Print(
+			"Reached render loop!",
+			"KALASERVER",
+			LogType::LOG_DEBUG);
 
+		while (isRunning)
+		{
 			Render::Run();
 		}
 	}
@@ -142,7 +146,7 @@ bool RunAsAdmin()
 		{
 			Log::Print(
 				"User cancelled elevation request, aborting initialization!",
-				"KalaServer",
+				"KALASERVER",
 				LogType::LOG_ERROR,
 				2);
 

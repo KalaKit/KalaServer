@@ -85,7 +85,9 @@ target_include_directories(KalaServer PRIVATE
 # Preprocessor Defines
 target_compile_definitions(KalaServer PRIVATE 
 	WIN32_LEAN_AND_MEAN 
-	NOMINMAX)
+	NOMINMAX
+	UNICODE
+	_UNICODE)
 
 # Link libraries
 target_link_libraries(KalaServer PRIVATE

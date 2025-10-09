@@ -5,7 +5,10 @@
 
 #include <string>
 
+#include "KalaHeaders/log_utils.hpp"
+
 #include "KalaWindow/include/core/core.hpp"
+#include "KalaWindow/include/graphics/window_global.hpp"
 #include "KalaWindow/include/graphics/window.hpp"
 #include "KalaWindow/include/core/glm_global.hpp"
 #include "KalaWindow/include/core/input.hpp"
@@ -14,6 +17,8 @@
 #include "KalaWindow/include/graphics/opengl/opengl_functions_core.hpp"
 
 #include "graphics/render.hpp"
+
+using namespace KalaHeaders;
 
 using namespace KalaWindow::Core;
 using namespace KalaWindow::Graphics;
@@ -24,9 +29,6 @@ using namespace KalaWindow::UI;
 using std::string;
 
 static Window* window{};
-static Input* input{};
-static OpenGL_Context* context{};
-static DebugUI* UI{};
 
 static void Redraw();
 static void ResizeProjectionMatrix();
@@ -35,31 +37,71 @@ namespace KalaServer::Graphics
 {
 	void Render::Initialize()
 	{
+		Window_Global::Initialize();
+
 		window = Window::Initialize(
 			"window 1",
 			vec2(1280, 720),
 			nullptr,
-			WindowState::WINDOW_HIDE,
-			DpiContext::DPI_SYSTEM_AWARE);
+			WindowState::WINDOW_HIDE);
+
+		if (!window)
+		{
+			KalaWindowCore::ForceClose(
+				"Initialization error",
+				"Failed to create a window!");
+
+			return;
+		}
 
 		u32 windowID = window->GetID();
 
-		input = Input::Initialize(windowID);
+		Input* input = Input::Initialize(windowID);
+
+		if (!input)
+		{
+			KalaWindowCore::ForceClose(
+				"Initialization error",
+				"Failed to set up input!");
+
+			return;
+		}
 
 		OpenGL_Global::Initialize();
-		context = OpenGL_Context::Initialize(windowID, 0);
+		OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
+		context->SetVSyncState(VSyncState::VSYNC_ON);
 
 		window->SetRedrawCallback(Redraw);
 		window->SetResizeCallback(ResizeProjectionMatrix);
 
-		UI = DebugUI::Initialize(windowID);
+		DebugUI* UI = DebugUI::Initialize(windowID);
 
-		window->SetWindowState(WindowState::WINDOW_NORMAL);
+		window->BringToFocus();
 	}
 
 	void Render::Run()
 	{
-		if (!window->IsIdle()) Redraw();
+		window->Update();
+
+		Input* input = window->GetInput();
+		if (input->IsKeyPressed(Key::Space))
+		{
+			window->Flash(
+				FlashTarget::TARGET_WINDOW,
+				FlashType::FLASH_TIMED,
+				5);
+
+			window->Flash(
+				FlashTarget::TARGET_TASKBAR,
+				FlashType::FLASH_TIMED,
+				5);
+		}
+
+		if (!window->IsIdle()
+			&& !window->IsResizing())
+		{
+			Redraw();
+		}
 	}
 
 	void Render::Shutdown()
@@ -75,11 +117,11 @@ void Redraw()
 		GL_COLOR_BUFFER_BIT
 		| GL_DEPTH_BUFFER_BIT);
 
-	UI->Render(window->GetID());
+	window->GetDebugUI()->Render();
 
-	context->SwapOpenGLBuffers();
+	window->GetOpenGLContext()->SwapOpenGLBuffers();
 
-	input->EndFrameUpdate();
+	window->GetInput()->EndFrameUpdate();
 }
 
 void ResizeProjectionMatrix()
