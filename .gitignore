@@ -1,9 +1,17 @@
-# Ignore folders not needed for distribution
+# Default VS stuff
 out/
 .vs/
-build-debug/
-build-release/
-distribution/
 
-# Ignore common file types not needed for distribution
+# CMake build targets
+build/
+debug/
+release/
+
+# Large files
+*.pdb
+*.obj
+*.exp
+
+# Misc
+*.spv # Vulkan shader files
 *.exe
