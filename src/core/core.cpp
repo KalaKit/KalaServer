@@ -70,9 +70,9 @@ namespace KalaServer::Core
 	void KalaServerCore::Run()
 	{
 		Log::Print(
-			"Reached render loop!",
-			"KALASERVER",
-			LogType::LOG_DEBUG);
+			"\n==============================\n"
+			" RENDER LOOP\n"
+			"==============================\n");
 
 		while (isRunning)
 		{

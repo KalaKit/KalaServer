@@ -8,6 +8,7 @@
 #include "KalaHeaders/log_utils.hpp"
 
 #include "KalaWindow/include/core/core.hpp"
+#include "KalaWindow/include/core/crash.hpp"
 #include "KalaWindow/include/core/containers.hpp"
 #include "KalaWindow/include/graphics/window_global.hpp"
 #include "KalaWindow/include/graphics/window.hpp"
@@ -20,9 +21,18 @@
 
 using namespace KalaHeaders;
 
-using namespace KalaWindow::Core;
-using namespace KalaWindow::Graphics;
-using namespace KalaWindow::Graphics::OpenGL;
+using KalaWindow::Core::KalaWindowCore;
+using KalaWindow::Core::CrashHandler;
+using KalaWindow::Core::Input;
+using KalaWindow::Core::WindowContent;
+using KalaWindow::Core::runtimeWindows;
+using KalaWindow::Core::windowContent;
+using KalaWindow::Graphics::Window_Global;
+using KalaWindow::Graphics::Window;
+using KalaWindow::Graphics::WindowState;
+using KalaWindow::Graphics::OpenGL::OpenGL_Global;
+using KalaWindow::Graphics::OpenGL::OpenGL_Context;
+using KalaWindow::Graphics::OpenGL::VSyncState;
 using namespace KalaWindow::Graphics::OpenGLFunctions;
 
 using std::string;
@@ -30,21 +40,25 @@ using std::string;
 static void Redraw();
 static void ResizeProjectionMatrix();
 
-static void CreateNewWindow(const string& name);
+static Window* CreateNewWindow(const string& name);
 
 namespace KalaServer::Graphics
 {
 	void Render::Initialize()
 	{
+		CrashHandler::Initialize(
+			"KalaServer",
+			Shutdown);
+		KalaWindowCore::SetUserShutdownFunction(Shutdown);
+
 		Window_Global::Initialize();
 		Window_Global::SetVerboseLoggingState(true);
 
 		OpenGL_Global::Initialize();
 
-		CreateNewWindow("test 1");
-		CreateNewWindow("test 2");
+		Window* win1 = CreateNewWindow("test 1");
+		Window* win2 = CreateNewWindow("test 2");
 	}
-
 
 	void Render::Run()
 	{
@@ -77,7 +91,8 @@ void Redraw()
 			continue;
 		}
 
-		OpenGL_Context* context = win->GetOpenGLContext();
+		WindowContent* content = windowContent[win].get();
+		OpenGL_Context* context = content->glContext.get();
 
 		if (context
 			&& context->IsInitialized())
@@ -91,8 +106,6 @@ void Redraw()
 
 			context->SwapOpenGLBuffers();
 		}
-
-		
 	}
 
 	for (const auto& win : runtimeWindows)
@@ -104,7 +117,8 @@ void Redraw()
 			continue;
 		}
 
-		Input* input = win->GetInput();
+		WindowContent* content = windowContent[win].get();
+		Input* input = content->input.get();
 
 		if (input
 			&& input->IsInitialized())
@@ -119,7 +133,7 @@ void ResizeProjectionMatrix()
 
 }
 
-void CreateNewWindow(const string& name)
+Window* CreateNewWindow(const string& name)
 {
 	Window* window = Window::Initialize(
 		name,
@@ -133,7 +147,7 @@ void CreateNewWindow(const string& name)
 			"Initialization error",
 			"Failed to create a window!");
 
-		return;
+		return nullptr;
 	}
 
 	u32 windowID = window->GetID();
@@ -146,7 +160,7 @@ void CreateNewWindow(const string& name)
 			"Initialization error",
 			"Failed to set up input!");
 
-		return;
+		return nullptr;
 	}
 
 	OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
@@ -156,4 +170,6 @@ void CreateNewWindow(const string& name)
 	window->SetResizeCallback(ResizeProjectionMatrix);
 
 	window->BringToFocus();
+
+	return window;
 }
