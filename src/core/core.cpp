@@ -13,6 +13,7 @@
 #include "KalaHeaders/log_utils.hpp"
 
 #include "KalaWindow/include/core/core.hpp"
+#include "KalaWindow/include/core/crash.hpp"
 
 #include "core/core_program.hpp"
 #include "graphics/render.hpp"
@@ -24,6 +25,7 @@ using KalaHeaders::Log;
 using KalaHeaders::LogType;
 
 using KalaWindow::Core::KalaWindowCore;
+using KalaWindow::Core::CrashHandler;
 
 using KalaServer::DNS::CloudFlare;
 using KalaServer::DNS::CustomDNS;
@@ -58,6 +60,12 @@ namespace KalaServer::Core
 			else quick_exit(0); //close the initializer program
 		}
 		*/
+
+		CrashHandler::Initialize(
+			"KalaServer",
+			Shutdown);
+
+		KalaWindowCore::SetUserShutdownFunction(Shutdown);
 
 		Render::Initialize();
 		
