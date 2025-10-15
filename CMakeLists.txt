@@ -201,6 +201,12 @@ add_custom_command(TARGET KalaServer POST_BUILD
 )
 endforeach()
 
+# Copy files directory
+add_custom_command(TARGET KalaServer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "$<TARGET_FILE_DIR:KalaServer>/files"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/files" "$<TARGET_FILE_DIR:KalaServer>/files"
+)
+
 # Copy entire docs folder
 add_custom_command(TARGET KalaServer POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E rm -rf

@@ -27,11 +27,13 @@ using namespace KalaHeaders;
 
 using KalaWindow::Core::KalaWindowCore;
 using KalaWindow::Core::Input;
+using KalaWindow::Core::Key;
 using KalaWindow::Core::WindowContent;
 using KalaWindow::Core::windowContent;
 using KalaWindow::Core::runtimeWindows;
 using KalaWindow::Graphics::Window_Global;
 using KalaWindow::Graphics::Window;
+using KalaWindow::Graphics::WindowData;
 using KalaWindow::Graphics::WindowState;
 using KalaWindow::Graphics::OpenGL::OpenGL_Global;
 using KalaWindow::Graphics::OpenGL::OpenGL_Context;
@@ -47,6 +49,7 @@ using KalaWindow::Graphics::OpenGL::Shader::shader_quad_fragment;
 using namespace KalaWindow::Graphics::OpenGLFunctions;
 
 using std::string;
+using std::to_string;
 using std::vector;
 using std::filesystem::exists;
 using std::filesystem::path;
@@ -55,22 +58,35 @@ using std::filesystem::current_path;
 static void Redraw();
 static void ResizeProjectionMatrix();
 
-static Window* CreateNewWindow(const string& name);
+static Window* ownerWindow{};
+static Window* CreateNewWindow(
+	const string& name,
+	Window* parentWindow = nullptr);
+
+static vector<Window*> windows{};
+
+//light blue background color
+constexpr vec3 NORMALIZED_BACKGROUND_COLOR = vec3(0.29f, 0.36f, 0.85f);
 
 namespace KalaServer::Graphics
 {
 	void Render::Initialize()
 	{
 		Window_Global::Initialize();
-		Window_Global::SetVerboseLoggingState(true);
-
 		OpenGL_Global::Initialize();
 
+		Input::SetVerboseLoggingState(true);
+
+		ownerWindow = CreateNewWindow("owner");
+
+		/*
 		Window* win1 = CreateNewWindow("test 1");
 		Window* win2 = CreateNewWindow("test 2");
 
 		WindowContent* content = windowContent[win1].get();
-		OpenGL_Context* c1 = content->glContext.get();
+		OpenGL_Context* c1 = content->glContext
+			? content->glContext.get()
+			: content->parentGLContext;
 
 		c1->MakeContextCurrent();
 
@@ -81,7 +97,7 @@ namespace KalaServer::Graphics
 			"tex01",
 			texPath,
 			TextureType::Type_2D,
-			TextureFormat::Format_RGB8);
+			TextureFormat::Format_RGBA8);
 
 		OpenGL_Shader::CreateShader(
 			win1->GetID(),
@@ -90,13 +106,33 @@ namespace KalaServer::Graphics
 				{.shaderData = string(shader_quad_vertex), .type = ShaderType::SHADER_VERTEX },
 				{.shaderData = string(shader_quad_fragment), .type = ShaderType::SHADER_FRAGMENT }
 			} });
+		*/
 	}
 
 	void Render::Run()
 	{
-		for (const auto& win : runtimeWindows)
+		for (const auto& win : windows)
 		{
 			win->Update();
+
+			if (win == ownerWindow)
+			{
+				WindowContent* content = windowContent[win].get();
+				Input* input = content->input.get();
+
+				static int globalIndex = 1;
+				if (input->IsKeyPressed(Key::X))
+				{
+					for (int i = 1; i < 26; i++)
+					{
+						CreateNewWindow(
+							"test " + to_string(globalIndex),
+							ownerWindow);
+
+						++globalIndex;
+					}
+				}
+			}
 
 			if (!win->IsIdle()
 				&& !win->IsResizing())
@@ -104,6 +140,8 @@ namespace KalaServer::Graphics
 				Redraw();
 			}
 		}
+
+		if (windows != runtimeWindows) windows = runtimeWindows;
 	}
 
 	void Render::Shutdown()
@@ -114,49 +152,41 @@ namespace KalaServer::Graphics
 
 void Redraw()
 {
-	for (const auto& win : runtimeWindows)
-	{
-		if (!win
-			|| (win
-			&& !win->IsInitialized()))
+	auto IsChild = [](Window* parentWindow, Window* thisWindow) -> bool
 		{
-			continue;
-		}
+			WindowContent* content = windowContent[parentWindow].get();
 
-		WindowContent* content = windowContent[win].get();
+			//return find(content.cch)
+		};
+
+	for (const auto& window : runtimeWindows)
+	{
+		WindowContent* content = windowContent[window].get();
+
 		OpenGL_Context* context = content->glContext.get();
 
-		if (context
-			&& context->IsInitialized())
-		{
-			context->MakeContextCurrent();
+		context->MakeContextCurrent();
 
-			glClearColor(0.29f, 0.36f, 0.85f, 1.0f); //light blue
+		if (!IsChild(ownerWindow, window))
+		{
+			glClearColor(
+				NORMALIZED_BACKGROUND_COLOR.x,
+				NORMALIZED_BACKGROUND_COLOR.y,
+				NORMALIZED_BACKGROUND_COLOR.z,
+				1.0f);
 			glClear(
 				GL_COLOR_BUFFER_BIT
 				| GL_DEPTH_BUFFER_BIT);
 
 			context->SwapOpenGLBuffers();
 		}
-	}
-
-	for (const auto& win : runtimeWindows)
-	{
-		if (!win
-			|| (win
-			&& !win->IsInitialized()))
+		else
 		{
-			continue;
+			
 		}
 
-		WindowContent* content = windowContent[win].get();
 		Input* input = content->input.get();
-
-		if (input
-			&& input->IsInitialized())
-		{
-			input->EndFrameUpdate();
-		}
+		input->EndFrameUpdate();
 	}
 }
 
@@ -165,12 +195,14 @@ void ResizeProjectionMatrix()
 
 }
 
-Window* CreateNewWindow(const string& name)
+Window* CreateNewWindow(
+	const string& name,
+	Window* parentWindow)
 {
 	Window* window = Window::Initialize(
 		name,
 		vec2(1280, 720),
-		nullptr,
+		parentWindow,
 		WindowState::WINDOW_HIDE);
 
 	if (!window)
@@ -184,29 +216,21 @@ Window* CreateNewWindow(const string& name)
 
 	u32 windowID = window->GetID();
 
-	Input* input = Input::Initialize(windowID);
+	Input::Initialize(windowID);
 
-	if (!input)
+	if (parentWindow)
 	{
-		KalaWindowCore::ForceClose(
-			"Initialization error",
-			"Failed to set up input!");
+		WindowContent* pContent = windowContent[parentWindow].get();
+		OpenGL_Context* pContext = pContent->glContext.get();
 
-		return nullptr;
+		WindowContent* content = windowContent[window].get();
+		content->parentGLContext = pContext;
 	}
-
-	OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
-
-	if (!context)
+	else
 	{
-		KalaWindowCore::ForceClose(
-			"Initialization error",
-			"Failed to set up OpenGL context!");
-
-		return nullptr;
+		OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
+		context->SetVSyncState(VSyncState::VSYNC_ON);
 	}
-
-	context->SetVSyncState(VSyncState::VSYNC_ON);
 
 	window->SetRedrawCallback(Redraw);
 	window->SetResizeCallback(ResizeProjectionMatrix);
