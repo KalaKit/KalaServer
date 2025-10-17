@@ -9,8 +9,8 @@
 
 #include "KalaHeaders/log_utils.hpp"
 
+#include "KalaWindow/include/core/registry.hpp"
 #include "KalaWindow/include/core/core.hpp"
-#include "KalaWindow/include/core/containers.hpp"
 #include "KalaWindow/include/graphics/window_global.hpp"
 #include "KalaWindow/include/graphics/window.hpp"
 #include "KalaWindow/include/core/glm_global.hpp"
@@ -26,13 +26,12 @@
 using namespace KalaHeaders;
 
 using KalaWindow::Core::KalaWindowCore;
+using KalaWindow::Core::Registry;
 using KalaWindow::Core::Input;
 using KalaWindow::Core::Key;
-using KalaWindow::Core::WindowContent;
-using KalaWindow::Core::windowContent;
-using KalaWindow::Core::runtimeWindows;
 using KalaWindow::Graphics::Window_Global;
 using KalaWindow::Graphics::Window;
+using KalaWindow::Graphics::TargetType;
 using KalaWindow::Graphics::WindowData;
 using KalaWindow::Graphics::WindowState;
 using KalaWindow::Graphics::OpenGL::OpenGL_Global;
@@ -111,19 +110,23 @@ namespace KalaServer::Graphics
 
 	void Render::Run()
 	{
-		for (const auto& win : windows)
+		for (const auto& window : windows)
 		{
-			win->Update();
+			if (!window) continue;
 
-			if (win == ownerWindow)
+			window->Update();
+			u32 windowID = window->GetID();
+
+			if (ownerWindow
+				&& window == ownerWindow)
 			{
-				WindowContent* content = windowContent[win].get();
-				Input* input = content->input.get();
+				auto inputs = Input::registry.GetAllWindowContent(windowID);
+				Input* input = inputs.empty() ? nullptr : inputs.front();
 
 				static int globalIndex = 1;
 				if (input->IsKeyPressed(Key::X))
 				{
-					for (int i = 1; i < 26; i++)
+					for (int i = 1; i < 3; i++)
 					{
 						CreateNewWindow(
 							"test " + to_string(globalIndex),
@@ -134,14 +137,14 @@ namespace KalaServer::Graphics
 				}
 			}
 
-			if (!win->IsIdle()
-				&& !win->IsResizing())
+			if (!window->IsIdle()
+				&& !window->IsResizing())
 			{
 				Redraw();
 			}
 		}
 
-		if (windows != runtimeWindows) windows = runtimeWindows;
+		if (windows != Window::registry.runtimeContent) windows = Window::registry.runtimeContent;
 	}
 
 	void Render::Shutdown()
@@ -152,23 +155,19 @@ namespace KalaServer::Graphics
 
 void Redraw()
 {
-	auto IsChild = [](Window* parentWindow, Window* thisWindow) -> bool
-		{
-			WindowContent* content = windowContent[parentWindow].get();
-
-			//return find(content.cch)
-		};
-
-	for (const auto& window : runtimeWindows)
+	for (const auto& window : Window::registry.runtimeContent)
 	{
-		WindowContent* content = windowContent[window].get();
+		if (!window) continue;
 
-		OpenGL_Context* context = content->glContext.get();
+		u32 windowID = window->GetID();
 
-		context->MakeContextCurrent();
+		auto contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
+		OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
 
-		if (!IsChild(ownerWindow, window))
+		if (context)
 		{
+			context->MakeContextCurrent();
+
 			glClearColor(
 				NORMALIZED_BACKGROUND_COLOR.x,
 				NORMALIZED_BACKGROUND_COLOR.y,
@@ -178,15 +177,23 @@ void Redraw()
 				GL_COLOR_BUFFER_BIT
 				| GL_DEPTH_BUFFER_BIT);
 
+			bool isChild = ownerWindow->IsChildWindow(window);
+			if (!isChild)
+			{
+
+			}
+			else
+			{
+
+			}
+
 			context->SwapOpenGLBuffers();
 		}
-		else
-		{
-			
-		}
 
-		Input* input = content->input.get();
-		input->EndFrameUpdate();
+		auto inputs = Input::registry.GetAllWindowContent(windowID);
+		Input* input = inputs.empty() ? nullptr : inputs.front();
+
+		if (input) input->EndFrameUpdate();
 	}
 }
 
@@ -218,19 +225,8 @@ Window* CreateNewWindow(
 
 	Input::Initialize(windowID);
 
-	if (parentWindow)
-	{
-		WindowContent* pContent = windowContent[parentWindow].get();
-		OpenGL_Context* pContext = pContent->glContext.get();
-
-		WindowContent* content = windowContent[window].get();
-		content->parentGLContext = pContext;
-	}
-	else
-	{
-		OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
-		context->SetVSyncState(VSyncState::VSYNC_ON);
-	}
+	OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
+	context->SetVSyncState(VSyncState::VSYNC_ON);
 
 	window->SetRedrawCallback(Redraw);
 	window->SetResizeCallback(ResizeProjectionMatrix);
@@ -238,4 +234,5 @@ Window* CreateNewWindow(
 	window->BringToFocus();
 
 	return window;
+	return nullptr;
 }
