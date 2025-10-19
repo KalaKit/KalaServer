@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <chrono>
 
 #include "KalaHeaders/log_utils.hpp"
 
@@ -20,6 +21,7 @@
 #include "KalaWindow/include/graphics/opengl/opengl_shader.hpp"
 #include "KalaWindow/include/graphics/opengl/opengl_functions_core.hpp"
 #include "KalaWindow/include/graphics/opengl/shaders/shader_quad.hpp"
+#include "KalaWindow/include/ui/image.hpp"
 
 #include "graphics/render.hpp"
 
@@ -29,6 +31,7 @@ using KalaWindow::Core::KalaWindowCore;
 using KalaWindow::Core::Registry;
 using KalaWindow::Core::Input;
 using KalaWindow::Core::Key;
+using KalaWindow::Core::globalID;
 using KalaWindow::Graphics::Window_Global;
 using KalaWindow::Graphics::Window;
 using KalaWindow::Graphics::TargetType;
@@ -46,18 +49,22 @@ using KalaWindow::Graphics::OpenGL::VSyncState;
 using KalaWindow::Graphics::OpenGL::Shader::shader_quad_vertex;
 using KalaWindow::Graphics::OpenGL::Shader::shader_quad_fragment;
 using namespace KalaWindow::Graphics::OpenGLFunctions;
+using KalaWindow::UI::Image;
 
 using std::string;
+using std::string_view;
 using std::to_string;
 using std::vector;
 using std::filesystem::exists;
 using std::filesystem::path;
 using std::filesystem::current_path;
 
-static void Redraw();
-static void ResizeProjectionMatrix();
+constexpr string_view windowIconPath = "logo.png";
+static inline OpenGL_Texture* windowIconTexture{};
 
-static Window* ownerWindow{};
+static void Redraw(Window* window);
+static void ResizeProjectionMatrix(Window* window);
+
 static Window* CreateNewWindow(
 	const string& name,
 	Window* parentWindow = nullptr);
@@ -74,38 +81,62 @@ namespace KalaServer::Graphics
 		Window_Global::Initialize();
 		OpenGL_Global::Initialize();
 
-		Input::SetVerboseLoggingState(true);
+		Window* window = CreateNewWindow("window");
 
-		ownerWindow = CreateNewWindow("owner");
+		u32 windowID = window->GetID();
 
-		/*
-		Window* win1 = CreateNewWindow("test 1");
-		Window* win2 = CreateNewWindow("test 2");
+		auto contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
+		OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
 
-		WindowContent* content = windowContent[win1].get();
-		OpenGL_Context* c1 = content->glContext
-			? content->glContext.get()
-			: content->parentGLContext;
+		if (!context)
+		{
+			KalaWindowCore::ForceClose(
+				"Initialization error",
+				"Failed to attach an OpenGL context to window '" + window->GetTitle() + "'!");
 
-		c1->MakeContextCurrent();
+			return;
+		}
+
+		context->MakeContextCurrent();
+
+		glEnable(GL_FRAMEBUFFER_SRGB);
+		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);    //Cull back faces (default)
+		glFrontFace(GL_CCW);    //Define CCW vertices as front-facing
+
+#ifdef _DEBUG
+		glEnable(GL_DEBUG_OUTPUT);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); //Ensures callbacks run immediately
+		glDebugMessageCallback(DebugCallback, nullptr);
+#endif
 
 		string texPath = (current_path() / "files" / "UI" / "image1.png").string();
 
-		OpenGL_Texture* tex = OpenGL_Texture::LoadTexture(
-			win1->GetID(),
+		OpenGL_Texture* tex01 = OpenGL_Texture::LoadTexture(
+			windowID,
 			"tex01",
 			texPath,
 			TextureType::Type_2D,
 			TextureFormat::Format_RGBA8);
 
-		OpenGL_Shader::CreateShader(
-			win1->GetID(),
+		OpenGL_Shader* shader01 = OpenGL_Shader::CreateShader(
+			windowID,
 			"shader01",
 			{ {
 				{.shaderData = string(shader_quad_vertex), .type = ShaderType::SHADER_VERTEX },
 				{.shaderData = string(shader_quad_fragment), .type = ShaderType::SHADER_FRAGMENT }
 			} });
-		*/
+
+		Image* image = Image::Initialize(
+			"img01",
+			windowID,
+			vec2(256, 256),
+			0.0f,
+			vec2(256, 256),
+			nullptr,
+			tex01,
+			shader01);
 	}
 
 	void Render::Run()
@@ -117,31 +148,16 @@ namespace KalaServer::Graphics
 			window->Update();
 			u32 windowID = window->GetID();
 
-			if (ownerWindow
-				&& window == ownerWindow)
-			{
-				auto inputs = Input::registry.GetAllWindowContent(windowID);
-				Input* input = inputs.empty() ? nullptr : inputs.front();
-
-				static int globalIndex = 1;
-				if (input->IsKeyPressed(Key::X))
-				{
-					for (int i = 1; i < 3; i++)
-					{
-						CreateNewWindow(
-							"test " + to_string(globalIndex),
-							ownerWindow);
-
-						++globalIndex;
-					}
-				}
-			}
-
 			if (!window->IsIdle()
 				&& !window->IsResizing())
 			{
-				Redraw();
+				Redraw(window);
 			}
+
+			const vector<Input*>& inputs = Input::registry.GetAllWindowContent(windowID);
+			Input* input = inputs.empty() ? nullptr : inputs.front();
+
+			if (input) input->EndFrameUpdate();
 		}
 
 		if (windows != Window::registry.runtimeContent) windows = Window::registry.runtimeContent;
@@ -153,51 +169,43 @@ namespace KalaServer::Graphics
 	}
 }
 
-void Redraw()
+void Redraw(Window* window)
 {
-	for (const auto& window : Window::registry.runtimeContent)
+	if (!window) return;
+
+	u32 windowID = window->GetID();
+
+	mat3 projection2D = Projection2D(
+		window->GetClientRectSize(),
+		720.0f);
+
+	const vector<OpenGL_Context*>& contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
+	OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
+
+	if (!context) return;
+	
+	context->MakeContextCurrent();
+
+	glClearColor(
+		NORMALIZED_BACKGROUND_COLOR.x,
+		NORMALIZED_BACKGROUND_COLOR.y,
+		NORMALIZED_BACKGROUND_COLOR.z,
+		1.0f);
+	glClear(
+		GL_COLOR_BUFFER_BIT
+		| GL_DEPTH_BUFFER_BIT);
+
+	glDisable(GL_CULL_FACE);
+	for (const auto& image : Image::registry.runtimeContent)
 	{
-		if (!window) continue;
-
-		u32 windowID = window->GetID();
-
-		auto contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
-		OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
-
-		if (context)
-		{
-			context->MakeContextCurrent();
-
-			glClearColor(
-				NORMALIZED_BACKGROUND_COLOR.x,
-				NORMALIZED_BACKGROUND_COLOR.y,
-				NORMALIZED_BACKGROUND_COLOR.z,
-				1.0f);
-			glClear(
-				GL_COLOR_BUFFER_BIT
-				| GL_DEPTH_BUFFER_BIT);
-
-			bool isChild = ownerWindow->IsChildWindow(window);
-			if (!isChild)
-			{
-
-			}
-			else
-			{
-
-			}
-
-			context->SwapOpenGLBuffers();
-		}
-
-		auto inputs = Input::registry.GetAllWindowContent(windowID);
-		Input* input = inputs.empty() ? nullptr : inputs.front();
-
-		if (input) input->EndFrameUpdate();
+		if (image) image->Render(projection2D);
 	}
+	glEnable(GL_CULL_FACE);
+
+	context->SwapOpenGLBuffers();
 }
 
-void ResizeProjectionMatrix()
+void ResizeProjectionMatrix(Window* window)
 {
 
 }
@@ -220,19 +228,59 @@ Window* CreateNewWindow(
 
 		return nullptr;
 	}
-
-	u32 windowID = window->GetID();
-
-	Input::Initialize(windowID);
-
-	OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
-	context->SetVSyncState(VSyncState::VSYNC_ON);
-
-	window->SetRedrawCallback(Redraw);
-	window->SetResizeCallback(ResizeProjectionMatrix);
+	
+	window->SetRedrawCallback([window]() { Redraw(window); });
+	window->SetResizeCallback([window]() { ResizeProjectionMatrix(window); });
 
 	window->BringToFocus();
 
+	u32 windowID = window->GetID();
+
+	OpenGL_Context* context = OpenGL_Context::Initialize(windowID, 0);
+
+	if (!context)
+	{
+		KalaWindowCore::ForceClose(
+			"Initialization error",
+			"Failed to attach an OpenGL context to window '" + window->GetTitle() + "'!");
+
+		return nullptr;
+	}
+
+	context->SetVSyncState(VSyncState::VSYNC_ON);
+
+	if (!windowIconTexture)
+	{
+		if (!exists(windowIconPath))
+		{
+			KalaWindowCore::ForceClose(
+				"Initialization error",
+				"Failed to attach icon to window '" + window->GetTitle() + "' because the icon was not found!");
+
+			return nullptr;
+		}
+		else
+		{
+			windowIconTexture = OpenGL_Texture::LoadTexture(
+				windowID,
+				"exeIcon",
+				windowIconPath.data(),
+				TextureType::Type_2D,
+				TextureFormat::Format_RGBA8);
+		}
+	}
+	else window->SetIcon(windowIconTexture->GetID());
+
+	Input* input = Input::Initialize(windowID);
+
+	if (!input)
+	{
+		KalaWindowCore::ForceClose(
+			"Initialization error",
+			"Failed to attach an Input context to window '" + window->GetTitle() + "'!");
+
+		return nullptr;
+	}
+
 	return window;
-	return nullptr;
 }

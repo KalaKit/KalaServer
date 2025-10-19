@@ -190,7 +190,7 @@ foreach(BIN_FILE ${BIN_FILES})
 endforeach()
 
 # Copy important files
-set(COPY_TARGETS README.md LICENSE.md)
+set(COPY_TARGETS README.md LICENSE.md logo.png)
 foreach(FILE ${COPY_TARGETS})
 add_custom_command(TARGET KalaServer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E rm -f 

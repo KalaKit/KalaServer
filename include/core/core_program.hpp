@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "KalaHeaders/core_utils.hpp"
+
 namespace KalaServer::Core
 {
 	class KalaServerCore
