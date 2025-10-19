@@ -7,6 +7,7 @@
 #include <vector>
 #include <filesystem>
 #include <chrono>
+#include <sstream>
 
 #include "KalaHeaders/log_utils.hpp"
 
@@ -30,7 +31,7 @@ using namespace KalaHeaders;
 using KalaWindow::Core::KalaWindowCore;
 using KalaWindow::Core::Registry;
 using KalaWindow::Core::Input;
-using KalaWindow::Core::Key;
+using KalaWindow::Core::MouseButton;
 using KalaWindow::Core::globalID;
 using KalaWindow::Graphics::Window_Global;
 using KalaWindow::Graphics::Window;
@@ -50,6 +51,9 @@ using KalaWindow::Graphics::OpenGL::Shader::shader_quad_vertex;
 using KalaWindow::Graphics::OpenGL::Shader::shader_quad_fragment;
 using namespace KalaWindow::Graphics::OpenGLFunctions;
 using KalaWindow::UI::Image;
+using KalaWindow::UI::PosTarget;
+using KalaWindow::UI::RotTarget;
+using KalaWindow::UI::SizeTarget;
 
 using std::string;
 using std::string_view;
@@ -58,6 +62,7 @@ using std::vector;
 using std::filesystem::exists;
 using std::filesystem::path;
 using std::filesystem::current_path;
+using std::ostringstream;
 
 constexpr string_view windowIconPath = "logo.png";
 static inline OpenGL_Texture* windowIconTexture{};
@@ -68,6 +73,11 @@ static void ResizeProjectionMatrix(Window* window);
 static Window* CreateNewWindow(
 	const string& name,
 	Window* parentWindow = nullptr);
+
+static void HandleUIInteraction(
+	u32 windowID,
+	vec2 windowSize,
+	Input* input);
 
 static vector<Window*> windows{};
 
@@ -131,9 +141,9 @@ namespace KalaServer::Graphics
 		Image* image = Image::Initialize(
 			"img01",
 			windowID,
-			vec2(256, 256),
+			vec2(256),
 			0.0f,
-			vec2(256, 256),
+			vec2(512),
 			nullptr,
 			tex01,
 			shader01);
@@ -148,14 +158,22 @@ namespace KalaServer::Graphics
 			window->Update();
 			u32 windowID = window->GetID();
 
+			const vector<Input*>& inputs = Input::registry.GetAllWindowContent(windowID);
+			Input* input = inputs.empty() ? nullptr : inputs.front();
+
+			if (input)
+			{
+				HandleUIInteraction(
+					windowID,
+					window->GetClientRectSize(),
+					input);
+			}
+
 			if (!window->IsIdle()
 				&& !window->IsResizing())
 			{
 				Redraw(window);
 			}
-
-			const vector<Input*>& inputs = Input::registry.GetAllWindowContent(windowID);
-			Input* input = inputs.empty() ? nullptr : inputs.front();
 
 			if (input) input->EndFrameUpdate();
 		}
@@ -175,9 +193,7 @@ void Redraw(Window* window)
 
 	u32 windowID = window->GetID();
 
-	mat3 projection2D = Projection2D(
-		window->GetClientRectSize(),
-		720.0f);
+	mat3 projection2D = Projection2D(window->GetClientRectSize());
 
 	const vector<OpenGL_Context*>& contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
 	OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
@@ -198,7 +214,19 @@ void Redraw(Window* window)
 	glDisable(GL_CULL_FACE);
 	for (const auto& image : Image::registry.runtimeContent)
 	{
-		if (image) image->Render(projection2D);
+		if (!image) continue;
+
+		static vec2 lastSize = vec2(0);
+		vec2 currentSize = window->GetClientRectSize();
+
+		if (currentSize != lastSize)
+		{
+			image->UpdateTransform();
+
+			lastSize = currentSize;
+		}
+
+		image->Render(projection2D);
 	}
 	glEnable(GL_CULL_FACE);
 
@@ -283,4 +311,93 @@ Window* CreateNewWindow(
 	}
 
 	return window;
+}
+
+void HandleUIInteraction(
+	u32 windowID,
+	vec2 windowSize,
+	Input* input)
+{
+	Image* img{};
+
+	const vector<Image*>& images = Image::registry.GetAllWindowContent(windowID);
+
+	if (images.empty())
+	{
+		Log::Print(
+			"Cannot handle UI input because there are no images!",
+			"IMAGE",
+			LogType::LOG_ERROR,
+			2);
+
+		return;
+	}
+
+	if (!img)
+	{
+		Image* tempImg = Image::registry.GetAllWindowContent(windowID).front();
+		if (!tempImg)
+		{
+			KalaWindowCore::ForceClose(
+				"Image error",
+				"Found image was nullptr!");
+			
+			return;
+		}
+
+		img = tempImg;
+	}
+
+	if (input->IsMousePressed(MouseButton::Left))
+	{
+		ostringstream result{};
+
+		const string& imgName = img->GetName();
+
+		bool hovered = img->IsHovered();
+		if (hovered) result << "\nhovering over image " << imgName << "\n";
+
+		vec2 mousePos = input->GetMousePosition();
+		
+		string newLine = !hovered ? "\n" : "";
+		result << newLine << "pressed lmb at:\n    '"
+			<< mousePos.x << ", "
+			<< mousePos.y << "'\n";
+
+		{
+			result << "viewport size is:\n    '"
+				<< windowSize.x << ", "
+				<< windowSize.y << "'\n";
+
+			vec2 imgPos = img->GetPos(PosTarget::POS_COMBINED);
+
+			result << "img '" << imgName << "' combined pos is:\n    '"
+				<< imgPos.x << ", "
+				<< imgPos.y << "'\n";
+
+			float imgRot = img->GetRot(RotTarget::ROT_COMBINED);
+
+			result << "img '" << imgName << "' combined rot is:\n    '"
+				<< imgRot << "'\n";
+
+			vec2 imgSize = img->GetSize(SizeTarget::SIZE_COMBINED);
+
+			result << "img '" << imgName << "' combined size is:\n    '"
+				   << imgSize.x << ", "
+				   << imgSize.y << "'\n";
+
+			const array<vec2, 4>& corners = img->GetCorners();
+
+			result << "img '" << imgName << "' corners are:\n"
+				   << "    top-left:     '" << corners[0].x << ", " << corners[0].y << "'\n"
+				   << "    top-right:    '" << corners[1].x << ", " << corners[1].y << "'\n"
+				   << "    bottom-right: '" << corners[2].x << ", " << corners[2].y << "'\n"
+				   << "    bottom-left:  '" << corners[3].x << ", " << corners[3].y << "'\n";
+		}
+
+		Log::Print(
+			result.str(),
+			"IMAGE",
+			LogType::LOG_INFO);
+	}
 }
