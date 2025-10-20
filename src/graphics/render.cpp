@@ -54,6 +54,7 @@ using KalaWindow::UI::Image;
 using KalaWindow::UI::PosTarget;
 using KalaWindow::UI::RotTarget;
 using KalaWindow::UI::SizeTarget;
+using KalaWindow::UI::ActionTarget;
 
 using std::string;
 using std::string_view;
@@ -77,6 +78,23 @@ static Window* CreateNewWindow(
 static void HandleUIInteraction(
 	Window* window,
 	Input* input);
+
+static void PrintOnClick()
+{
+	Log::Print("this is a click down event!");
+}
+static void PrintOnRelease()
+{
+	Log::Print("this is a click up event!");
+}
+static void PrintOnScroll()
+{
+	Log::Print("this is a scroll event!");
+}
+static void PrintOnDrag()
+{
+	Log::Print("this is a drag event!");
+}
 
 static vector<Window*> windows{};
 
@@ -155,6 +173,19 @@ namespace KalaServer::Graphics
 
 			vec2 offset = vec2(0.0f, -(size.y * 0.7f * normalizedHeight));
 			image->SetAABBOffset(offset);
+
+			image->SetAction(
+				[]() { PrintOnClick(); },
+				ActionTarget::ACTION_PRESSED);
+			image->SetAction(
+				[]() { PrintOnRelease(); },
+				ActionTarget::ACTION_RELEASED);
+			image->SetAction(
+				[]() { PrintOnDrag(); },
+				ActionTarget::ACTION_DRAGGED);
+			image->SetAction(
+				[]() { PrintOnScroll(); },
+				ActionTarget::ACTION_SCROLLED);
 		}
 	}
 
@@ -374,22 +405,33 @@ void HandleUIInteraction(
 		img = tempImg;
 	}
 
-	const string& imgName = img->GetName();
-
 	bool hovered = img->IsHovered();
+
 	if (hovered)
 	{
-		Log::Print(
-			"Hovering over image '" + imgName + "'",
-			"IMAGE",
-			LogType::LOG_INFO);
+		if (input->IsMousePressed(MouseButton::Left))
+		{
+			img->RunAction(ActionTarget::ACTION_PRESSED);
+		}
+		if (input->IsMouseReleased(MouseButton::Left))
+		{
+			img->RunAction(ActionTarget::ACTION_RELEASED);
+		}
+		if (input->IsMouseDragging())
+		{
+			img->RunAction(ActionTarget::ACTION_DRAGGED);
+		}
+		if (input->GetMouseWheelDelta() != 0)
+		{
+			img->RunAction(ActionTarget::ACTION_SCROLLED);
+		}
 	}
 
+	/*
 	if (input->IsMousePressed(MouseButton::Left))
 	{
 		ostringstream result{};
 
-		/*
 		const string& imgName = img->GetName();
 
 		bool hovered = img->IsHovered();
@@ -398,15 +440,10 @@ void HandleUIInteraction(
 			result << "\nhovering over image '" + imgName + "'\n";
 		}
 
-		string newLine = hovered ? "\n" : "";
-		result << newLine << "pressed lmb at pos:\n    '"
-			<< mousePos.x << ", "
-			<< mousePos.y << "'\n";
-		*/
-
 		vec2 mousePos = input->GetMousePosition();
 
-		result << "pressed lmb at pos:\n    '"
+		string newLine = hovered ? "\n" : "";
+		result << newLine << "pressed lmb at pos:\n    '"
 			<< mousePos.x << ", "
 			<< mousePos.y << "'\n";
 
@@ -444,4 +481,5 @@ void HandleUIInteraction(
 			"IMAGE",
 			LogType::LOG_INFO);
 	}
+	*/
 }
