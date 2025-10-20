@@ -75,8 +75,7 @@ static Window* CreateNewWindow(
 	Window* parentWindow = nullptr);
 
 static void HandleUIInteraction(
-	u32 windowID,
-	vec2 windowSize,
+	Window* window,
 	Input* input);
 
 static vector<Window*> windows{};
@@ -141,9 +140,9 @@ namespace KalaServer::Graphics
 		Image* image = Image::Initialize(
 			"img01",
 			windowID,
-			vec2(256),
+			vec2(0),
 			0.0f,
-			vec2(512),
+			vec2(256),
 			nullptr,
 			tex01,
 			shader01);
@@ -161,21 +160,20 @@ namespace KalaServer::Graphics
 			const vector<Input*>& inputs = Input::registry.GetAllWindowContent(windowID);
 			Input* input = inputs.empty() ? nullptr : inputs.front();
 
-			if (input)
-			{
-				HandleUIInteraction(
-					windowID,
-					window->GetClientRectSize(),
-					input);
-			}
-
 			if (!window->IsIdle()
 				&& !window->IsResizing())
 			{
 				Redraw(window);
 			}
 
-			if (input) input->EndFrameUpdate();
+			if (input)
+			{
+				HandleUIInteraction(
+					window,
+					input);
+
+				input->EndFrameUpdate();
+			}
 		}
 
 		if (windows != Window::registry.runtimeContent) windows = Window::registry.runtimeContent;
@@ -193,7 +191,7 @@ void Redraw(Window* window)
 
 	u32 windowID = window->GetID();
 
-	mat3 projection2D = Projection2D(window->GetClientRectSize());
+	mat3 projection2D = Projection2D(window->GetFramebufferSize());
 
 	const vector<OpenGL_Context*>& contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
 	OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
@@ -201,6 +199,9 @@ void Redraw(Window* window)
 	if (!context) return;
 	
 	context->MakeContextCurrent();
+
+	const vector<Input*>& inputs = Input::registry.GetAllWindowContent(windowID);
+	Input* input = inputs.empty() ? nullptr : inputs.front();
 
 	glClearColor(
 		NORMALIZED_BACKGROUND_COLOR.x,
@@ -217,13 +218,28 @@ void Redraw(Window* window)
 		if (!image) continue;
 
 		static vec2 lastSize = vec2(0);
-		vec2 currentSize = window->GetClientRectSize();
+		vec2 currentSize = window->GetFramebufferSize();
 
 		if (currentSize != lastSize)
 		{
-			image->UpdateTransform();
+			vec2 center = currentSize * 0.5f;
+			vec2 correctPos = vec2(center.x * 0.8f, center.y * 1.2f);
+
+			vec2 pos = image->GetPos(PosTarget::POS_WORLD);
+			if (pos != correctPos) image->SetPos(correctPos, PosTarget::POS_WORLD);
 
 			lastSize = currentSize;
+		}
+
+		if (input
+			&& input->IsMousePressed(MouseButton::Left))
+		{
+			vec3 ndc = projection2D * vec3(image->GetPos(PosTarget::POS_COMBINED), 1.0f);
+			vec2 projectedCenter = ((vec2(ndc.x, ndc.y) + vec2(1.0f)) * 0.5f) * window->GetFramebufferSize();
+			vec2 logged = image->GetPos(PosTarget::POS_COMBINED);
+
+			Log::Print("logged combined: " + to_string(logged.x) + ", " + to_string(logged.y));
+			Log::Print("gpu projected center: " + to_string(projectedCenter.x) + ", " + to_string(projectedCenter.y));
 		}
 
 		image->Render(projection2D);
@@ -314,10 +330,13 @@ Window* CreateNewWindow(
 }
 
 void HandleUIInteraction(
-	u32 windowID,
-	vec2 windowSize,
+	Window* window,
 	Input* input)
 {
+	u32 windowID = window->GetID();
+	vec2 fbSize = window->GetFramebufferSize();
+	HWND hwnd = ToVar<HWND>(window->GetWindowData().hwnd);
+
 	Image* img{};
 
 	const vector<Image*>& images = Image::registry.GetAllWindowContent(windowID);
@@ -360,20 +379,34 @@ void HandleUIInteraction(
 		vec2 mousePos = input->GetMousePosition();
 		
 		string newLine = !hovered ? "\n" : "";
-		result << newLine << "pressed lmb at:\n    '"
+		result << newLine << "pressed lmb at unscaled pos:\n    '"
 			<< mousePos.x << ", "
 			<< mousePos.y << "'\n";
 
+		UINT dpi = GetDpiForWindow(hwnd);
+		float dpiScale = dpi / 96.0f;
+		vec2 mousePhysicalPos = input->GetMousePosition() * dpiScale;
+
+		result << "pressed lmb at scaled pos:\n    '"
+			<< mousePhysicalPos.x << ", "
+			<< mousePhysicalPos.y << "'\n";
+
 		{
 			result << "viewport size is:\n    '"
-				<< windowSize.x << ", "
-				<< windowSize.y << "'\n";
+				<< fbSize.x << ", "
+				<< fbSize.y << "'\n";
 
 			vec2 imgPos = img->GetPos(PosTarget::POS_COMBINED);
 
 			result << "img '" << imgName << "' combined pos is:\n    '"
 				<< imgPos.x << ", "
 				<< imgPos.y << "'\n";
+
+			vec2 imgCorrectedPos = imgPos * dpiScale;
+
+			result << "img '" << imgName << "' corrected pos is:\n    '"
+				<< imgCorrectedPos.x << ", "
+				<< imgCorrectedPos.y << "\n";
 
 			float imgRot = img->GetRot(RotTarget::ROT_COMBINED);
 
