@@ -83,6 +83,8 @@ static vector<Window*> windows{};
 //light blue background color
 constexpr vec3 NORMALIZED_BACKGROUND_COLOR = vec3(0.29f, 0.36f, 0.85f);
 
+constexpr vec2 BASE_SIZE = vec2(1280.0f, 720.0f);
+
 namespace KalaServer::Graphics
 {
 	void Render::Initialize()
@@ -148,10 +150,10 @@ namespace KalaServer::Graphics
 			shader01);
 
 		{
-			vec2 offset = image->GetAABBOffset();
 			vec2 size = image->GetSize(SizeTarget::SIZE_COMBINED);
+			float normalizedHeight = window->GetClientRectSize().y / BASE_SIZE.y;
 
-			offset = vec2(0.0f, -(size.y * 0.7f));
+			vec2 offset = vec2(0.0f, -(size.y * 0.7f * normalizedHeight));
 			image->SetAABBOffset(offset);
 		}
 	}
@@ -227,11 +229,23 @@ void Redraw(Window* window)
 
 		if (currentSize != lastSize)
 		{
-			vec2 center = currentSize * 0.5f;
-			vec2 correctPos = vec2(center.x * 0.8f, center.y * 1.2f);
+			//update position
+			{
+				vec2 center = currentSize * 0.5f;
+				vec2 correctPos = vec2(center.x * 0.8f, center.y * 1.2f);
 
-			vec2 pos = image->GetPos(PosTarget::POS_WORLD);
-			if (pos != correctPos) image->SetPos(correctPos, PosTarget::POS_WORLD);
+				vec2 pos = image->GetPos(PosTarget::POS_WORLD);
+				if (pos != correctPos) image->SetPos(correctPos, PosTarget::POS_WORLD);
+			}
+
+			//update aabb offset
+			{
+				vec2 size = image->GetSize(SizeTarget::SIZE_COMBINED);
+				float normalizedHeight = window->GetClientRectSize().y / BASE_SIZE.y;
+
+				vec2 offset = vec2(0.0f, -(size.y * 0.7f * normalizedHeight));
+				image->SetAABBOffset(offset);
+			}
 
 			lastSize = currentSize;
 		}
@@ -246,7 +260,7 @@ void Redraw(Window* window)
 void ResizeProjectionMatrix(Window* window)
 {
 
-}
+} 
 
 Window* CreateNewWindow(
 	const string& name,
@@ -254,7 +268,7 @@ Window* CreateNewWindow(
 {
 	Window* window = Window::Initialize(
 		name,
-		vec2(1280, 720),
+		BASE_SIZE,
 		parentWindow,
 		WindowState::WINDOW_HIDE);
 
@@ -360,10 +374,22 @@ void HandleUIInteraction(
 		img = tempImg;
 	}
 
+	const string& imgName = img->GetName();
+
+	bool hovered = img->IsHovered();
+	if (hovered)
+	{
+		Log::Print(
+			"Hovering over image '" + imgName + "'",
+			"IMAGE",
+			LogType::LOG_INFO);
+	}
+
 	if (input->IsMousePressed(MouseButton::Left))
 	{
 		ostringstream result{};
 
+		/*
 		const string& imgName = img->GetName();
 
 		bool hovered = img->IsHovered();
@@ -372,10 +398,15 @@ void HandleUIInteraction(
 			result << "\nhovering over image '" + imgName + "'\n";
 		}
 
-		vec2 mousePos = input->GetMousePosition();
-		
 		string newLine = hovered ? "\n" : "";
 		result << newLine << "pressed lmb at pos:\n    '"
+			<< mousePos.x << ", "
+			<< mousePos.y << "'\n";
+		*/
+
+		vec2 mousePos = input->GetMousePosition();
+
+		result << "pressed lmb at pos:\n    '"
 			<< mousePos.x << ", "
 			<< mousePos.y << "'\n";
 
