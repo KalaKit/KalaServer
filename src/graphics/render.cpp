@@ -146,6 +146,14 @@ namespace KalaServer::Graphics
 			nullptr,
 			tex01,
 			shader01);
+
+		{
+			vec2 offset = image->GetAABBOffset();
+			vec2 size = image->GetSize(SizeTarget::SIZE_COMBINED);
+
+			offset = vec2(0.0f, -(size.y * 0.7f));
+			image->SetAABBOffset(offset);
+		}
 	}
 
 	void Render::Run()
@@ -200,9 +208,6 @@ void Redraw(Window* window)
 	
 	context->MakeContextCurrent();
 
-	const vector<Input*>& inputs = Input::registry.GetAllWindowContent(windowID);
-	Input* input = inputs.empty() ? nullptr : inputs.front();
-
 	glClearColor(
 		NORMALIZED_BACKGROUND_COLOR.x,
 		NORMALIZED_BACKGROUND_COLOR.y,
@@ -229,17 +234,6 @@ void Redraw(Window* window)
 			if (pos != correctPos) image->SetPos(correctPos, PosTarget::POS_WORLD);
 
 			lastSize = currentSize;
-		}
-
-		if (input
-			&& input->IsMousePressed(MouseButton::Left))
-		{
-			vec3 ndc = projection2D * vec3(image->GetPos(PosTarget::POS_COMBINED), 1.0f);
-			vec2 projectedCenter = ((vec2(ndc.x, ndc.y) + vec2(1.0f)) * 0.5f) * window->GetFramebufferSize();
-			vec2 logged = image->GetPos(PosTarget::POS_COMBINED);
-
-			Log::Print("logged combined: " + to_string(logged.x) + ", " + to_string(logged.y));
-			Log::Print("gpu projected center: " + to_string(projectedCenter.x) + ", " + to_string(projectedCenter.y));
 		}
 
 		image->Render(projection2D);
@@ -334,8 +328,7 @@ void HandleUIInteraction(
 	Input* input)
 {
 	u32 windowID = window->GetID();
-	vec2 fbSize = window->GetFramebufferSize();
-	HWND hwnd = ToVar<HWND>(window->GetWindowData().hwnd);
+	vec2 viewportSize = window->GetFramebufferSize();
 
 	Image* img{};
 
@@ -374,39 +367,28 @@ void HandleUIInteraction(
 		const string& imgName = img->GetName();
 
 		bool hovered = img->IsHovered();
-		if (hovered) result << "\nhovering over image " << imgName << "\n";
+		if (hovered)
+		{
+			result << "\nhovering over image '" + imgName + "'\n";
+		}
 
 		vec2 mousePos = input->GetMousePosition();
 		
-		string newLine = !hovered ? "\n" : "";
-		result << newLine << "pressed lmb at unscaled pos:\n    '"
+		string newLine = hovered ? "\n" : "";
+		result << newLine << "pressed lmb at pos:\n    '"
 			<< mousePos.x << ", "
 			<< mousePos.y << "'\n";
 
-		UINT dpi = GetDpiForWindow(hwnd);
-		float dpiScale = dpi / 96.0f;
-		vec2 mousePhysicalPos = input->GetMousePosition() * dpiScale;
-
-		result << "pressed lmb at scaled pos:\n    '"
-			<< mousePhysicalPos.x << ", "
-			<< mousePhysicalPos.y << "'\n";
-
 		{
 			result << "viewport size is:\n    '"
-				<< fbSize.x << ", "
-				<< fbSize.y << "'\n";
+				<< viewportSize.x << ", "
+				<< viewportSize.y << "'\n";
 
 			vec2 imgPos = img->GetPos(PosTarget::POS_COMBINED);
 
 			result << "img '" << imgName << "' combined pos is:\n    '"
 				<< imgPos.x << ", "
 				<< imgPos.y << "'\n";
-
-			vec2 imgCorrectedPos = imgPos * dpiScale;
-
-			result << "img '" << imgName << "' corrected pos is:\n    '"
-				<< imgCorrectedPos.x << ", "
-				<< imgCorrectedPos.y << "\n";
 
 			float imgRot = img->GetRot(RotTarget::ROT_COMBINED);
 
@@ -419,13 +401,11 @@ void HandleUIInteraction(
 				   << imgSize.x << ", "
 				   << imgSize.y << "'\n";
 
-			const array<vec2, 4>& corners = img->GetCorners();
+			const array<vec2, 2>& aabb = img->GetAABB();
 
 			result << "img '" << imgName << "' corners are:\n"
-				   << "    top-left:     '" << corners[0].x << ", " << corners[0].y << "'\n"
-				   << "    top-right:    '" << corners[1].x << ", " << corners[1].y << "'\n"
-				   << "    bottom-right: '" << corners[2].x << ", " << corners[2].y << "'\n"
-				   << "    bottom-left:  '" << corners[3].x << ", " << corners[3].y << "'\n";
+				   << "    top-left:     '" << aabb[0].x << ", " << aabb[0].y << "'\n"
+				   << "    bottom-right: '" << aabb[1].x << ", " << aabb[1].y << "'\n";
 		}
 
 		Log::Print(
