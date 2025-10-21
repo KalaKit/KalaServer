@@ -174,18 +174,20 @@ namespace KalaServer::Graphics
 			vec2 offset = vec2(0.0f, -(size.y * 0.7f * normalizedHeight));
 			image->SetAABBOffset(offset);
 
-			image->SetAction(
+			image->SetMouseEvent(
 				[]() { PrintOnClick(); },
+				MouseButton::Left,
 				ActionTarget::ACTION_PRESSED);
-			image->SetAction(
+			image->SetMouseEvent(
 				[]() { PrintOnRelease(); },
+				MouseButton::Left,
 				ActionTarget::ACTION_RELEASED);
-			image->SetAction(
+			image->SetMouseEvent(
 				[]() { PrintOnDrag(); },
+				MouseButton::Left,
 				ActionTarget::ACTION_DRAGGED);
-			image->SetAction(
-				[]() { PrintOnScroll(); },
-				ActionTarget::ACTION_SCROLLED);
+
+			image->SetMouseScrollEvent([]() { PrintOnScroll(); });
 		}
 	}
 
@@ -405,27 +407,7 @@ void HandleUIInteraction(
 		img = tempImg;
 	}
 
-	bool hovered = img->IsHovered();
-
-	if (hovered)
-	{
-		if (input->IsMousePressed(MouseButton::Left))
-		{
-			img->RunAction(ActionTarget::ACTION_PRESSED);
-		}
-		if (input->IsMouseReleased(MouseButton::Left))
-		{
-			img->RunAction(ActionTarget::ACTION_RELEASED);
-		}
-		if (input->IsMouseDragging())
-		{
-			img->RunAction(ActionTarget::ACTION_DRAGGED);
-		}
-		if (input->GetMouseWheelDelta() != 0)
-		{
-			img->RunAction(ActionTarget::ACTION_SCROLLED);
-		}
-	}
+	if (img->IsHovered()) img->PollEvents(input);
 
 	/*
 	if (input->IsMousePressed(MouseButton::Left))
