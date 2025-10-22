@@ -18,10 +18,15 @@ namespace KalaServer::Core
 		static void SetRunningState(bool newState) { isRunning = newState; }
 		static inline bool IsRunning() { return isRunning; }
 
+		static void UpdateDeltaTime();
+		static inline f64 GetDeltaTime() { return deltaTime; }
+
 		static void Run();
 
 		static void Shutdown();
 	private:
+		static inline f64 deltaTime{};
+
 		static inline bool isInitialized{};
 		static inline bool isRunning{};
 	};

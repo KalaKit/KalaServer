@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 #include <filesystem>
-#include <chrono>
 #include <sstream>
 
 #include "KalaHeaders/log_utils.hpp"
@@ -24,13 +23,16 @@
 #include "KalaWindow/include/graphics/opengl/shaders/shader_quad.hpp"
 #include "KalaWindow/include/ui/image.hpp"
 
+#include "core/core_program.hpp"
 #include "graphics/render.hpp"
 
-using namespace KalaHeaders;
+using KalaHeaders::Log;
+using KalaHeaders::LogType;
 
 using KalaWindow::Core::KalaWindowCore;
 using KalaWindow::Core::Registry;
 using KalaWindow::Core::Input;
+using KalaWindow::Core::Key;
 using KalaWindow::Core::MouseButton;
 using KalaWindow::Core::globalID;
 using KalaWindow::Graphics::Window_Global;
@@ -56,6 +58,8 @@ using KalaWindow::UI::RotTarget;
 using KalaWindow::UI::SizeTarget;
 using KalaWindow::UI::ActionTarget;
 
+using KalaServer::Core::KalaServerCore;
+
 using std::string;
 using std::string_view;
 using std::to_string;
@@ -69,34 +73,18 @@ constexpr string_view windowIconPath = "logo.png";
 static inline OpenGL_Texture* windowIconTexture{};
 
 static void Redraw(Window* window);
-static void ResizeProjectionMatrix(Window* window);
+static void Resize(Window* window);
 
 static Window* CreateNewWindow(
 	const string& name,
 	Window* parentWindow = nullptr);
 
-static void HandleUIInteraction(
-	Window* window,
-	Input* input);
+static void PrintOnClick()   { Log::Print("this is a click down event!"); }
+static void PrintOnRelease() { Log::Print("this is a click up event!"); }
+static void PrintOnScroll()  { Log::Print("this is a scroll event!"); }
+static void PrintOnDrag()    { Log::Print("this is a drag event!"); }
 
-static void PrintOnClick()
-{
-	Log::Print("this is a click down event!");
-}
-static void PrintOnRelease()
-{
-	Log::Print("this is a click up event!");
-}
-static void PrintOnScroll()
-{
-	Log::Print("this is a scroll event!");
-}
-static void PrintOnDrag()
-{
-	Log::Print("this is a drag event!");
-}
-
-static vector<Window*> windows{};
+static vector<Window*> activeWindows{};
 
 //light blue background color
 constexpr vec3 NORMALIZED_BACKGROUND_COLOR = vec3(0.29f, 0.36f, 0.85f);
@@ -105,6 +93,82 @@ constexpr vec2 BASE_SIZE = vec2(1280.0f, 720.0f);
 
 namespace KalaServer::Graphics
 {
+	struct InputPlaceholder
+	{
+		enum class TransformState
+		{
+			TR_POS,
+			TR_ROT,
+			TR_SIZE
+		};
+
+		static inline void UpdateWidgetTransform(
+			Input* input,
+			Image* image)
+		{
+			if (!input
+				|| !image)
+			{
+				return;
+			}
+
+			if (input->IsKeyPressed(Key::Z)) transformState = TransformState::TR_POS;
+			if (input->IsKeyPressed(Key::X)) transformState = TransformState::TR_ROT;
+			if (input->IsKeyPressed(Key::C)) transformState = TransformState::TR_SIZE;
+
+			f64 deltaTime = KalaServerCore::GetDeltaTime();
+			float velocity = speed * deltaTime;
+
+			vec2 pos = image->GetPos(PosTarget::POS_WORLD);
+			float rot = image->GetRot(RotTarget::ROT_WORLD);
+			vec2 size = image->GetSize(SizeTarget::SIZE_WORLD);
+
+			const vec2 up = vec2(0.0f, 1.0f);
+			const vec2 right = vec2(-1.0f, 0.0f);
+
+			bool wasUpdated = false;
+
+			switch (transformState)
+			{
+			case TransformState::TR_POS:
+			{
+				if (input->IsKeyHeld(Key::W)) pos -= up * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::S)) pos += up * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::A)) pos -= right * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::D)) pos += right * velocity; wasUpdated = true;
+				 
+				if (wasUpdated) image->SetPos(pos, PosTarget::POS_WORLD);
+
+				break;
+			}
+			case TransformState::TR_ROT:
+			{
+				if (input->IsKeyHeld(Key::A)) rot -= velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::D)) rot += velocity; wasUpdated = true;
+
+				if (wasUpdated) image->SetRot(rot, RotTarget::ROT_WORLD);
+
+				break;
+			}
+			case TransformState::TR_SIZE:
+			{
+				if (input->IsKeyHeld(Key::W)) size += up * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::S)) size -= up * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::A)) size -= right * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::D)) size += right * velocity; wasUpdated = true;
+
+				if (wasUpdated) image->SetSize(size, SizeTarget::SIZE_WORLD);
+
+				break;
+			}
+			}
+		}
+
+		static inline TransformState transformState{};
+		static inline f64 deltaTime{};
+		static inline f32 speed = 5.0f;
+	};
+
 	void Render::Initialize()
 	{
 		Window_Global::Initialize();
@@ -157,22 +221,18 @@ namespace KalaServer::Graphics
 				{.shaderData = string(shader_quad_fragment), .type = ShaderType::SHADER_FRAGMENT }
 			} });
 
-		Image* image = Image::Initialize(
-			"img01",
-			windowID,
-			vec2(0),
-			0.0f,
-			vec2(256),
-			nullptr,
-			tex01,
-			shader01);
-
 		{
-			vec2 size = image->GetSize(SizeTarget::SIZE_COMBINED);
-			float normalizedHeight = window->GetClientRectSize().y / BASE_SIZE.y;
+			Image* image = Image::Initialize(
+				"img01",
+				windowID,
+				vec2(0),
+				0.0f,
+				vec2(256),
+				nullptr,
+				tex01,
+				shader01);
 
-			vec2 offset = vec2(0.0f, -(size.y * 0.7f * normalizedHeight));
-			image->SetAABBOffset(offset);
+			image->SetBaseHeight(720.0f);
 
 			image->SetMouseEvent(
 				[]() { PrintOnClick(); },
@@ -193,7 +253,7 @@ namespace KalaServer::Graphics
 
 	void Render::Run()
 	{
-		for (const auto& window : windows)
+		for (const auto& window : activeWindows)
 		{
 			if (!window) continue;
 
@@ -203,23 +263,28 @@ namespace KalaServer::Graphics
 			const vector<Input*>& inputs = Input::registry.GetAllWindowContent(windowID);
 			Input* input = inputs.empty() ? nullptr : inputs.front();
 
+			const vector<Image*>& images = Image::registry.GetAllWindowContent(windowID);
+
 			if (!window->IsIdle()
 				&& !window->IsResizing())
 			{
+				for (const auto& image : images)
+				{
+					if (image
+						&& image->IsHovered())
+					{
+						image->PollEvents(input);
+					}
+				}
+
 				Redraw(window);
 			}
 
-			if (input)
-			{
-				HandleUIInteraction(
-					window,
-					input);
+			if (input) input->EndFrameUpdate();
 
-				input->EndFrameUpdate();
-			}
 		}
 
-		if (windows != Window::registry.runtimeContent) windows = Window::registry.runtimeContent;
+		if (activeWindows != Window::registry.runtimeContent) activeWindows = Window::registry.runtimeContent;
 	}
 
 	void Render::Shutdown()
@@ -253,44 +318,17 @@ void Redraw(Window* window)
 		| GL_DEPTH_BUFFER_BIT);
 
 	glDisable(GL_CULL_FACE);
-	for (const auto& image : Image::registry.runtimeContent)
+	const vector<Image*>& images = Image::registry.GetAllWindowContent(windowID);
+	for (const auto& image : images)
 	{
-		if (!image) continue;
-
-		static vec2 lastSize = vec2(0);
-		vec2 currentSize = window->GetFramebufferSize();
-
-		if (currentSize != lastSize)
-		{
-			//update position
-			{
-				vec2 center = currentSize * 0.5f;
-				vec2 correctPos = vec2(center.x * 0.8f, center.y * 1.2f);
-
-				vec2 pos = image->GetPos(PosTarget::POS_WORLD);
-				if (pos != correctPos) image->SetPos(correctPos, PosTarget::POS_WORLD);
-			}
-
-			//update aabb offset
-			{
-				vec2 size = image->GetSize(SizeTarget::SIZE_COMBINED);
-				float normalizedHeight = window->GetClientRectSize().y / BASE_SIZE.y;
-
-				vec2 offset = vec2(0.0f, -(size.y * 0.7f * normalizedHeight));
-				image->SetAABBOffset(offset);
-			}
-
-			lastSize = currentSize;
-		}
-
-		image->Render(projection2D);
+		if (image) image->Render(projection2D, window->GetClientRectSize());
 	}
 	glEnable(GL_CULL_FACE);
 
 	context->SwapOpenGLBuffers();
 }
 
-void ResizeProjectionMatrix(Window* window)
+void Resize(Window* window)
 {
 
 } 
@@ -315,7 +353,7 @@ Window* CreateNewWindow(
 	}
 	
 	window->SetRedrawCallback([window]() { Redraw(window); });
-	window->SetResizeCallback([window]() { ResizeProjectionMatrix(window); });
+	window->SetResizeCallback([window]() { Resize(window); });
 
 	window->BringToFocus();
 
@@ -368,100 +406,4 @@ Window* CreateNewWindow(
 	}
 
 	return window;
-}
-
-void HandleUIInteraction(
-	Window* window,
-	Input* input)
-{
-	u32 windowID = window->GetID();
-	vec2 viewportSize = window->GetFramebufferSize();
-
-	Image* img{};
-
-	const vector<Image*>& images = Image::registry.GetAllWindowContent(windowID);
-
-	if (images.empty())
-	{
-		Log::Print(
-			"Cannot handle UI input because there are no images!",
-			"IMAGE",
-			LogType::LOG_ERROR,
-			2);
-
-		return;
-	}
-
-	if (!img)
-	{
-		Image* tempImg = Image::registry.GetAllWindowContent(windowID).front();
-		if (!tempImg)
-		{
-			KalaWindowCore::ForceClose(
-				"Image error",
-				"Found image was nullptr!");
-			
-			return;
-		}
-
-		img = tempImg;
-	}
-
-	if (img->IsHovered()) img->PollEvents(input);
-
-	/*
-	if (input->IsMousePressed(MouseButton::Left))
-	{
-		ostringstream result{};
-
-		const string& imgName = img->GetName();
-
-		bool hovered = img->IsHovered();
-		if (hovered)
-		{
-			result << "\nhovering over image '" + imgName + "'\n";
-		}
-
-		vec2 mousePos = input->GetMousePosition();
-
-		string newLine = hovered ? "\n" : "";
-		result << newLine << "pressed lmb at pos:\n    '"
-			<< mousePos.x << ", "
-			<< mousePos.y << "'\n";
-
-		{
-			result << "viewport size is:\n    '"
-				<< viewportSize.x << ", "
-				<< viewportSize.y << "'\n";
-
-			vec2 imgPos = img->GetPos(PosTarget::POS_COMBINED);
-
-			result << "img '" << imgName << "' combined pos is:\n    '"
-				<< imgPos.x << ", "
-				<< imgPos.y << "'\n";
-
-			float imgRot = img->GetRot(RotTarget::ROT_COMBINED);
-
-			result << "img '" << imgName << "' combined rot is:\n    '"
-				<< imgRot << "'\n";
-
-			vec2 imgSize = img->GetSize(SizeTarget::SIZE_COMBINED);
-
-			result << "img '" << imgName << "' combined size is:\n    '"
-				   << imgSize.x << ", "
-				   << imgSize.y << "'\n";
-
-			const array<vec2, 2>& aabb = img->GetAABB();
-
-			result << "img '" << imgName << "' corners are:\n"
-				   << "    top-left:     '" << aabb[0].x << ", " << aabb[0].y << "'\n"
-				   << "    bottom-right: '" << aabb[1].x << ", " << aabb[1].y << "'\n";
-		}
-
-		Log::Print(
-			result.str(),
-			"IMAGE",
-			LogType::LOG_INFO);
-	}
-	*/
 }

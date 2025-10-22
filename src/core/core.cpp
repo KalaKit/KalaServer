@@ -9,6 +9,8 @@
 #endif
 
 #include <iostream>
+#include <chrono>
+#include <algorithm>
 
 #include "KalaHeaders/log_utils.hpp"
 
@@ -33,6 +35,10 @@ using KalaServer::Graphics::Render;
 
 using std::cout;
 using std::cin;
+using std::chrono::steady_clock;
+using std::chrono::time_point;
+using std::chrono::duration;
+using std::clamp;
 
 static bool IsAdmin();
 static bool RunAsAdmin();
@@ -75,6 +81,17 @@ namespace KalaServer::Core
 		Run();
 	}
 
+	void KalaServerCore::UpdateDeltaTime()
+	{
+		auto now = steady_clock::now();
+		static time_point<steady_clock> lastFrameTime = now;
+
+		duration<f64> delta = now - lastFrameTime;
+		lastFrameTime = now;
+
+		deltaTime = clamp(delta.count(), 0.0, 0.1);
+	}
+
 	void KalaServerCore::Run()
 	{
 		Log::Print(
@@ -84,6 +101,7 @@ namespace KalaServer::Core
 
 		while (isRunning)
 		{
+			UpdateDeltaTime();
 			Render::Run();
 		}
 	}
