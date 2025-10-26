@@ -25,6 +25,7 @@
 
 #include "core/core_program.hpp"
 #include "graphics/render.hpp"
+#include "glm/glm.hpp"
 
 using KalaHeaders::Log;
 using KalaHeaders::LogType;
