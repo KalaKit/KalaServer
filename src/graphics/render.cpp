@@ -136,32 +136,90 @@ namespace KalaServer::Graphics
 			{
 			case TransformState::TR_POS:
 			{
-				if (input->IsKeyHeld(Key::W)) pos -= up * velocity; wasUpdated = true;
-				if (input->IsKeyHeld(Key::S)) pos += up * velocity; wasUpdated = true;
-				if (input->IsKeyHeld(Key::A)) pos -= right * velocity; wasUpdated = true;
-				if (input->IsKeyHeld(Key::D)) pos += right * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::W))
+				{
+					pos -= up * velocity;
+					wasUpdated = true;
+				}
+				if (input->IsKeyHeld(Key::S))
+				{
+					pos += up * velocity;
+					wasUpdated = true;
+				}
+				if (input->IsKeyHeld(Key::A))
+				{
+					pos -= right * velocity;
+					wasUpdated = true;
+				}
+				if (input->IsKeyHeld(Key::D))
+				{
+					pos += right * velocity;
+					wasUpdated = true;
+				}
 				 
-				if (wasUpdated) image->SetPos(pos, PosTarget::POS_WORLD);
+				if (wasUpdated)
+				{
+					Log::Print("set new pos to " + to_string(pos.x) + ", " + to_string(pos.y));
+
+					image->SetPos(pos, PosTarget::POS_WORLD);
+					wasUpdated = false;
+				}
 
 				break;
 			}
 			case TransformState::TR_ROT:
 			{
-				if (input->IsKeyHeld(Key::A)) rot -= velocity; wasUpdated = true;
-				if (input->IsKeyHeld(Key::D)) rot += velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::A))
+				{
+					rot -= velocity;
+					wasUpdated = true;
+				}
+				if (input->IsKeyHeld(Key::D))
+				{
+					rot += velocity;
+					wasUpdated = true;
+				}
 
-				if (wasUpdated) image->SetRot(rot, RotTarget::ROT_WORLD);
+				if (wasUpdated)
+				{
+					Log::Print("set new rot to " + to_string(rot));
+
+					image->SetRot(rot, RotTarget::ROT_WORLD);
+					wasUpdated = false;
+				}
 
 				break;
 			}
 			case TransformState::TR_SIZE:
 			{
-				if (input->IsKeyHeld(Key::W)) size += up * velocity; wasUpdated = true;
-				if (input->IsKeyHeld(Key::S)) size -= up * velocity; wasUpdated = true;
-				if (input->IsKeyHeld(Key::A)) size -= right * velocity; wasUpdated = true;
-				if (input->IsKeyHeld(Key::D)) size += right * velocity; wasUpdated = true;
+				if (input->IsKeyHeld(Key::W))
+				{
+					size += up * velocity;
+					wasUpdated = true;
+				}
+				if (input->IsKeyHeld(Key::S))
+				{
+					size -= up * velocity;
+					wasUpdated = true;
+				}
+				if (input->IsKeyHeld(Key::A))
+				{
+					size += right * velocity;
+					wasUpdated = true;
+				}
+				if (input->IsKeyHeld(Key::D))
+				{
+					size -= right * velocity;
+					wasUpdated = true;
+				}
 
-				if (wasUpdated) image->SetSize(size, SizeTarget::SIZE_WORLD);
+				if (wasUpdated)
+				{
+					Log::Print("set new size to " + to_string(size.x) + ", " + to_string(size.y));
+
+					image->SetSize(size, SizeTarget::SIZE_WORLD);
+					wasUpdated = false;
+				}
 
 				break;
 			}
@@ -274,10 +332,13 @@ namespace KalaServer::Graphics
 			{
 				for (const auto& image : images)
 				{
-					if (image
-						&& image->IsHovered())
+					if (image)
 					{
-						image->PollEvents(input);
+						if (image->IsHovered()) image->PollEvents(input);
+
+						InputPlaceholder::UpdateWidgetTransform(
+							input,
+							image);
 					}
 				}
 
