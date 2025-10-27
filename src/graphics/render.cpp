@@ -9,12 +9,12 @@
 #include <sstream>
 
 #include "KalaHeaders/log_utils.hpp"
+#include "KalaHeaders/math_utils.hpp"
 
 #include "KalaWindow/include/core/registry.hpp"
 #include "KalaWindow/include/core/core.hpp"
 #include "KalaWindow/include/graphics/window_global.hpp"
 #include "KalaWindow/include/graphics/window.hpp"
-#include "KalaWindow/include/core/glm_global.hpp"
 #include "KalaWindow/include/core/input.hpp"
 #include "KalaWindow/include/graphics/opengl/opengl.hpp"
 #include "KalaWindow/include/graphics/opengl/opengl_texture.hpp"
@@ -25,10 +25,13 @@
 
 #include "core/core_program.hpp"
 #include "graphics/render.hpp"
-#include "glm/glm.hpp"
 
 using KalaHeaders::Log;
 using KalaHeaders::LogType;
+using KalaHeaders::kvec2;
+using KalaHeaders::kvec3;
+using KalaHeaders::kmat4;
+using KalaHeaders::ortho;
 
 using KalaWindow::Core::KalaWindowCore;
 using KalaWindow::Core::Registry;
@@ -88,9 +91,9 @@ static void PrintOnDrag()    { Log::Print("this is a drag event!"); }
 static vector<Window*> activeWindows{};
 
 //light blue background color
-constexpr vec3 NORMALIZED_BACKGROUND_COLOR = vec3(0.29f, 0.36f, 0.85f);
+constexpr kvec3 NORMALIZED_BACKGROUND_COLOR = kvec3(0.29f, 0.36f, 0.85f);
 
-constexpr vec2 BASE_SIZE = vec2(1280.0f, 720.0f);
+constexpr kvec2 BASE_SIZE = kvec2(1280.0f, 720.0f);
 
 namespace KalaServer::Graphics
 {
@@ -120,12 +123,12 @@ namespace KalaServer::Graphics
 			f64 deltaTime = KalaServerCore::GetDeltaTime();
 			float velocity = speed * deltaTime;
 
-			vec2 pos = image->GetPos(PosTarget::POS_WORLD);
+			kvec2 pos = image->GetPos(PosTarget::POS_WORLD);
 			float rot = image->GetRot(RotTarget::ROT_WORLD);
-			vec2 size = image->GetSize(SizeTarget::SIZE_WORLD);
+			kvec2 size = image->GetSize(SizeTarget::SIZE_WORLD);
 
-			const vec2 up = vec2(0.0f, 1.0f);
-			const vec2 right = vec2(-1.0f, 0.0f);
+			const kvec2 up = kvec2(0.0f, 1.0f);
+			const kvec2 right = kvec2(-1.0f, 0.0f);
 
 			bool wasUpdated = false;
 
@@ -226,9 +229,9 @@ namespace KalaServer::Graphics
 			Image* image = Image::Initialize(
 				"img01",
 				windowID,
-				vec2(0),
+				kvec2(0),
 				0.0f,
-				vec2(256),
+				kvec2(256),
 				nullptr,
 				tex01,
 				shader01);
@@ -300,7 +303,7 @@ void Redraw(Window* window)
 
 	u32 windowID = window->GetID();
 
-	mat3 projection2D = Projection2D(window->GetFramebufferSize());
+	kmat4 projection = ortho(window->GetFramebufferSize());
 
 	const vector<OpenGL_Context*>& contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
 	OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
@@ -322,7 +325,7 @@ void Redraw(Window* window)
 	const vector<Image*>& images = Image::registry.GetAllWindowContent(windowID);
 	for (const auto& image : images)
 	{
-		if (image) image->Render(projection2D, window->GetClientRectSize());
+		if (image) image->Render(projection, window->GetClientRectSize());
 	}
 	glEnable(GL_CULL_FACE);
 

@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "KalaHeaders/core_utils.hpp"
+#include "KalaHeaders/math_utils.hpp"
 
 namespace KalaServer::Core
 {
