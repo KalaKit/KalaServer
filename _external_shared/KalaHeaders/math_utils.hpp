@@ -133,7 +133,7 @@ namespace KalaHeaders
 	}
 
 	//
-	// vec
+	// VEC
 	//
 
 	template<size_t N>
@@ -149,7 +149,7 @@ namespace KalaHeaders
 	template <size_t N>
 	struct vec : public vec_storage<N>
 	{
-		static_assert(N >= 2 && N <= 4, "vec can only have 2, 3, or 4 components.");
+		static_assert(N >= 2 && N <= 4, "kvec can only have 2, 3, or 4 components.");
 
 		constexpr vec() = default;
 
@@ -600,7 +600,7 @@ namespace KalaHeaders
 	}
 
 	//
-	// mat
+	// MAT
 	//
 
 	template<size_t N>
