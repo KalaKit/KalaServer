@@ -231,7 +231,7 @@ namespace KalaServer::Graphics
 
 		static inline TransformState transformState{};
 		static inline f64 deltaTime{};
-		static inline f32 speed = 5.0f;
+		static inline f32 speed = 100.0f;
 	};
 
 	void Render::Initialize()
