@@ -11,7 +11,8 @@
 #include "KalaHeaders/log_utils.hpp"
 #include "KalaHeaders/math_utils.hpp"
 
-#include "KalaWindow/include/core/registry.hpp"
+#include "KalaWindow/include/utils/registry.hpp"
+#include "KalaWindow/include/utils/transform.hpp"
 #include "KalaWindow/include/core/core.hpp"
 #include "KalaWindow/include/graphics/window_global.hpp"
 #include "KalaWindow/include/graphics/window.hpp"
@@ -28,13 +29,12 @@
 
 using KalaHeaders::Log;
 using KalaHeaders::LogType;
-using KalaHeaders::kvec2;
-using KalaHeaders::kvec3;
-using KalaHeaders::kmat4;
+using KalaHeaders::vec2;
+using KalaHeaders::vec3;
+using KalaHeaders::mat4;
 using KalaHeaders::ortho;
 
 using KalaWindow::Core::KalaWindowCore;
-using KalaWindow::Core::Registry;
 using KalaWindow::Core::Input;
 using KalaWindow::Core::Key;
 using KalaWindow::Core::MouseButton;
@@ -57,10 +57,12 @@ using KalaWindow::Graphics::OpenGL::Shader::shader_quad_vertex;
 using KalaWindow::Graphics::OpenGL::Shader::shader_quad_fragment;
 using namespace KalaWindow::Graphics::OpenGLFunctions;
 using KalaWindow::UI::Image;
-using KalaWindow::UI::PosTarget;
-using KalaWindow::UI::RotTarget;
-using KalaWindow::UI::SizeTarget;
 using KalaWindow::UI::ActionTarget;
+using KalaWindow::Utils::Registry;
+using KalaWindow::Utils::Transform2D;
+using KalaWindow::Utils::PosTarget;
+using KalaWindow::Utils::RotTarget;
+using KalaWindow::Utils::SizeTarget;
 
 using KalaServer::Core::KalaServerCore;
 
@@ -91,9 +93,9 @@ static void PrintOnDrag()    { Log::Print("this is a drag event!"); }
 static vector<Window*> activeWindows{};
 
 //light blue background color
-constexpr kvec3 NORMALIZED_BACKGROUND_COLOR = kvec3(0.29f, 0.36f, 0.85f);
+constexpr vec3 NORMALIZED_BACKGROUND_COLOR = vec3(0.29f, 0.36f, 0.85f);
 
-constexpr kvec2 BASE_SIZE = kvec2(1280.0f, 720.0f);
+constexpr vec2 BASE_SIZE = vec2(1280.0f, 720.0f);
 
 namespace KalaServer::Graphics
 {
@@ -123,12 +125,13 @@ namespace KalaServer::Graphics
 			f64 deltaTime = KalaServerCore::GetDeltaTime();
 			float velocity = speed * deltaTime;
 
-			kvec2 pos = image->GetPos(PosTarget::POS_WORLD);
-			float rot = image->GetRot(RotTarget::ROT_WORLD);
-			kvec2 size = image->GetSize(SizeTarget::SIZE_WORLD);
+			const Transform2D& tf = image->GetTransform();
+			vec2 pos = tf.GetPos(PosTarget::POS_WORLD);
+			float rot = tf.GetRot(RotTarget::ROT_WORLD);
+			vec2 size = tf.GetSize(SizeTarget::SIZE_WORLD);
 
-			const kvec2 up = kvec2(0.0f, 1.0f);
-			const kvec2 right = kvec2(-1.0f, 0.0f);
+			const vec2 up = vec2(0.0f, 1.0f);
+			const vec2 right = vec2(-1.0f, 0.0f);
 
 			bool wasUpdated = false;
 
@@ -161,7 +164,7 @@ namespace KalaServer::Graphics
 				{
 					Log::Print("set new pos to " + to_string(pos.x) + ", " + to_string(pos.y));
 
-					image->SetPos(pos, PosTarget::POS_WORLD);
+					image->GetTransform().SetPos(pos, PosTarget::POS_WORLD);
 					wasUpdated = false;
 				}
 
@@ -184,7 +187,7 @@ namespace KalaServer::Graphics
 				{
 					Log::Print("set new rot to " + to_string(rot));
 
-					image->SetRot(rot, RotTarget::ROT_WORLD);
+					image->GetTransform().SetRot(rot, RotTarget::ROT_WORLD);
 					wasUpdated = false;
 				}
 
@@ -217,7 +220,7 @@ namespace KalaServer::Graphics
 				{
 					Log::Print("set new size to " + to_string(size.x) + ", " + to_string(size.y));
 
-					image->SetSize(size, SizeTarget::SIZE_WORLD);
+					image->GetTransform().SetSize(size, SizeTarget::SIZE_WORLD);
 					wasUpdated = false;
 				}
 
@@ -287,14 +290,14 @@ namespace KalaServer::Graphics
 			Image* image = Image::Initialize(
 				"img01",
 				windowID,
-				kvec2(0),
+				vec2(0),
 				0.0f,
-				kvec2(256),
+				vec2(256),
 				nullptr,
 				tex01,
 				shader01);
 
-			image->SetBaseHeight(720.0f);
+			//image->SetBaseHeight(720.0f);
 
 			image->SetMouseEvent(
 				[]() { PrintOnClick(); },
@@ -364,7 +367,7 @@ void Redraw(Window* window)
 
 	u32 windowID = window->GetID();
 
-	kmat4 projection = ortho(window->GetFramebufferSize());
+	mat4 projection = ortho(window->GetFramebufferSize());
 
 	const vector<OpenGL_Context*>& contexts = OpenGL_Context::registry.GetAllWindowContent(windowID);
 	OpenGL_Context* context = contexts.empty() ? nullptr : contexts.front();
