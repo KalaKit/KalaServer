@@ -1,0 +1,39 @@
+# How to get access globally with port forwarding
+
+- make sure hosts doesnt have your localhost ip
+	- open 'C:\Windows\System32\drivers\etc\hosts'
+	- remove or comment out '127.0.0.1   yourdomain.yourextension' at the bottom
+
+- allow port '30000' through firewall
+	- add inbound rule
+	- choose port
+	- choose tcp
+	- set specific local port to 30000
+	- allow connection
+	- profile: All
+	- name: yourservername
+- log in to your router admin page (usually 192.168.1.1)
+- go to the port forwarding section 
+	- port: 30000
+	- protocol: tcp
+	- internal ip: your ipv4
+	- internal port: 30000
+	- name: yourservername
+- add a root domain record to cloudflare (or other domain provider)
+	- go to your cloudflare domain
+	- go to dns
+	- click add record
+	- Type: A
+	- Name: @
+	- IPv4 address: your public ipv4 (not the same from cmd ipconfig command)
+	- Proxy status: on
+- add a cname record to cloudflare (or other domain provider)
+	- go to your cloudflare domain
+	- go to dns
+	- click add record
+	- Type: CNAME
+	- Name: www
+	- Target: yourdomain.yourextension
+	- Proxy status: on
+- run the server as admin (which listens on port 30000)
+- open your browser and go to 'http://yourdomain.yourextension'
