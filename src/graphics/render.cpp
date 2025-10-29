@@ -33,6 +33,7 @@ using KalaHeaders::vec2;
 using KalaHeaders::vec3;
 using KalaHeaders::mat4;
 using KalaHeaders::ortho;
+using KalaHeaders::kclamp;
 
 using KalaWindow::Core::KalaWindowCore;
 using KalaWindow::Core::Input;
@@ -97,156 +98,179 @@ constexpr vec3 NORMALIZED_BACKGROUND_COLOR = vec3(0.29f, 0.36f, 0.85f);
 
 constexpr vec2 BASE_SIZE = vec2(1280.0f, 720.0f);
 
-namespace KalaServer::Graphics
+struct InputPlaceholder
 {
-	struct InputPlaceholder
+	enum class TransformState
 	{
-		enum class TransformState
-		{
-			TR_POS,
-			TR_ROT,
-			TR_SIZE
-		};
-
-		static inline void UpdateWidgetTransform(
-			Input* input,
-			Image* image)
-		{
-			if (!input
-				|| !image)
-			{
-				return;
-			}
-
-			if (input->IsKeyPressed(Key::Z)) transformState = TransformState::TR_POS;
-			if (input->IsKeyPressed(Key::X)) transformState = TransformState::TR_ROT;
-			if (input->IsKeyPressed(Key::C)) transformState = TransformState::TR_SIZE;
-
-			f64 deltaTime = KalaServerCore::GetDeltaTime();
-			float velocity = speed * deltaTime;
-
-			Transform2D* tf = image->GetTransform();
-			vec2 pos = tf->GetPos(PosTarget::POS_WORLD);
-			float rot = tf->GetRot(RotTarget::ROT_WORLD);
-			vec2 size = tf->GetSize(SizeTarget::SIZE_WORLD);
-
-			const vec2 up = vec2(0.0f, 1.0f);
-			const vec2 right = vec2(1.0f, 0.0f);
-
-			bool wasUpdated = false;
-
-			switch (transformState)
-			{
-			case TransformState::TR_POS:
-			{
-				if (input->IsKeyHeld(Key::W))
-				{
-					pos += up * velocity * 3.0f;
-					wasUpdated = true;
-				}
-				if (input->IsKeyHeld(Key::S))
-				{
-					pos -= up * velocity * 3.0f;
-					wasUpdated = true;
-				}
-				if (input->IsKeyHeld(Key::A))
-				{
-					pos -= right * velocity * 3.0f;
-					wasUpdated = true;
-				}
-				if (input->IsKeyHeld(Key::D))
-				{
-					pos += right * velocity * 3.0f;
-					wasUpdated = true;
-				}
-				 
-				if (wasUpdated)
-				{
-					tf->SetPos(pos, PosTarget::POS_WORLD);
-
-					vec2 pos_new = tf->GetPos(PosTarget::POS_COMBINED);
-
-					Log::Print("set new pos to " 
-						+ to_string(pos_new.x) + ", "
-						+ to_string(pos_new.y));
-
-					wasUpdated = false;
-				}
-
-				break;
-			}
-			case TransformState::TR_ROT:
-			{
-				if (input->IsKeyHeld(Key::A))
-				{
-					rot -= velocity;
-					wasUpdated = true;
-				}
-				if (input->IsKeyHeld(Key::D))
-				{
-					rot += velocity;
-					wasUpdated = true;
-				}
-
-				if (wasUpdated)
-				{
-					tf->SetRot(rot, RotTarget::ROT_WORLD);
-
-					f32 rot_new = tf->GetRot(RotTarget::ROT_COMBINED);
-
-					Log::Print("set new rot to " + to_string(rot_new));
-
-					wasUpdated = false;
-				}
-
-				break;
-			}
-			case TransformState::TR_SIZE:
-			{
-				if (input->IsKeyHeld(Key::W))
-				{
-					size += up * velocity * 3.0f;
-					wasUpdated = true;
-				}
-				if (input->IsKeyHeld(Key::S))
-				{
-					size -= up * velocity * 3.0f;
-					wasUpdated = true;
-				}
-				if (input->IsKeyHeld(Key::A))
-				{
-					size -= right * velocity * 3.0f;
-					wasUpdated = true;
-				}
-				if (input->IsKeyHeld(Key::D))
-				{
-					size += right * velocity * 3.0f;
-					wasUpdated = true;
-				}
-
-				if (wasUpdated)
-				{
-					tf->SetSize(size, SizeTarget::SIZE_WORLD);
-
-					vec2 size_new = tf->GetSize(SizeTarget::SIZE_COMBINED);
-
-					Log::Print("set new size to "
-						+ to_string(size_new.x) + ", "
-						+ to_string(size_new.y));
-
-					wasUpdated = false;
-				}
-
-				break;
-			}
-			}
-		}
-
-		static inline TransformState transformState{};
-		static inline f64 deltaTime{};
-		static inline f32 speed = 100.0f;
+		TR_POS,
+		TR_ROT,
+		TR_SIZE
 	};
 
+	static inline void UpdateWidgetTransform(
+		Input* input,
+		Image* image)
+	{
+		if (!input
+			|| !image)
+		{
+			return;
+		}
+
+		if (input->IsKeyPressed(Key::Z)) transformState = TransformState::TR_POS;
+		if (input->IsKeyPressed(Key::X)) transformState = TransformState::TR_ROT;
+		if (input->IsKeyPressed(Key::C)) transformState = TransformState::TR_SIZE;
+
+		f64 deltaTime = KalaServerCore::GetDeltaTime();
+		float velocity = speed * deltaTime;
+
+		Transform2D* tf = image->GetTransform();
+		vec2 pos = tf->GetPos(PosTarget::POS_WORLD);
+		float rot = tf->GetRot(RotTarget::ROT_WORLD);
+		vec2 size = tf->GetSize(SizeTarget::SIZE_WORLD);
+
+		const vec2 up = vec2(0.0f, 1.0f);
+		const vec2 right = vec2(1.0f, 0.0f);
+
+		bool wasUpdated = false;
+
+		switch (transformState)
+		{
+		case TransformState::TR_POS:
+		{
+			if (input->IsKeyHeld(Key::W))
+			{
+				pos += up * velocity * 3.0f;
+				wasUpdated = true;
+			}
+			if (input->IsKeyHeld(Key::S))
+			{
+				pos -= up * velocity * 3.0f;
+				wasUpdated = true;
+			}
+			if (input->IsKeyHeld(Key::A))
+			{
+				pos -= right * velocity * 3.0f;
+				wasUpdated = true;
+			}
+			if (input->IsKeyHeld(Key::D))
+			{
+				pos += right * velocity * 3.0f;
+				wasUpdated = true;
+			}
+
+			if (wasUpdated)
+			{
+				tf->SetPos(pos, PosTarget::POS_WORLD);
+
+				vec2 pos_new = tf->GetPos(PosTarget::POS_COMBINED);
+
+				Log::Print("set new pos to "
+					+ to_string(pos_new.x) + ", "
+					+ to_string(pos_new.y));
+
+				wasUpdated = false;
+			}
+
+			break;
+		}
+		case TransformState::TR_ROT:
+		{
+			if (input->IsKeyHeld(Key::A))
+			{
+				rot -= velocity;
+				wasUpdated = true;
+			}
+			if (input->IsKeyHeld(Key::D))
+			{
+				rot += velocity;
+				wasUpdated = true;
+			}
+
+			if (wasUpdated)
+			{
+				tf->SetRot(rot, RotTarget::ROT_WORLD);
+
+				f32 rot_new = tf->GetRot(RotTarget::ROT_COMBINED);
+
+				Log::Print("set new rot to " + to_string(rot_new));
+
+				wasUpdated = false;
+			}
+
+			break;
+		}
+		case TransformState::TR_SIZE:
+		{
+			if (input->IsKeyHeld(Key::W))
+			{
+				size += up * velocity * 3.0f;
+				wasUpdated = true;
+			}
+			if (input->IsKeyHeld(Key::S))
+			{
+				size -= up * velocity * 3.0f;
+				wasUpdated = true;
+			}
+			if (input->IsKeyHeld(Key::A))
+			{
+				size -= right * velocity * 3.0f;
+				wasUpdated = true;
+			}
+			if (input->IsKeyHeld(Key::D))
+			{
+				size += right * velocity * 3.0f;
+				wasUpdated = true;
+			}
+
+			if (wasUpdated)
+			{
+				tf->SetSize(size, SizeTarget::SIZE_WORLD);
+
+				vec2 size_new = tf->GetSize(SizeTarget::SIZE_COMBINED);
+
+				Log::Print("set new size to "
+					+ to_string(size_new.x) + ", "
+					+ to_string(size_new.y));
+
+				wasUpdated = false;
+			}
+
+			break;
+		}
+		}
+	}
+
+	//Adjust widget on the viewport dynamically.
+	//  - viewportSize is current size of your viewport/window,
+	//  - baseSize is original size when this viewport/window was created,
+	//  - scaling is how much you've scaled your monitor in your display settings,
+	//  - offset moves relative to bottom-left corner, so vec2(0.5f) is center of your viewport/window
+	static void MoveWidget(
+		Image* image,
+		vec2 viewportSize,
+		vec2 baseSize,
+		f32 scaling,
+		vec2 offset = vec2(0.5f))
+	{
+		Transform2D* tr = image->GetTransform();
+
+		vec2 clampedOffset = kclamp(offset, vec2(-0.25f), vec2(1.25f));
+		f32 clampedScale = clamp(scaling, 1.0f, 5.0f);
+
+		vec2 vpHalf = viewportSize * 0.5f;
+		vec2 wHalf = tr->GetSize(SizeTarget::SIZE_COMBINED) * 0.5f;
+
+		tr->SetPos(vec2(vpHalf - wHalf), PosTarget::POS_WORLD);
+	}
+
+	static inline TransformState transformState{};
+	static inline f64 deltaTime{};
+	static inline f32 speed = 100.0f;
+};
+
+namespace KalaServer::Graphics
+{
 	void Render::Initialize()
 	{
 		Window_Global::Initialize();
@@ -402,7 +426,17 @@ void Redraw(Window* window)
 	const vector<Image*>& images = Image::registry.GetAllWindowContent(windowID);
 	for (const auto& image : images)
 	{
-		if (image) image->Render(projection, window->GetClientRectSize());
+		if (image)
+		{
+			InputPlaceholder::MoveWidget(
+				image,
+				window->GetClientRectSize(),
+				BASE_SIZE,
+				1.25f,
+				vec2(0.5f, 0.5f));
+
+			image->Render(projection, window->GetClientRectSize());
+		}
 	}
 	glEnable(GL_CULL_FACE);
 
