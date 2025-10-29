@@ -241,29 +241,6 @@ struct InputPlaceholder
 		}
 	}
 
-	//Adjust widget on the viewport dynamically.
-	//  - viewportSize is current size of your viewport/window,
-	//  - baseSize is original size when this viewport/window was created,
-	//  - scaling is how much you've scaled your monitor in your display settings,
-	//  - offset moves relative to bottom-left corner, so vec2(0.5f) is center of your viewport/window
-	static void MoveWidget(
-		Image* image,
-		vec2 viewportSize,
-		vec2 baseSize,
-		f32 scaling,
-		vec2 offset = vec2(0.5f))
-	{
-		Transform2D* tr = image->GetTransform();
-
-		vec2 clampedOffset = kclamp(offset, vec2(-0.25f), vec2(1.25f));
-		f32 clampedScale = clamp(scaling, 1.0f, 5.0f);
-
-		vec2 vpHalf = viewportSize * 0.5f;
-		vec2 wHalf = tr->GetSize(SizeTarget::SIZE_COMBINED) * 0.5f;
-
-		tr->SetPos(vec2(vpHalf - wHalf), PosTarget::POS_WORLD);
-	}
-
 	static inline TransformState transformState{};
 	static inline f64 deltaTime{};
 	static inline f32 speed = 100.0f;
@@ -428,14 +405,11 @@ void Redraw(Window* window)
 	{
 		if (image)
 		{
-			InputPlaceholder::MoveWidget(
-				image,
+			image->MoveWidget(
 				window->GetClientRectSize(),
-				BASE_SIZE,
-				1.25f,
-				vec2(0.5f, 0.5f));
+				vec2(1.0f, 1.0f));
 
-			image->Render(projection, window->GetClientRectSize());
+			image->Render(projection);
 		}
 	}
 	glEnable(GL_CULL_FACE);
