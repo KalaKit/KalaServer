@@ -13,7 +13,6 @@
 #include <system_error>
 
 #include "core/client.hpp"
-#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "core/event.hpp"
 #include "response/response_200.hpp"

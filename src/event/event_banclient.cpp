@@ -7,7 +7,6 @@
 #include <memory>
 #include <vector>
 
-#include "core/core_program.hpp"
 #include "core/event.hpp"
 #include "core/server.hpp"
 #include "response/response_418.hpp"

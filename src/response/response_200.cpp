@@ -3,13 +3,11 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "response/response_200.hpp"
 #include "core/event.hpp"
 
 using KalaServer::Core::Server;
-using KalaServer::Core::KalaServerCore;
 using KalaServer::Core::Event;
 using KalaServer::Core::EventType;
 using KalaServer::Core::PrintData;

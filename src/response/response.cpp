@@ -6,11 +6,9 @@
 #include <WinSock2.h>
 #include <filesystem>
 
-#include "core/core_program.hpp"
 #include "response/response.hpp"
 #include "core/event.hpp"
 
-using KalaServer::Core::KalaServerCore;
 using KalaServer::Core::Event;
 using KalaServer::Core::EventType;
 using KalaServer::Core::PrintData;

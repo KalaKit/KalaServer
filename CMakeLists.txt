@@ -5,9 +5,17 @@ set(PROGRAM_VERSION_NUMBER 0.2.0.0)
 
 project("KalaServer" VERSION ${PROGRAM_VERSION_NUMBER} LANGUAGES C CXX)
 
+# Adds a '_' prefix in front of the created binary files if set to TRUE
+set(KALA_PRERELEASE TRUE)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Runtime lib handling for MSVC
+if (MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+endif()
 
 # Platform Detection
 if (WIN32)
@@ -25,29 +33,18 @@ else()
     message(FATAL_ERROR "Unknown CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'! Must be Debug, Release, or RelWithDebInfo.")
 endif()
 
-# Runtime lib handling for MSVC
-if (MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-endif()
-
-# Optional Resource File
-set(RESOURCE_FILE "${CMAKE_SOURCE_DIR}/files/icon.rc")
-
-# Directory Setup
+# Paths
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
 set(INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include")
 
 set(EXT_SHARED_DIR "${CMAKE_SOURCE_DIR}/_external_shared")
-set(EXT_WINDOW_DIR "${EXT_SHARED_DIR}/Kalawindow")
 set(EXT_OPENSSL_DIR "${EXT_SHARED_DIR}/OpenSSL")
 
 # Library Paths
 if(IS_RELEASE)
-	set(WINDOW_LIBRARY_PATH "${EXT_WINDOW_DIR}/release/_KWnd03.lib")
 	set(OPENSSL_LIBSSL "${EXT_OPENSSL_DIR}/release/libssl.lib")
 	set(OPENSSL_LIBCRYPTO "${EXT_OPENSSL_DIR}/release/libcrypto.lib")
 else()
-	set(WINDOW_LIBRARY_PATH "${EXT_WINDOW_DIR}/debug/_KWnd03d.lib")
 	set(OPENSSL_LIBSSL "${EXT_OPENSSL_DIR}/debug/libssl.lib")
 	set(OPENSSL_LIBCRYPTO "${EXT_OPENSSL_DIR}/debug/libcrypto.lib")
 endif()
@@ -58,16 +55,34 @@ file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS
     "${SRC_DIR}/*/*.cpp"
 )
 
-# Executable
-add_executable(KalaServer ${SOURCE_FILES})
+# SHARED LIBRARY (.dll)
+add_library(KalaServer SHARED ${SOURCE_FILES})
 
-# Enable exception handling for MSVC
+# Enable C++ exception handling semantics for MSVC
 if (MSVC)
     target_compile_options(KalaServer PRIVATE /EHsc)
 endif()
 
-set_target_properties(KalaServer PROPERTIES OUTPUT_NAME "KalaServer")
-target_compile_features(KalaServer PRIVATE cxx_std_20)
+# Get prefix
+set(KALA_PREFIX "")
+if (KALA_PRERELEASE)
+	set(KALA_PREFIX "_")
+endif()
+	
+# Get version
+set(KALA_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}")
+	
+# Get suffix
+if (IS_RELEASE)
+	set(KALA_SUFFIX "")
+else()
+	set(KALA_SUFFIX "d")
+endif()
+
+# Set output name with renderer suffix and debug postfix
+set_target_properties(KalaServer PROPERTIES
+	OUTPUT_NAME "${KALA_PREFIX}KalaServer${KALA_VERSION}${KALA_SUFFIX}"
+)
 
 # Includes
 file(GLOB_RECURSE HEADERS
@@ -78,31 +93,29 @@ target_sources(KalaServer PRIVATE ${HEADERS})
 target_include_directories(KalaServer PRIVATE
 	"${INCLUDE_DIR}"
 	"${EXT_SHARED_DIR}"
-	"${EXT_SHARED_DIR}/KalaWindow/include"
 	"${EXT_SHARED_DIR}/OpenSSL/include"
 )
 
 # Preprocessor Defines
 target_compile_definitions(KalaServer PRIVATE 
-	WIN32_LEAN_AND_MEAN 
-	NOMINMAX
+	LIB_EXPORT
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
 	UNICODE
-	_UNICODE)
+	_UNICODE
+)
 
 # Link libraries
 target_link_libraries(KalaServer PRIVATE
-	opengl32
 	${WINDOW_LIBRARY_PATH}
 	${OPENSSL_LIBSSL}
-	${OPENSSL_LIBCRYPTO})
+	${OPENSSL_LIBCRYPTO}
+)
 
-# Hide console in release mode
-# if(IS_RELEASE)
-#     set_target_properties(KalaServer PROPERTIES WIN32_EXECUTABLE TRUE)
-#     if (MSVC)
-#         set_target_properties(KalaServer PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
-#    endif()
-# endif()
+# Expose version string
+add_compile_definitions(
+	PROGRAM_VERSION="${PROGRAM_VERSION}"
+)
 
 # Set Windows Details tab data
 set(ICON_DIR "${CMAKE_SOURCE_DIR}/files/icon.ico")
@@ -141,15 +154,6 @@ configure_file(
 
 target_sources(KalaServer PRIVATE "${CMAKE_BINARY_DIR}/version.rc")
 
-# Expose version string
-add_compile_definitions(
-	PROGRAM_VERSION="${PROGRAM_VERSION}"
-)
-
-# Installation
-set(CMAKE_INSTALL_BINDIR bin)
-install(TARGETS KalaServer DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 # Copy files directory
 add_custom_command(TARGET KalaServer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E remove_directory "$<TARGET_FILE_DIR:KalaServer>/files"
@@ -158,22 +162,17 @@ add_custom_command(TARGET KalaServer POST_BUILD
 
 # Copy external binaries
 if(IS_RELEASE)
-	set(BIN_KALAWINDOW "${EXT_WINDOW_DIR}/release")
 	set(BIN_OPENSSL "${EXT_OPENSSL_DIR}/release")
 else()
-	set(BIN_KALAWINDOW "${EXT_WINDOW_DIR}/debug")
 	set(BIN_OPENSSL "${EXT_OPENSSL_DIR}/release")
 endif()
 
 if (IS_RELEASE)
 	file(GLOB BIN_FILES
-		"${BIN_KALAWINDOW}/*.dll"
 		"${BIN_OPENSSL}/*.dll"
 	)
 else()
 	file(GLOB BIN_FILES
-		"${BIN_KALAWINDOW}/*.dll"
-		"${BIN_KALAWINDOW}/*.pdb"
 		"${BIN_OPENSSL}/*.dll"
 	)
 endif()
@@ -215,6 +214,3 @@ add_custom_command(TARGET KalaServer POST_BUILD
 		"${CMAKE_SOURCE_DIR}/docs"
 		"$<TARGET_FILE_DIR:KalaServer>/docs"
 )
-
-# Package
-include(CPack)

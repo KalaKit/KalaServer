@@ -15,13 +15,11 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"
 #include "dns/dns.hpp"
 #include "core/event.hpp"
 
-using KalaServer::Core::KalaServerCore;
 using KalaServer::Core::Server;
 using KalaServer::Core::Event;
 using KalaServer::Core::EventType;

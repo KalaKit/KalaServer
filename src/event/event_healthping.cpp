@@ -6,7 +6,6 @@
 #include <string>
 #include <memory>
 
-#include "core/core.hpp"
 #include "core/event.hpp"
 #include "core/server.hpp"
 #include "dns/cloudflare.hpp"

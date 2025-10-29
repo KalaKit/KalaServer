@@ -17,7 +17,6 @@
 #pragma comment(lib, "Wininet.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "core/client.hpp"
 #include "core/event.hpp"
@@ -201,8 +200,6 @@ namespace KalaServer::Core
 		};
 		unique_ptr<Event> pEvent = make_unique<Event>();
 		pEvent->SendEvent(rec_c, pData);
-
-		KalaServerCore::SetRunningState(true);
 
 		PrintData ifData =
 		{
@@ -1078,7 +1075,7 @@ namespace KalaServer::Core
 			acEvent->SendEvent(rec_c, acData);
 
 			SOCKET thisSocket = static_cast<SOCKET>(server->serverSocket);
-			while (KalaServerCore::IsRunning())
+			while (true)
 			{
 				bool isHealthy = CloudFlare::IsConnHealthy(0)
 					&& CloudFlare::IsConnHealthy(1)
@@ -1130,7 +1127,7 @@ namespace KalaServer::Core
 		{
 			thread([healthTimer]
 			{
-				while (KalaServerCore::IsRunning())
+				while (true)
 				{
 					sleep_for(seconds(healthTimer));
 
@@ -1146,7 +1143,7 @@ namespace KalaServer::Core
 
 		thread([]
 		{
-			while (KalaServerCore::IsRunning())
+			while (true)
 			{
 				if (!canUpdateMachineIPs) canUpdateMachineIPs = true;
 
@@ -1156,7 +1153,7 @@ namespace KalaServer::Core
 
 		thread([]
 		{
-			while (KalaServerCore::IsRunning())
+			while (true)
 			{
 				if (!server->canUpdateWhitelistedIPs) server->canUpdateWhitelistedIPs = true;
 
@@ -1166,7 +1163,7 @@ namespace KalaServer::Core
 
 		thread([]
 		{
-			while (KalaServerCore::IsRunning())
+			while (true)
 			{
 				if (!server->canUpdateBannedIPs) server->canUpdateBannedIPs = true;
 
@@ -1176,7 +1173,7 @@ namespace KalaServer::Core
 
 		thread([]
 		{
-			while (KalaServerCore::IsRunning())
+			while (true)
 			{
 				if (!server->canUpdateWhitelistedRoutes) server->canUpdateWhitelistedRoutes = true;
 
@@ -1186,7 +1183,7 @@ namespace KalaServer::Core
 
 		thread([]
 		{
-			while (KalaServerCore::IsRunning())
+			while (true)
 			{
 				if (!server->canUpdateRouteAccess) server->canUpdateRouteAccess = true;
 
@@ -1196,7 +1193,7 @@ namespace KalaServer::Core
 
 		thread([] 
 		{
-			while (KalaServerCore::IsRunning())
+			while (true)
 			{
 				sleep_for(seconds(1));
 				lock_guard<mutex> lock(server->requestMutex);

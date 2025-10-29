@@ -5,13 +5,11 @@
 
 #include <string>
 
-#include "core/core_program.hpp"
 #include "core/server.hpp"
 #include "response/response_418.hpp"
 #include "core/event.hpp"
 
 using KalaServer::Core::Server;
-using KalaServer::Core::KalaServerCore;
 using KalaServer::Core::Event;
 using KalaServer::Core::EventType;
 using KalaServer::Core::PrintData;
