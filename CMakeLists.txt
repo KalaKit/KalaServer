@@ -117,9 +117,6 @@ add_compile_definitions(
 	PROGRAM_VERSION="${PROGRAM_VERSION}"
 )
 
-# Set Windows Details tab data
-set(ICON_DIR "${CMAKE_SOURCE_DIR}/files/icon.ico")
-
 if (IS_RELEASE)
     set(FILEFLAGS "0x00")
 else()
@@ -151,8 +148,6 @@ configure_file(
 	${CMAKE_BINARY_DIR}/version.rc
 	@ONLY
 )
-
-target_sources(KalaServer PRIVATE "${CMAKE_BINARY_DIR}/version.rc")
 
 # Copy files directory
 add_custom_command(TARGET KalaServer POST_BUILD
