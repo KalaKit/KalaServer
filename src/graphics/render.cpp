@@ -12,7 +12,7 @@
 #include "KalaHeaders/math_utils.hpp"
 
 #include "KalaWindow/include/utils/registry.hpp"
-#include "KalaWindow/include/utils/transform.hpp"
+#include "KalaWindow/include/utils/transform2d.hpp"
 #include "KalaWindow/include/core/core.hpp"
 #include "KalaWindow/include/graphics/window_global.hpp"
 #include "KalaWindow/include/graphics/window.hpp"
@@ -125,13 +125,13 @@ namespace KalaServer::Graphics
 			f64 deltaTime = KalaServerCore::GetDeltaTime();
 			float velocity = speed * deltaTime;
 
-			const Transform2D& tf = image->GetTransform();
-			vec2 pos = tf.GetPos(PosTarget::POS_WORLD);
-			float rot = tf.GetRot(RotTarget::ROT_WORLD);
-			vec2 size = tf.GetSize(SizeTarget::SIZE_WORLD);
+			Transform2D* tf = image->GetTransform();
+			vec2 pos = tf->GetPos(PosTarget::POS_WORLD);
+			float rot = tf->GetRot(RotTarget::ROT_WORLD);
+			vec2 size = tf->GetSize(SizeTarget::SIZE_WORLD);
 
 			const vec2 up = vec2(0.0f, 1.0f);
-			const vec2 right = vec2(-1.0f, 0.0f);
+			const vec2 right = vec2(1.0f, 0.0f);
 
 			bool wasUpdated = false;
 
@@ -141,30 +141,35 @@ namespace KalaServer::Graphics
 			{
 				if (input->IsKeyHeld(Key::W))
 				{
-					pos -= up * velocity;
+					pos += up * velocity * 3.0f;
 					wasUpdated = true;
 				}
 				if (input->IsKeyHeld(Key::S))
 				{
-					pos += up * velocity;
+					pos -= up * velocity * 3.0f;
 					wasUpdated = true;
 				}
 				if (input->IsKeyHeld(Key::A))
 				{
-					pos -= right * velocity;
+					pos -= right * velocity * 3.0f;
 					wasUpdated = true;
 				}
 				if (input->IsKeyHeld(Key::D))
 				{
-					pos += right * velocity;
+					pos += right * velocity * 3.0f;
 					wasUpdated = true;
 				}
 				 
 				if (wasUpdated)
 				{
-					Log::Print("set new pos to " + to_string(pos.x) + ", " + to_string(pos.y));
+					tf->SetPos(pos, PosTarget::POS_WORLD);
 
-					image->GetTransform().SetPos(pos, PosTarget::POS_WORLD);
+					vec2 pos_new = tf->GetPos(PosTarget::POS_COMBINED);
+
+					Log::Print("set new pos to " 
+						+ to_string(pos_new.x) + ", "
+						+ to_string(pos_new.y));
+
 					wasUpdated = false;
 				}
 
@@ -185,9 +190,12 @@ namespace KalaServer::Graphics
 
 				if (wasUpdated)
 				{
-					Log::Print("set new rot to " + to_string(rot));
+					tf->SetRot(rot, RotTarget::ROT_WORLD);
 
-					image->GetTransform().SetRot(rot, RotTarget::ROT_WORLD);
+					f32 rot_new = tf->GetRot(RotTarget::ROT_COMBINED);
+
+					Log::Print("set new rot to " + to_string(rot_new));
+
 					wasUpdated = false;
 				}
 
@@ -197,30 +205,35 @@ namespace KalaServer::Graphics
 			{
 				if (input->IsKeyHeld(Key::W))
 				{
-					size += up * velocity;
+					size += up * velocity * 3.0f;
 					wasUpdated = true;
 				}
 				if (input->IsKeyHeld(Key::S))
 				{
-					size -= up * velocity;
+					size -= up * velocity * 3.0f;
 					wasUpdated = true;
 				}
 				if (input->IsKeyHeld(Key::A))
 				{
-					size += right * velocity;
+					size -= right * velocity * 3.0f;
 					wasUpdated = true;
 				}
 				if (input->IsKeyHeld(Key::D))
 				{
-					size -= right * velocity;
+					size += right * velocity * 3.0f;
 					wasUpdated = true;
 				}
 
 				if (wasUpdated)
 				{
-					Log::Print("set new size to " + to_string(size.x) + ", " + to_string(size.y));
+					tf->SetSize(size, SizeTarget::SIZE_WORLD);
 
-					image->GetTransform().SetSize(size, SizeTarget::SIZE_WORLD);
+					vec2 size_new = tf->GetSize(SizeTarget::SIZE_COMBINED);
+
+					Log::Print("set new size to "
+						+ to_string(size_new.x) + ", "
+						+ to_string(size_new.y));
+
 					wasUpdated = false;
 				}
 
