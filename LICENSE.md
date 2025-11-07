@@ -1,5 +1,4 @@
-KalaServer library repository
-https://github.com/KalaKit/KalaServer
+[KalaServer source repository](https://github.com/KalaKit/KalaServer)
 
 ---
 
