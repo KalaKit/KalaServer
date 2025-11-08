@@ -10,10 +10,20 @@ KalaServer is a lightweight C++ 20 library for Windows (no Linux support of any 
 
 ---
 
-# Documentation
+## Links
 
-[How to set up](https://thekalakit.com/kalaserver/first-setup)
+[Donate on PayPal](https://www.paypal.com/donate/?hosted_button_id=QWG8SAYX5TTP6)
 
-Other documentation:
+[Official Discord server](https://discord.gg/jkvasmTND5)
 
-[How to build from source](docs/build_from_source/readme.md)
+[Official Youtube channel](https://youtube.com/greenlaser)
+
+---
+
+## Docs
+
+[How to build from source](docs/build_from_source.md)
+
+[External libraries](docs/external_libraries.md)
+
+[Lost Empire Entertainment and KalaKit ecosystem](docs/ecosystem.md)
