@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.29.2)
 
-set(PROGRAM_VERSION "KalaServer 0.2.0 Alpha")
-set(PROGRAM_VERSION_NUMBER 0.2.0.0)
+set(PROGRAM_VERSION "KalaServer 1.0.0 Alpha")
+set(PROGRAM_VERSION_NUMBER 1.0.0.0)
 
 project("KalaServer" VERSION ${PROGRAM_VERSION_NUMBER} LANGUAGES C CXX)
-
-# Adds a '_' prefix in front of the created binary files if set to TRUE
-set(KALA_PRERELEASE TRUE)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,15 +59,9 @@ add_library(KalaServer SHARED ${SOURCE_FILES})
 if (MSVC)
     target_compile_options(KalaServer PRIVATE /EHsc)
 endif()
-
-# Get prefix
-set(KALA_PREFIX "")
-if (KALA_PRERELEASE)
-	set(KALA_PREFIX "_")
-endif()
 	
 # Get version
-set(KALA_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}")
+set(KALA_VERSION "${PROJECT_VERSION_MAJOR}")
 	
 # Get suffix
 if (IS_RELEASE)
