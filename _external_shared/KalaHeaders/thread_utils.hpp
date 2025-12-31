@@ -39,6 +39,8 @@ namespace KalaHeaders::KalaThread
 	using std::chrono::duration;
 	using std::chrono::time_point;
 	using std::remove_cvref_t;
+
+	using abool = atomic<bool>;
 	
 	//
 	// CREATE THREAD
