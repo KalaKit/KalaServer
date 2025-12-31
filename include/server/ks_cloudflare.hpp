@@ -18,11 +18,10 @@ namespace KalaServer::Server
 	class LIB_API CloudFlare
 	{
 	public:
-		//Start up CloudFlare tunnel
-		static void Initialize();
+		//Start up the CloudFlare tunnel, pass the cloudflare tunnel exe path
+		static void Initialize(const string& cloudflareExePath);
 
 		static inline bool IsInitialized() { return isInitialized; }
-		static inline bool IsRunning() { return isRunning; }
 		static inline bool IsHealthy(u8 connection)
 		{
 			switch (connection)
@@ -47,18 +46,14 @@ namespace KalaServer::Server
 
 		static bool IsTunnelAlive();
 
-		static inline const string& GetTunnelName() { return tunnelName; }
-		static inline uintptr_t GetTunnelHandle() { return tunnelHandle; }
+		//Shut down the CloudFlare tunnel
+		static void Shutdown();
 	private:
 		static inline bool isInitialized{};
-		static inline bool isRunning{};
 
 		static inline bool isFirstHealthy{};
 		static inline bool isSecondHealthy{};
 		static inline bool isThirdHealthy{};
 		static inline bool isFourthHealthy{};
-
-		static inline string tunnelName{};
-		static inline uintptr_t tunnelHandle{};
 	};
 }

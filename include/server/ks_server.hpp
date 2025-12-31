@@ -312,8 +312,9 @@ namespace KalaServer::Server
 		{
 			switch (role)
 			{
-			default:                      return "UNKNOWN";
+			default:
 			case Role::ROLE_NONE:         return "NONE";
+
 			case Role::ROLE_BANNED:       return "BANNED";
 			case Role::ROLE_GUEST:        return "GUEST";
 			case Role::ROLE_WHITELISTED:  return "WHITELISTED";
@@ -324,14 +325,14 @@ namespace KalaServer::Server
 		}
 		static inline Role StringToRole(const string& role)
 		{
-			if (role == "NONE")             return Role::ROLE_NONE;
+			if (role == "BANNED")           return Role::ROLE_BANNED;
 			else if (role == "GUEST")       return Role::ROLE_GUEST;
 			else if (role == "WHITELISTED") return Role::ROLE_WHITELISTED;
 			else if (role == "BLACKLISTED") return Role::ROLE_BLACKLISTED;
 			else if (role == "USER")        return Role::ROLE_USER;
 			else if (role == "ADMIN")       return Role::ROLE_ADMIN;
 
-			else return Role::ROLE_BANNED; //assume all unknown inputs route to banned by default
+			else return Role::ROLE_NONE; //assume all unknown inputs route to NONE by default
 		}
 
 		static inline Role GetUserRole(const string& userIP)
@@ -368,7 +369,7 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			return Role::ROLE_BANNED;
+			return Role::ROLE_NONE;
 		}
 		static inline void SetUserRole(const string& userIP, Role newRole)
 		{
@@ -556,7 +557,7 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			return Role::ROLE_BANNED;
+			return Role::ROLE_NONE;
 		}
 		static inline void SetRouteRole(const string& route, Role newRole)
 		{

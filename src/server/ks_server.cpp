@@ -916,8 +916,8 @@ wstring ToWide(const string& input)
 	int size_needed = MultiByteToWideChar(
 		CP_UTF8,
 		0,
-		input.c_str(),
-		-1,
+		input.data(),
+		scast<int>(input.size()),
 		nullptr,
 		0);
 
@@ -926,8 +926,8 @@ wstring ToWide(const string& input)
 	MultiByteToWideChar(
 		CP_UTF8,
 		0,
-		input.c_str(),
-		-1,
+		input.data(),
+		scast<int>(input.size()),
 		wstr.data(),
 		size_needed);
 
