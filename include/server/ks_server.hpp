@@ -132,7 +132,7 @@ namespace KalaServer::Server
 		friend class KalaServer::Server::Inbound;
 	public:
 		//Initialize a new server on this process.
-		//Port is where your server connects to CloudFlare.
+		//Port is where your server connects to Cloudflare.
 		//Server name helps distinguish this server from other servers.
 		//Domain name is name inserted to url path in browser.
 		//Server root is the true origin where the server will expose routes from relative to where the process was ran from,
@@ -150,7 +150,7 @@ namespace KalaServer::Server
 		//Returns true if this server instance has been initialized successfully
 		static inline bool IsInitialized() { return isInitialized; }
 
-		//Returns true if the server CloudFlare backend has been initialized successfully,
+		//Returns true if the server Cloudflare backend has been initialized successfully,
 		//the server cannot be started if its not ready yet, even if its instance is already initialized
 		static inline bool IsReady() { return isReady; }
 

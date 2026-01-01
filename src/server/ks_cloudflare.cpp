@@ -26,6 +26,9 @@ using KalaServer::Core::KalaServerCore;
 using std::filesystem::exists;
 using std::filesystem::path;
 using std::filesystem::current_path;
+using std::filesystem::directory_iterator;
+using std::filesystem::last_write_time;
+using std::filesystem::file_time_type;
 using std::string;
 using std::to_string;
 
@@ -35,78 +38,119 @@ using std::wstring;
 //TODO: add linux equivalent
 #endif
 
-static string tunnelID{};
-static string cloudflareFolder{};
 static string cloudflareCertFile{};
+static string cloudflareTunnelID{};
 static string cloudflareJsonFile{};
 
 static uintptr_t tunnelHandle{};
 
-static void CreateCertFile();
-static void CreateTunnelCredentials();
-static void RouteTunnel();
-static void RunTunnel();
+static bool CreateCertFile();
+static bool CreateTunnelCredentials();
+static bool RouteTunnel();
+static bool RunTunnel();
 
 static wstring ToWide(const string& input);
 
 namespace KalaServer::Server
 {
-	void CloudFlare::Initialize(const string& cloudflareExePath)
+	bool Cloudflare::Initialize(
+		const string& cloudflareExePath,
+		const string& cloudflareFolder)
 	{
-		if (CloudFlare::IsInitialized())
+		if (Cloudflare::IsInitialized())
 		{
 			Log::Print(
-				"Cannot initialize CloudFlare tunnel because it has already been initialized!",
+				"Cannot initialize Cloudflare tunnel because it has already been initialized!",
 				"CLOUDFLARE_INIT",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
 		if (!exists(cloudflareExePath))
 		{
 			Log::Print(
-				"Cannot initialize CloudFlare tunnel because its path '" + cloudflareExePath + "' does not exist!",
+				"Cannot initialize Cloudflare tunnel because its path '" + cloudflareExePath + "' does not exist!",
 				"CLOUDFLARE_INIT",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
-		if (cloudflareFolder.empty())
+		if (!exists(cloudflareFolder))
 		{
-			cloudflareFolder = (path(getenv("USERPROFILE")) / ".cloudflared").string();
+			Log::Print(
+				"Cannot initialize Cloudflare tunnel because its cert path '" + cloudflareFolder + "' does not exist!",
+				"CLOUDFLARE_INIT",
+				LogType::LOG_ERROR,
+				2);
 
-			if (!exists(cloudflareFolder))
+			return false;
+		}
+
+		if (cloudflareCertFile.empty())
+		{
+			cloudflareCertFile = path(path(cloudflareFolder) / "cert.pem").string();
+		}
+		
+		if (!exists(cloudflareCertFile)
+			&& !CreateCertFile())
+		{
+			return false;
+		}
+
+		if (cloudflareJsonFile.empty())
+		{
+			file_time_type newestTime{};
+
+			for (const auto& f : directory_iterator(cloudflareFolder))
 			{
-				Log::Print(
-					"Cannot initialize CloudFlare tunnel because its cert path '" + cloudflareFolder + "' does not exist!",
-					"CLOUDFLARE_INIT",
-					LogType::LOG_ERROR,
-					2);
+				path tf = path(f);
+				if (tf.extension() == ".json")
+				{
+					auto lastWrite = last_write_time(tf);
+					if (lastWrite > newestTime)
+					{
+						cloudflareTunnelID = tf.stem().string();
+						newestTime = lastWrite;
+					}
+				}
+			}
 
-				return;
+			cloudflareJsonFile = path(path(cloudflareFolder) / (cloudflareTunnelID + ".json")).string();
+		}
+
+		if (exists(cloudflareJsonFile))
+		{
+			Log::Print(
+				"Cloudflare tunnel file already exists, skipping creation and using existing one with ID '" + cloudflareTunnelID + "'.",
+				"CLOUDFLARE_INIT",
+				LogType::LOG_INFO);
+		}
+		else
+		{
+			if (!CreateTunnelCredentials()
+				|| !RouteTunnel())
+			{
+				return false;
 			}
 		}
 
-		cloudflareCertFile = path(path(cloudflareFolder) / "cert.pem").string();
-		if (!exists(cloudflareCertFile)) CreateCertFile();
-
-		CreateTunnelCredentials();
-		RouteTunnel();
-		RunTunnel();
+		if (!RunTunnel()) return false;
 
 		isInitialized = true;
 
 		Log::Print(
-			"Initialized CloudFlare tunnel!",
+			"Initialized Cloudflare tunnel!",
 			"CLOUDFLARE_INIT",
 			LogType::LOG_SUCCESS);
+
+		return true;
 	}
 
-	bool CloudFlare::IsTunnelAlive()
+	bool Cloudflare::IsTunnelAlive()
 	{
 		if (!ServerCore::IsInitialized())
 		{
@@ -130,10 +174,10 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		if (!CloudFlare::IsInitialized())
+		if (!Cloudflare::IsInitialized())
 		{
 			Log::Print(
-				"Cannot check for tunnel status because CloudFlare tunnel has not been initialized!",
+				"Cannot check for tunnel status because Cloudflare tunnel has not been initialized!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -144,7 +188,7 @@ namespace KalaServer::Server
 		if (tunnelHandle == NULL)
 		{
 			Log::Print(
-				"Cannot check for tunnel status because CloudFlare tunnel is NULL!",
+				"Cannot check for tunnel status because Cloudflare tunnel is NULL!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -157,7 +201,7 @@ namespace KalaServer::Server
 		if (handle == INVALID_HANDLE_VALUE)
 		{
 			Log::Print(
-				"Cannot check for tunnel status because created CloudFlare tunnel is invalid!",
+				"Cannot check for tunnel status because created Cloudflare tunnel is invalid!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -168,12 +212,12 @@ namespace KalaServer::Server
 		return WaitForSingleObject(handle, 0) == WAIT_TIMEOUT;
 	}
 
-	void CloudFlare::Shutdown()
+	void Cloudflare::Shutdown()
 	{
-		if (!CloudFlare::IsInitialized())
+		if (!Cloudflare::IsInitialized())
 		{
 			Log::Print(
-				"Cannot shut down CloudFlare tunnel because it has not been initialized!",
+				"Cannot shut down Cloudflare tunnel because it has not been initialized!",
 				"CLOUDFLARE_QUIT",
 				LogType::LOG_ERROR,
 				2);
@@ -187,7 +231,7 @@ namespace KalaServer::Server
 		if (handle == INVALID_HANDLE_VALUE)
 		{
 			Log::Print(
-				"Cannot shut down CloudFlare tunnel because its handle is invalid!",
+				"Cannot shut down Cloudflare tunnel because its handle is invalid!",
 				"CLOUDFLARE_QUIT",
 				LogType::LOG_ERROR,
 				2);
@@ -206,17 +250,17 @@ namespace KalaServer::Server
 		isInitialized = false;
 
 		Log::Print(
-			"Finished shutting down CloudFlare tunnel!",
+			"Finished shutting down Cloudflare tunnel!",
 			"CLOUDFLARE_QUIT",
 			LogType::LOG_SUCCESS);
 	}
 }
 
-void CreateCertFile()
+bool CreateCertFile()
 {
 	Log::Print(
-		"Creating new CloudFlare tunnel cert file at '" + cloudflareCertFile + "'.",
-		"CREATE_CERT",
+		"Creating new Cloudflare tunnel cert file at '" + cloudflareCertFile + "'.",
+		"CLOUDFLARE_INIT",
 		LogType::LOG_INFO);
 
 #ifdef _WIN32
@@ -239,14 +283,18 @@ void CreateCertFile()
 		&si,
 		&pi))
 	{
-		KalaServerCore::ForceClose(
-			"CloudFlare error",
-			"Failed to create process for CloudFlare cert creation!");
+		Log::Print(
+			"Failed to create Cloudflare cert because Cloudflare tunnel process failed to start!",
+			"CLOUDFLARE_INIT",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
 	}
 
 	Log::Print(
-		"Launched brower to authorize with CloudFlare. PID: " + to_string(pi.dwProcessId),
-		"CREATE_CERT",
+		"Launched brower to authorize with Cloudflare. PID: " + to_string(pi.dwProcessId),
+		"CLOUDFLARE_INIT",
 		LogType::LOG_INFO);
 
 	//wait for user to do their thing with cloudflare,
@@ -261,34 +309,46 @@ void CreateCertFile()
 
 	if (!exists(cloudflareCertFile))
 	{
-		KalaServerCore::ForceClose(
-			"CloudFlare error",
-			"Failed to create CloudFlare cert!");
+		Log::Print(
+			"Failed to create Cloudflare cert because user did not successfully authenticate via browser!",
+			"CLOUDFLARE_INIT",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
 	}
+
+	return true;
 }
 
-void CreateTunnelCredentials()
+bool CreateTunnelCredentials()
 {
 	Log::Print(
-		"Creating CloudFlare tunnel credentials.",
+		"Creating Cloudflare tunnel credentials.",
 		"CLOUDFLARE_INIT",
 		LogType::LOG_INFO);
+
+	return true;
 }
 
-void RouteTunnel()
+bool RouteTunnel()
 {
 	Log::Print(
-		"Starting to route CloudFlare tunnel.",
+		"Starting to route Cloudflare tunnel.",
 		"CLOUDFLARE_INIT",
 		LogType::LOG_INFO);
+
+	return true;
 }
 
-void RunTunnel()
+bool RunTunnel()
 {
 	Log::Print(
-		"Starting to run CloudFlare tunnel.",
+		"Starting to run Cloudflare tunnel.",
 		"CLOUDFLARE_INIT",
 		LogType::LOG_INFO);
+
+	return true;
 }
 
 wstring ToWide(const string& input)

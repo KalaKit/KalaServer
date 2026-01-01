@@ -15,11 +15,15 @@ namespace KalaServer::Server
 
 	using u8 = uint8_t;
 
-	class LIB_API CloudFlare
+	class LIB_API Cloudflare
 	{
 	public:
-		//Start up the CloudFlare tunnel, pass the cloudflare tunnel exe path
-		static void Initialize(const string& cloudflareExePath);
+		//Start up the Cloudflare tunnel,
+		//pass the cloudflare tunnel exe path where its ran from
+		//and pass the cloudflare folder where the json and cert files will live at
+		static bool Initialize(
+			const string& cloudflareExePath,
+			const string& cloudflareFolder);
 
 		static inline bool IsInitialized() { return isInitialized; }
 		static inline bool IsHealthy(u8 connection)
@@ -46,7 +50,7 @@ namespace KalaServer::Server
 
 		static bool IsTunnelAlive();
 
-		//Shut down the CloudFlare tunnel
+		//Shut down the Cloudflare tunnel
 		static void Shutdown();
 	private:
 		static inline bool isInitialized{};

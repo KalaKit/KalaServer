@@ -23,7 +23,7 @@
 #include "core/ks_core.hpp"
 
 using KalaServer::Core::KalaServerCore;
-using KalaServer::Server::CloudFlare;
+using KalaServer::Server::Cloudflare;
 
 using std::make_unique;
 using std::unique_ptr;
@@ -284,15 +284,15 @@ namespace KalaServer::Server
 				while (isListenerRunning.load(memory_order_acquire))
 				{
 					bool isHealthy = 
-						CloudFlare::IsHealthy(0)
-						&& CloudFlare::IsHealthy(1)
-						&& CloudFlare::IsHealthy(2)
-						&& CloudFlare::IsHealthy(3);
+						Cloudflare::IsHealthy(0)
+						&& Cloudflare::IsHealthy(1)
+						&& Cloudflare::IsHealthy(2)
+						&& Cloudflare::IsHealthy(3);
 
 					if (!isHealthy)
 					{
 						bool isOnline =
-							CloudFlare::IsTunnelAlive()
+							Cloudflare::IsTunnelAlive()
 							&& ServerCore::HasInternet();
 
 						//wait a second instead of spamming full check every frame
