@@ -1,7 +1,5 @@
 # Prerequisites for building from source
 
-## On Windows
-
 Download Visual Studio 2022 Installer from here:
 https://visualstudio.microsoft.com/vs/
 
@@ -12,18 +10,6 @@ once its installed make sure these are enabled when installing Visual Studio 202
 
 And finally unpack prerequisites.7z and then run setup.bat to install cmake and ninja
 
-## On Linux
+## How to build from source
 
-> Not ready, coming soon
-
-# How to build from source
-
-The compiled executable and its files will be placed to `/release` and `/debug` in the root folder relative to the build stage
-
-## On Windows
-
-> Run `build_windows.bat`
-
-## On Linux
-
-> Not ready, coming soon
+The compiled executable and its files will be placed to `/release` and `/debug` in the root folder relative to the build stage. Run `build_windows.bat` to build the game from source.
