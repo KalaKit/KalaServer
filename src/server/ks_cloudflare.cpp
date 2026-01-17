@@ -1,4 +1,4 @@
-//Copyright(C) 2025 Lost Empire Entertainment
+//Copyright(C) 2026 Lost Empire Entertainment
 //This program comes with ABSOLUTELY NO WARRANTY.
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
@@ -53,6 +53,13 @@ static wstring ToWide(const string& input);
 
 namespace KalaServer::Server
 {
+	static bool isInitialized{};
+
+	static bool isFirstHealthy{};
+	static bool isSecondHealthy{};
+	static bool isThirdHealthy{};
+	static bool isFourthHealthy{};
+
 	bool Cloudflare::Initialize(
 		const string& cloudflareExePath,
 		const string& cloudflareFolder)
@@ -148,6 +155,29 @@ namespace KalaServer::Server
 			LogType::LOG_SUCCESS);
 
 		return true;
+	}
+
+	bool Cloudflare::IsInitialized() { return isInitialized; }
+	bool Cloudflare::IsHealthy(u8 connection)
+	{
+		switch (connection)
+		{
+		default:
+			return false;
+		case 0:
+			return isFirstHealthy;
+			break;
+		case 1:
+			return isSecondHealthy;
+			break;
+		case 2:
+			return isThirdHealthy;
+			break;
+		case 3:
+			return isFourthHealthy;
+			break;
+		}
+		return false;
 	}
 
 	bool Cloudflare::IsTunnelAlive()

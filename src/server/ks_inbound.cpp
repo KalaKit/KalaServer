@@ -1,4 +1,4 @@
-//Copyright(C) 2025 Lost Empire Entertainment
+//Copyright(C) 2026 Lost Empire Entertainment
 //This program comes with ABSOLUTELY NO WARRANTY.
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
@@ -36,16 +36,16 @@ namespace KalaServer::Server
 
 			l->connectionThread = thread([l]
 				{
-					while (ServerCore::isListenerRunning.load(memory_order_acquire)
+					while (ServerCore::IsListenerRunning()
 						   && l->isRunning.load(memory_order_acquire))
 					{
 						_HandleWebRequest(l);
 					}
 				});
 
-			lockwait_m(ServerCore::m_connectSockets);
-			ServerCore::connectSockets.push_back(move(c));
-			unlock_m(ServerCore::m_connectSockets);
+			lockwait_m(ServerCore::GetConnectMutex());
+			ServerCore::GetConnectSockets().push_back(move(c));
+			unlock_m(ServerCore::GetConnectMutex());
 		}
 	}
 }

@@ -1,4 +1,4 @@
-//Copyright(C) 2025 Lost Empire Entertainment
+//Copyright(C) 2026 Lost Empire Entertainment
 //This program comes with ABSOLUTELY NO WARRANTY.
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
@@ -14,14 +14,7 @@
 #include <functional>
 
 #include "KalaHeaders/core_utils.hpp"
-#include "KalaHeaders/log_utils.hpp"
-#include "KalaHeaders/string_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
-
-namespace KalaServer::Server
-{
-	class Inbound;
-}
 
 namespace KalaServer::Server
 {
@@ -33,19 +26,12 @@ namespace KalaServer::Server
 	using std::mutex;
 	using std::function;
 
+	using KalaHeaders::KalaThread::abool;
+
 	using u8 = uint8_t;
 	using u16 = uint16_t;
 	using u32 = uint32_t;
 	using f32 = float;
-
-	using KalaHeaders::KalaLog::Log;
-	using KalaHeaders::KalaLog::LogType;
-	using KalaHeaders::KalaString::HasAnyWhiteSpace;
-	using KalaHeaders::KalaString::ContainsString;
-	using KalaHeaders::KalaString::SplitString;
-	using KalaHeaders::KalaThread::abool;
-	using KalaHeaders::KalaThread::lockwait_m;
-	using KalaHeaders::KalaThread::unlock_m;
 
 	constexpr u16 MIN_PORT_RANGE = 1024;
 	constexpr u16 MAX_PORT_RANGE = 65535;
@@ -129,7 +115,6 @@ namespace KalaServer::Server
 
 	class LIB_API ServerCore
 	{
-		friend class KalaServer::Server::Inbound;
 	public:
 		//Initialize a new server on this process.
 		//Port is where your server connects to Cloudflare.
@@ -148,22 +133,24 @@ namespace KalaServer::Server
 			const vector<Route>& routes = {});
 
 		//Returns true if this server instance has been initialized successfully
-		static inline bool IsInitialized() { return isInitialized; }
+		static bool IsInitialized();
+
+		static bool IsListenerRunning();
 
 		//Returns true if the server Cloudflare backend has been initialized successfully,
 		//the server cannot be started if its not ready yet, even if its instance is already initialized
-		static inline bool IsReady() { return isReady; }
+		static bool IsReady();
 
 		//Returns false if the server fails to connect to google.com
 		static bool HasInternet();
 
-		static inline u32 GetID() { return ID; }
+		static u32 GetID();
 
-		static inline u16 GetPort() { return port; }
+		static u16 GetPort();
 
-		static inline const string& GetServerName() { return serverName; }
-		static inline const string& GetDomainName() { return domainName; }
-		static inline const string& GetServerRoot() { return serverRoot; }
+		static const string& GetServerName();
+		static const string& GetDomainName();
+		static const string& GetServerRoot();
 
 		//Create a new listener socket, the sole purpose of this socket is to be able to receive
 		//incoming traffic so others with internet access can communicate with this server.
@@ -182,6 +169,12 @@ namespace KalaServer::Server
 		static void CreateConnectSocket(
 			const string& targetIP,
 			function<void()> onConnectFail = {});
+
+		static vector<unique_ptr<Connection>>& GetListenerSockets();
+		static mutex& GetListenerMutex();
+
+		static vector<unique_ptr<Connection>>& GetConnectSockets();
+		static mutex& GetConnectMutex();
 
 		//Send a packet from this server to a known target,
 		//requires a socket that has been already created with CreateConnectSocket.
@@ -220,558 +213,35 @@ namespace KalaServer::Server
 		//with optional reason sent as payload
 		static void CancelAllPackets(const vector<u8>& reason = {});
 
-		static inline IPResult IsValidIP(const string& targetIP)
-		{
-			if (HasAnyWhiteSpace(targetIP)) return IPResult::IP_STRUCTURE_IS_INVALID;
+		static IPResult IsValidIP(const string& targetIP);
 
-			if (targetIP.length() < 9) return IPResult::IP_TOO_SHORT;
-			if (targetIP.length() > 15) return IPResult::IP_TOO_LONG;
+		static string IPResultToString(IPResult result);
 
-			u8 dotCount{};
-			for (const auto& c : targetIP)
-			{
-				if (c == '.') dotCount++;
-				if (dotCount > 3) return IPResult::IP_STRUCTURE_IS_INVALID;
-			}
+		static string RoleToString(Role role);
+		static Role StringToRole(const string& role);
 
-			if (dotCount < 3) return IPResult::IP_STRUCTURE_IS_INVALID;
+		static Role GetUserRole(const string& userIP);
+		static void SetUserRole(const string& userIP, Role newRole);
 
-			vector<string> split = SplitString(targetIP, ".");
+		static void AddUser(const User& newUser);
+		static void RemoveUser(const string& userIP);
 
-			try
-			{
-				int v1 = stoi(split[0]);
-				if (v1 != 10
-					&& v1 != 172
-					&& v1 != 192)
-				{
-					return IPResult::IP_OUT_OF_RANGE;
-				}
+		static Role GetRouteRole(const string& route);
+		static void SetRouteRole(const string& route, Role newRole);
 
-				int v2 = stoi(split[1]);
+		static void AddRoute(const Route& newRoute);
+		static void RemoveRoute(const string& route);
 
-				if (v1 == 10
-					&& (v2 < 0
-					|| v2 > 255))
-				{
-					return IPResult::IP_OUT_OF_RANGE;
-				}
-				if (v1 == 172
-					&& (v2 < 16
-					|| v2 > 31))
-				{
-					return IPResult::IP_OUT_OF_RANGE;
-				}
-				if (v1 == 192
-					&& v2 != 168)
-				{
-					return IPResult::IP_OUT_OF_RANGE;
-				}
+		static vector<string> GetAllUsersByRole(Role targetRole);
+		static vector<string> GetAllRoutesByRole(Role targetRole);
 
-				if (v2 < 0
-					|| v2 > 255)
-				{
-					return IPResult::IP_OUT_OF_RANGE;
-				}
+		static vector<User> GetAllUsers();
+		static vector<Route> GetAllRoutes();
 
-				int v3 = stoi(split[2]);
-				if (v3 < 0
-					|| v3 > 255)
-				{
-					return IPResult::IP_OUT_OF_RANGE;
-				}
-
-				int v4 = stoi(split[3]);
-				if (v4 < 0
-					|| v4 > 255)
-				{
-					return IPResult::IP_OUT_OF_RANGE;
-				}
-			}
-			catch (...)
-			{
-				return IPResult::IP_STRUCTURE_IS_INVALID;
-			}
-
-			return IPResult::IP_IS_VALID;
-		}
-
-		static inline string IPResultToString(IPResult result)
-		{
-			switch (result)
-			{
-			default:                                return "Unknown error!";
-			case IPResult::IP_TOO_SHORT:            return "IP address was too short!";
-			case IPResult::IP_TOO_LONG:             return "IP address was too long!";
-			case IPResult::IP_OUT_OF_RANGE:         return "IP address was out of range!";
-			case IPResult::IP_STRUCTURE_IS_INVALID: return "IP address structure was invalid!";
-			}
-		}
-
-		static inline string RoleToString(Role role)
-		{
-			switch (role)
-			{
-			default:
-			case Role::ROLE_NONE:         return "NONE";
-
-			case Role::ROLE_BANNED:       return "BANNED";
-			case Role::ROLE_GUEST:        return "GUEST";
-			case Role::ROLE_WHITELISTED:  return "WHITELISTED";
-			case Role::ROLE_BLACKLISTED:  return "BLACKLISTED";
-			case Role::ROLE_USER:         return "USER";
-			case Role::ROLE_ADMIN:        return "ADMIN";
-			}
-		}
-		static inline Role StringToRole(const string& role)
-		{
-			if (role == "BANNED")           return Role::ROLE_BANNED;
-			else if (role == "GUEST")       return Role::ROLE_GUEST;
-			else if (role == "WHITELISTED") return Role::ROLE_WHITELISTED;
-			else if (role == "BLACKLISTED") return Role::ROLE_BLACKLISTED;
-			else if (role == "USER")        return Role::ROLE_USER;
-			else if (role == "ADMIN")       return Role::ROLE_ADMIN;
-
-			else return Role::ROLE_NONE; //assume all unknown inputs route to NONE by default
-		}
-
-		static inline Role GetUserRole(const string& userIP)
-		{
-			IPResult result = IsValidIP(userIP);
-			if (result != IPResult::IP_IS_VALID)
-			{
-				Log::Print(
-					"Failed to get role for user with IP '" + userIP + "'! Reason: " + IPResultToString(result),
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return Role::ROLE_BANNED;
-			}
-
-			lockwait_m(m_users);
-
-			for (const auto& u : users)
-			{
-				if (u.userIP == userIP)
-				{
-					unlock_m(m_users); //early unlock
-
-					return u.role;
-				}
-			}
-
-			unlock_m(m_users);
-
-			Log::Print(
-				"Failed to get role for user with IP '" + userIP + "' because that user does not exist!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return Role::ROLE_NONE;
-		}
-		static inline void SetUserRole(const string& userIP, Role newRole)
-		{
-			IPResult result = IsValidIP(userIP);
-			if (result != IPResult::IP_IS_VALID)
-			{
-				Log::Print(
-					"Failed to set role for user with IP '" + userIP + "'! Reason: " + IPResultToString(result),
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return;
-			}
-
-			if (newRole == Role::ROLE_NONE
-				|| newRole == Role::ROLE_BLACKLISTED)
-			{
-				Log::Print(
-					"Role '" + RoleToString(newRole) + "' cannot be given to users!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return;
-			}
-
-			lockwait_m(m_users);
-
-			for (auto& u : users)
-			{
-				if (u.userIP == userIP)
-				{
-					if (u.role == newRole)
-					{
-						Log::Print(
-							"Failed to set role for user with IP '" + userIP + "' because that user already has that role!",
-							"SERVER",
-							LogType::LOG_ERROR,
-							2);
-
-						unlock_m(m_users); //early unlock
-
-						return;
-					}
-
-					u.role = newRole;
-
-					Log::Print(
-						"Set user '" + userIP + "' role to '" + RoleToString(newRole) + "'.",
-						"SERVER",
-						LogType::LOG_SUCCESS);
-
-					unlock_m(m_users); //early unlock
-
-					return;
-				}
-			}
-
-			unlock_m(m_users);
-
-			Log::Print(
-				"Failed to set role for user with IP '" + userIP + "' because that user does not exist!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-		}
-
-		static inline void AddUser(const User& newUser)
-		{
-			IPResult result = IsValidIP(newUser.userIP);
-			if (result != IPResult::IP_IS_VALID)
-			{
-				Log::Print(
-					"Failed to add new user with IP '" + newUser.userIP + "'! Reason: " + IPResultToString(result),
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return;
-			}
-
-			if (newUser.role == Role::ROLE_NONE
-				|| newUser.role == Role::ROLE_BLACKLISTED)
-			{
-				Log::Print(
-					"Role '" + RoleToString(newUser.role) + "' cannot be given to new user with IP '" + newUser.userIP + "'!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return;
-			}
-
-			lockwait_m(m_users);
-
-			for (const auto& u : users)
-			{
-				if (u.userIP == newUser.userIP)
-				{
-					Log::Print(
-						"Failed to add new user with IP '" + newUser.userIP + "' because that user has already been added!",
-						"SERVER",
-						LogType::LOG_ERROR,
-						2);
-
-					unlock_m(m_users); //early unlock
-
-					return;
-				}
-			}
-
-			users.push_back(newUser);
-
-			unlock_m(m_users);
-
-			Log::Print(
-				"Added new user '" + newUser.userIP + "' with role '" + RoleToString(newUser.role) + "'!",
-				"SERVER",
-				LogType::LOG_SUCCESS);
-		}
-		static inline void RemoveUser(const string& userIP)
-		{
-			IPResult result = IsValidIP(userIP);
-			if (result != IPResult::IP_IS_VALID)
-			{
-				Log::Print(
-					"Failed to remove existing user with IP '" + userIP + "'! Reason: " + IPResultToString(result),
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return;
-			}
-
-			lockwait_m(m_users);
-
-			auto it = remove_if(
-				users.begin(),
-				users.end(),
-				[&](const User& u) { return u.userIP == userIP; });
-
-			if (it == users.end())
-			{
-				Log::Print(
-					"Failed to remove existing user with IP '" + userIP + "' because that user does not exist!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				unlock_m(m_users); //early unlock
-
-				return;
-			}
-
-			users.erase((it), users.end());
-
-			unlock_m(m_users);
-
-			Log::Print(
-				"Removed existing user '" + userIP + "'!",
-				"SERVER",
-				LogType::LOG_SUCCESS);
-		}
-
-		static inline Role GetRouteRole(const string& route)
-		{
-			lockwait_m(m_routes);
-
-			for (const auto& r : routes)
-			{
-				if (r.route == route)
-				{
-					unlock_m(m_routes);
-
-					return r.role;
-				}
-			}
-
-			unlock_m(m_routes);
-
-			Log::Print(
-				"Failed to get role for route '" + route + "' because that route does not exist!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return Role::ROLE_NONE;
-		}
-		static inline void SetRouteRole(const string& route, Role newRole)
-		{
-			if (newRole == Role::ROLE_NONE
-				|| newRole == Role::ROLE_BANNED
-				|| newRole == Role::ROLE_WHITELISTED)
-			{
-				Log::Print(
-					"Role '" + RoleToString(newRole) + "' cannot be given to routes!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return;
-			}
-
-			lockwait_m(m_routes);
-
-			for (auto& r : routes)
-			{
-				if (r.route == route)
-				{
-					if (r.role == newRole)
-					{
-						Log::Print(
-							"Failed to set role for route '" + route + "' because that route already has that role!",
-							"SERVER",
-							LogType::LOG_ERROR,
-							2);
-
-						unlock_m(m_routes); //early unlock
-
-						return;
-					}
-
-					r.role = newRole;
-
-					Log::Print(
-						"Set route '" + route + "' role to '" + RoleToString(newRole) + "'.",
-						"SERVER",
-						LogType::LOG_SUCCESS);
-
-					unlock_m(m_routes); //early unlock
-
-					return;
-				}
-			}
-
-			unlock_m(m_routes);
-
-			Log::Print(
-				"Failed to set role for route '" + route + "' because that route does not exist!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-		}
-
-		static inline void AddRoute(const Route& newRoute)
-		{
-			if (newRoute.role == Role::ROLE_NONE
-				|| newRoute.role == Role::ROLE_BANNED
-				|| newRoute.role == Role::ROLE_WHITELISTED)
-			{
-				Log::Print(
-					"Role '" + RoleToString(newRoute.role) + "' cannot be given to new route '" + newRoute.route + "'!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				return;
-			}
-
-			lockwait_m(m_routes);
-
-			for (const auto& r : routes)
-			{
-				if (r.route == newRoute.route)
-				{
-					Log::Print(
-						"Failed to add new route '" + newRoute.route + "' because that route has already been added!",
-						"SERVER",
-						LogType::LOG_ERROR,
-						2);
-
-					unlock_m(m_routes); //early unlock
-
-					return;
-				}
-			}
-
-			routes.push_back(newRoute);
-
-			unlock_m(m_routes);
-
-			Log::Print(
-				"Added new route '" + newRoute.route + "' with role '" + RoleToString(newRoute.role) + "'!",
-				"SERVER",
-				LogType::LOG_SUCCESS);
-		}
-		static inline void RemoveRoute(const string& route)
-		{
-			lockwait_m(m_routes);
-
-			auto it = remove_if(
-				routes.begin(),
-				routes.end(),
-				[&](const Route& u) { return u.route == route; });
-
-			if (it == routes.end())
-			{
-				Log::Print(
-					"Failed to remove existing route '" + route + "' because that route does not exist!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				unlock_m(m_routes);
-
-				return;
-			}
-
-			routes.erase((it), routes.end());
-
-			unlock_m(m_routes);
-
-			Log::Print(
-				"Removed existing route '" + route + "'!",
-				"SERVER",
-				LogType::LOG_SUCCESS);
-		}
-
-		static inline vector<string> GetAllUsersByRole(Role targetRole)
-		{
-			lockwait_m(m_users);
-
-			vector<string> foundUsers{};
-			for (const auto& u : users)
-			{
-				if (u.role == targetRole) foundUsers.push_back(u.userIP);
-			}
-
-			unlock_m(m_users);
-
-			return foundUsers;
-		}
-		static inline vector<string> GetAllRoutesByRole(Role targetRole)
-		{
-			lockwait_m(m_routes);
-
-			vector<string> foundRoutes{};
-			for (const auto& r : routes)
-			{
-				if (r.role == targetRole) foundRoutes.push_back(r.route);
-			}
-
-			unlock_m(m_routes);
-
-			return foundRoutes;
-		}
-
-		static inline vector<User> GetAllUsers()
-		{ 
-			lockwait_m(m_users);
-			vector<User> copy = users;
-			unlock_m(m_users);
-			return copy;
-		}
-		static inline vector<Route> GetAllRoutes()
-		{ 
-			lockwait_m(m_routes);
-			vector<Route> copy = routes;
-			unlock_m(m_routes);
-			return copy;
-		}
-
-		static inline void ClearAllUsers()
-		{ 
-			lockwait_m(m_users);
-			users.clear();
-			unlock_m(m_users);
-		}
-		static inline void ClearAllRoutes()
-		{
-			lockwait_m(m_routes);
-			routes.clear();
-			unlock_m(m_routes);
-		}
+		static void ClearAllUsers();
+		static void ClearAllRoutes();
 
 		//Close all sockets and clear all server resources
 		static void Shutdown();
-	protected:
-		static inline bool isInitialized{};
-		static inline bool isReady{};
-
-		static inline u32 ID{};
-
-		static inline u16 port{};
-
-		static inline string serverName{};
-		static inline string domainName{};
-		static inline string serverRoot{};
-
-		static inline vector<User> users{};
-		static inline mutex m_users{};
-
-		static inline vector<Route> routes{};
-		static inline mutex m_routes{};
-
-		static inline abool isListenerRunning{ false };
-
-		static inline vector<unique_ptr<Connection>> listenerSockets{};
-		static inline mutex m_listenerSockets{};
-
-		static inline vector<unique_ptr<Connection>> connectSockets{};
-		static inline mutex m_connectSockets{};
 	};
 }
