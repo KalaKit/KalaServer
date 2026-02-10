@@ -3,8 +3,6 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include <thread>
-
 #include "KalaHeaders/thread_utils.hpp"
 
 #include "server/ks_inbound.hpp"
@@ -13,7 +11,6 @@
 using KalaHeaders::KalaThread::lockwait_m;
 using KalaHeaders::KalaThread::unlock_m;
 
-using KalaServer::Server::ServerCore;
 using KalaServer::Server::Connection;
 
 using std::memory_order_acquire;
@@ -44,7 +41,7 @@ namespace KalaServer::Server
 				});
 
 			lockwait_m(ServerCore::GetConnectMutex());
-			ServerCore::GetConnectSockets().push_back(move(c));
+			ServerCore::GetConnectSockets().push_back(std::move(c));
 			unlock_m(ServerCore::GetConnectMutex());
 		}
 	}

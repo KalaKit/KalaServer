@@ -3,16 +3,16 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include <curl/curl.h>
+#include <curl/easy.h>
 #ifdef _WIN32
-#include <windows.h>
 #include <winsock2.h>
-#include <wininet.h>
 #pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "Wininet.lib")
 #else
-//TODO: add linux equivalent
+#include <sys/socket.h>
 #endif
 
+#include <thread>
 #include <memory>
 #include <string>
 #include <thread>
@@ -29,13 +29,11 @@
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaString::HasAnyWhiteSpace;
-using KalaHeaders::KalaString::ContainsString;
 using KalaHeaders::KalaString::SplitString;
 using KalaHeaders::KalaThread::lockwait_m;
 using KalaHeaders::KalaThread::unlock_m;
 
 using KalaServer::Core::KalaServerCore;
-using KalaServer::Server::Cloudflare;
 
 using std::make_unique;
 using std::unique_ptr;
@@ -43,13 +41,38 @@ using std::to_string;
 using std::string;
 using std::wstring;
 using std::thread;
+using std::this_thread::sleep_for;
 using std::memory_order_release;
 using std::memory_order_acquire;
-using std::this_thread::sleep_for;
 using std::chrono::seconds;
 using std::chrono::milliseconds;
 
+#ifdef _WIN32
+constexpr SOCKET invalid_socket = INVALID_SOCKET;
+#else
+constexpr int invalid_socket = -1;
+#endif
+
+#ifdef _WIN32
 static wstring ToWide(const string& input);
+#endif
+
+static void InitializeCurl()
+{
+	static bool curlInitialized{};
+
+	if (curlInitialized) return;
+
+	bool success = curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
+
+	if (success) curlInitialized = true;
+	else
+	{
+		KalaServerCore::ForceClose(
+			"Curl error",
+			"Failed to initialize Curl!");
+	}
+}
 
 namespace KalaServer::Server
 {
@@ -145,7 +168,7 @@ namespace KalaServer::Server
 
 	bool ServerCore::HasInternet()
 	{
-		if (ServerCore::IsInitialized())
+		if (!ServerCore::IsInitialized())
 		{
 			Log::Print(
 				"Cannot check for internet access because the server has not been initialized!",
@@ -168,39 +191,36 @@ namespace KalaServer::Server
 		}
 
 		const string testPage = "https://www.google.com";
-		const wstring testPageWide = ToWide(testPage);
-		HINTERNET hInternet = InternetOpenW(
-			ccast<LPWSTR>(testPageWide.c_str()),
-			INTERNET_OPEN_TYPE_DIRECT,
-			NULL,
-			NULL,
-			0);
 
-		if (!hInternet)
+		InitializeCurl();
+
+		CURL* curl = curl_easy_init();
+		if (!curl)
 		{
-			Log::Print(
-				"Failed to check for internet access because InternetOpenW returned false!",
-				"INTERNET_ACCESS",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			KalaServerCore::ForceClose(
+				"Curl error",
+				"curl_easy_init failed!");
 		}
 
-		HINTERNET hUrl = InternetOpenUrlW(
-			hInternet,
-			wstring(testPage.begin(), testPage.end()).c_str(),
-			NULL,
-			0,
-			INTERNET_FLAG_NO_UI,
-			0);
+		curl_easy_setopt(curl, CURLOPT_URL, testPage.c_str());
 
-		bool result = (hUrl != nullptr);
+		//ignore response body
+		curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
-		if (hUrl) InternetCloseHandle(hUrl);
-		if (hInternet) InternetCloseHandle(hInternet);
+		//reasonable timeouts
+		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
 
-		return result;
+		//follow redirects (google will redirect)
+		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+		//ignore errors
+		curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+
+		CURLcode res = curl_easy_perform(curl);
+		curl_easy_cleanup(curl);
+
+		return res == CURLE_OK;
 	}
 
 	u32 ServerCore::GetID() { return ID; }
@@ -509,8 +529,13 @@ namespace KalaServer::Server
 			return;
 		}
 
+
 		if (targetSocket == 0
-			|| scast<SOCKET>(targetSocket) == INVALID_SOCKET)
+#ifdef _WIN32
+			|| scast<SOCKET>(targetSocket) == invalid_socket)
+#else
+			|| targetSocket == invalid_socket)
+#endif
 		{
 			Log::Print(
 				"Failed to disconnect target via socket for server '" + serverName + "' because the socket is unassigned or invalid!",
@@ -533,7 +558,11 @@ namespace KalaServer::Server
 				c->isRunning.store(false, memory_order_release);
 
 				if (c->connectionSocket == 0
-					|| scast<SOCKET>(c->connectionSocket) == INVALID_SOCKET)
+#ifdef _WIN32
+					|| scast<SOCKET>(c->connectionSocket) == invalid_socket)
+#else
+					|| c->connectionSocket == invalid_socket)
+#endif
 				{
 					Log::Print(
 						"Failed to disconnect target via socket for server '" + serverName + "' because the stored socket is unassigned or invalid!",
@@ -543,9 +572,15 @@ namespace KalaServer::Server
 				}
 				else
 				{
+#ifdef _WIN32
 					SOCKET socket = scast<SOCKET>(c->connectionSocket);
 					shutdown(socket, SD_BOTH);
 					closesocket(socket);
+#else
+					int socket = c->connectionSocket;
+					shutdown(socket, SHUT_RDWR);
+					close(socket);
+#endif					
 					c->connectionSocket = 0;
 				}
 
@@ -585,7 +620,11 @@ namespace KalaServer::Server
 				c->isRunning.store(false, memory_order_release);
 
 				if (c->connectionSocket == 0
-					|| scast<SOCKET>(c->connectionSocket) == INVALID_SOCKET)
+#ifdef _WIN32
+					|| scast<SOCKET>(c->connectionSocket) == invalid_socket)
+#else
+					|| c->connectionSocket == invalid_socket)
+#endif
 				{
 					Log::Print(
 						"Failed to disconnect target via socket for server '" + serverName + "' because the stored socket is unassigned or invalid!",
@@ -595,9 +634,15 @@ namespace KalaServer::Server
 				}
 				else
 				{
+#ifdef _WIN32
 					SOCKET socket = scast<SOCKET>(c->connectionSocket);
 					shutdown(socket, SD_BOTH);
 					closesocket(socket);
+#else
+					int socket = c->connectionSocket;
+					shutdown(socket, SHUT_RDWR);
+					close(socket);
+#endif	
 					c->connectionSocket = 0;
 				}
 
@@ -685,7 +730,11 @@ namespace KalaServer::Server
 				
 				//we don't return error here if there is no socket because the target may only have a local socket via SendPacketLocal
 				if (c->connectionSocket == 0
-					|| scast<SOCKET>(c->connectionSocket) == INVALID_SOCKET)
+#ifdef _WIN32
+					|| scast<SOCKET>(c->connectionSocket) == invalid_socket)
+#else
+					|| c->connectionSocket == invalid_socket)
+#endif
 				{
 					Log::Print(
 						"Couldn't close socket for target via IP '" + targetIP + "' for server '" + serverName + "' because the socket is unassigned or invalid!",
@@ -694,9 +743,15 @@ namespace KalaServer::Server
 				}
 				else
 				{
+#ifdef _WIN32
 					SOCKET socket = scast<SOCKET>(c->connectionSocket);
 					shutdown(socket, SD_BOTH);
 					closesocket(socket);
+#else
+					int socket = c->connectionSocket;
+					shutdown(socket, SHUT_RDWR);
+					close(socket);
+#endif	
 					c->connectionSocket = 0;
 				}
 
@@ -737,7 +792,11 @@ namespace KalaServer::Server
 
 				//we don't return error here if there is no socket because the target may only have a local socket via SendPacketLocal
 				if (c->connectionSocket == 0
-					|| scast<SOCKET>(c->connectionSocket) == INVALID_SOCKET)
+#ifdef _WIN32
+					|| scast<SOCKET>(c->connectionSocket) == invalid_socket)
+#else
+					|| c->connectionSocket == invalid_socket)
+#endif
 				{
 					Log::Print(
 						"Couldn't close socket for target via IP '" + targetIP + "' for server '" + serverName + "' because the socket is unassigned or invalid!",
@@ -746,9 +805,15 @@ namespace KalaServer::Server
 				}
 				else
 				{
+#ifdef _WIN32
 					SOCKET socket = scast<SOCKET>(c->connectionSocket);
 					shutdown(socket, SD_BOTH);
 					closesocket(socket);
+#else
+					int socket = c->connectionSocket;
+					shutdown(socket, SHUT_RDWR);
+					close(socket);
+#endif	
 					c->connectionSocket = 0;
 				}
 
@@ -788,7 +853,11 @@ namespace KalaServer::Server
 		//TODO: use callback
 
 		if (listenerSocket == 0 
-			|| scast<SOCKET>(listenerSocket) == INVALID_SOCKET)
+#ifdef _WIN32
+			|| scast<SOCKET>(listenerSocket) == invalid_socket)
+#else
+			|| listenerSocket == invalid_socket)
+#endif
 		{
 			Log::Print(
 				"Failed to disconnect listener for server '" + serverName + "' because the server has no listener socket or it is invalid!",
@@ -836,11 +905,21 @@ namespace KalaServer::Server
 			s->isRunning.store(false, memory_order_release);
 
 			if (s->connectionSocket != 0
-				&& scast<SOCKET>(s->connectionSocket) != INVALID_SOCKET)
+#ifdef _WIN32
+				&& scast<SOCKET>(s->connectionSocket) != invalid_socket)
+#else
+				&& s->connectionSocket != invalid_socket)
+#endif
 			{
-				SOCKET socket = scast<SOCKET>(s->connectionSocket);
-				shutdown(socket, SD_BOTH);
-				closesocket(socket);
+#ifdef _WIN32
+					SOCKET socket = scast<SOCKET>(s->connectionSocket);
+					shutdown(socket, SD_BOTH);
+					closesocket(socket);
+#else
+					int socket = s->connectionSocket;
+					shutdown(socket, SHUT_RDWR);
+					close(socket);
+#endif	
 				s->connectionSocket = 0;
 			}
 
@@ -855,9 +934,15 @@ namespace KalaServer::Server
 			}
 		}
 
+#ifdef _WIN32
 		SOCKET socket = scast<SOCKET>(listenerSocket);
 		shutdown(socket, SD_BOTH);
 		closesocket(socket);
+#else
+		int socket = listenerSocket;
+		shutdown(socket, SHUT_RDWR);
+		close(socket);
+#endif	
 		listenerSocket = 0;
 
 		if (listenerThread.joinable()) listenerThread.join();
@@ -924,11 +1009,21 @@ namespace KalaServer::Server
 			lockwait_m(s->m_connection);
 
 			if (s->connectionSocket != 0
-				&& scast<SOCKET>(s->connectionSocket) != INVALID_SOCKET)
+#ifdef _WIN32
+				&& scast<SOCKET>(s->connectionSocket) != invalid_socket)
+#else
+				&& s->connectionSocket != invalid_socket)
+#endif
 			{
+#ifdef _WIN32
 				SOCKET socket = scast<SOCKET>(s->connectionSocket);
 				shutdown(socket, SD_BOTH);
 				closesocket(socket);
+#else
+				int socket = s->connectionSocket;
+				shutdown(socket, SHUT_RDWR);
+				close(socket);
+#endif	
 				s->connectionSocket = 0;
 			}
 
@@ -1493,6 +1588,7 @@ namespace KalaServer::Server
 	}
 }
 
+#ifdef _WIN32
 wstring ToWide(const string& input)
 {
 	if (input.empty()) return wstring();
@@ -1517,3 +1613,4 @@ wstring ToWide(const string& input)
 
 	return wstr;
 }
+#endif

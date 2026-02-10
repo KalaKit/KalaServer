@@ -4,9 +4,9 @@
 //Read LICENSE.md for more information.
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #else
-//TODO: add linux equivalent
+#include <sys/wait.h>
 #endif
 
 #include <filesystem>
@@ -16,12 +16,9 @@
 
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_server.hpp"
-#include "core/ks_core.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
-
-using KalaServer::Core::KalaServerCore;
 
 using std::filesystem::exists;
 using std::filesystem::path;
@@ -34,8 +31,6 @@ using std::to_string;
 
 #ifdef _WIN32
 using std::wstring;
-#else
-//TODO: add linux equivalent
 #endif
 
 static string cloudflareCertFile{};
@@ -49,7 +44,9 @@ static bool CreateTunnelCredentials();
 static bool RouteTunnel();
 static bool RunTunnel();
 
+#ifdef _WIN32
 static wstring ToWide(const string& input);
+#endif
 
 namespace KalaServer::Server
 {
@@ -215,7 +212,7 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		if (tunnelHandle == NULL)
+		if (tunnelHandle == 0)
 		{
 			Log::Print(
 				"Cannot check for tunnel status because Cloudflare tunnel is NULL!",
@@ -226,6 +223,7 @@ namespace KalaServer::Server
 			return false;
 		}
 
+#ifdef _WIN32
 		HANDLE handle = rcast<HANDLE>(tunnelHandle);
 
 		if (handle == INVALID_HANDLE_VALUE)
@@ -240,6 +238,14 @@ namespace KalaServer::Server
 		}
 
 		return WaitForSingleObject(handle, 0) == WAIT_TIMEOUT;
+#else
+		pid_t pid = tunnelHandle;
+
+		int status{};
+		pid_t r = waitpid(pid, &status, WNOHANG);
+
+		return r == 0;
+#endif
 	}
 
 	void Cloudflare::Shutdown()
@@ -275,7 +281,7 @@ namespace KalaServer::Server
 		//TODO: add linux equivalent
 #endif
 
-		tunnelHandle = NULL;
+		tunnelHandle = 0;
 
 		isInitialized = false;
 
@@ -381,6 +387,7 @@ bool RunTunnel()
 	return true;
 }
 
+#ifdef _WIN32
 wstring ToWide(const string& input)
 {
 	if (input.empty()) return wstring();
@@ -405,3 +412,4 @@ wstring ToWide(const string& input)
 
 	return wstr;
 }
+#endif

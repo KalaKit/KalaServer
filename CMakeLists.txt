@@ -17,8 +17,10 @@ endif()
 # Platform Detection
 if (WIN32)
     message(STATUS "[KALASERVER] Platform = Windows")
+elseif(UNIX)
+	message(STATUS "[KalaServer] Platform = Unix")
 else()
-    message(FATAL_ERROR "[KALASERVER] Unsupported platform. Only Windows is supported.")
+    message(FATAL_ERROR "[KalaServer] Unsupported platform. Only Windows and Unix are supported.")
 endif()
 
 # Build Type Detection
@@ -73,6 +75,9 @@ target_include_directories(KalaServer PRIVATE
 	"${EXT_SHARED_DIR}"
 )
 
+find_package(CURL REQUIRED)
+target_link_libraries(KalaServer PRIVATE CURL::libcurl)
+
 # Preprocessor Defines
 target_compile_definitions(KalaServer PRIVATE 
 	LIB_EXPORT          # dll import/export
@@ -94,7 +99,7 @@ add_custom_command(TARGET KalaServer POST_BUILD
 )
 
 # Copy important files
-set(COPY_TARGETS README.md LICENSE.md logo.png)
+set(COPY_TARGETS readme.md LICENSE.md logo.png)
 foreach(FILE ${COPY_TARGETS})
 add_custom_command(TARGET KalaServer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E rm -f 
