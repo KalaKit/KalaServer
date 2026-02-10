@@ -1,6 +1,6 @@
 # KalaServer
 
-KalaServer is a lightweight C++ 20 library for Windows (Linux coming in the future) that allows you to make web, media or any other kind of a server with very few dependencies. The library is currently in early alpha development, so a lot of changes will come, but the core goals will stay the same.
+KalaServer is a lightweight C++ 20 library for Windows and Linux that allows you to make web, media or any other kind of a server with very few dependencies. The library is currently in early alpha development, so a lot of changes will come, but the core goals will stay the same.
 
 ---
 

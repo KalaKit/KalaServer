@@ -302,7 +302,7 @@ namespace KalaServer::Server
 		TerminateProcess(handle, 0);
 		CloseHandle(handle);
 #else
-		//TODO: add linux equivalent
+		kill(scast<pid_t>(tunnelHandle), SIGKILL);
 #endif
 
 		tunnelHandle = 0;
