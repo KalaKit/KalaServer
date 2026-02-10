@@ -1,0 +1,1 @@
+These files were downloaded from the [official cloudflared releases page](https://github.com/cloudflare/cloudflared/releases) and are necessary for KalaServer to connect to your website or server if you want inbound connections to be accepted.

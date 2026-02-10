@@ -1,0 +1,75 @@
+#KMF VERSION 1.0
+
+//Manifest file for use with kalamove. Read more at https://github.com/kalakit/kalamove
+
+//
+// CORE STUFF
+//
+
+//copy readme
+origin: readme.md
+target: ..@jutt@_external_shared@KalaServer@readme.md
+action: forcecopy
+
+//copy license
+origin: LICENSE.md
+target: ..@jutt@_external_shared@KalaServer@LICENSE.md
+action: forcecopy
+
+//copy include files
+origin: include
+target: ..@jutt@_external_shared@KalaServer@include
+action: forcecopy
+
+//copy docs
+origin: docs
+target: ..@jutt@_external_shared@KalaServer@docs
+action: forcecopy
+
+//
+// BINARIES
+//
+
+//copy debug dll
+origin: build@windows-debug@libKalaServer1d.dll
+target: ..@jutt@_external_shared@KalaServer@debug@libKalaServer1d.dll
+action: forcecopy
+
+//copy debug lib
+origin: build@windows-debug@libKalaServer1d.dll.a
+target: ..@jutt@_external_shared@KalaServer@debug@libKalaServer1d.dll.a
+action: forcecopy
+
+//copy debug so
+origin: build@linux-debug@libKalaServer1d.so
+target: ..@jutt@_external_shared@KalaServer@debug@libKalaServer1d.so
+action: forcecopy
+
+//copy release dll
+origin: build@windows-release@libKalaServer1.dll
+target: ..@jutt@_external_shared@KalaServer@release@libKalaServer1.dll
+action: forcecopy
+
+//copy release lib
+origin: build@windows-release@libKalaServer1.dll.a
+target: ..@jutt@_external_shared@KalaServer@release@libKalaServer1.dll.a
+action: forcecopy
+
+//copy release so
+origin: build@linux-release@libKalaServer1.so
+target: ..@jutt@_external_shared@KalaServer@release@libKalaServer1.so
+action: forcecopy
+
+//
+// EXTERNAL LIBRARIES
+//
+
+//KalaHeaders
+origin: _external_shared@KalaHeaders
+target: ..@jutt@_external_shared@KalaHeaders
+action: copy
+
+//Cloudflared
+origin: _external_shared@Cloudflared
+target: ..@jutt@_external_shared@Cloudflared
+action: copy

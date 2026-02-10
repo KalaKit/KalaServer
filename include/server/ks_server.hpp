@@ -15,6 +15,7 @@
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
+#include "server/ks_cloudflare.hpp"
 
 namespace KalaServer::Server
 {
@@ -115,6 +116,7 @@ namespace KalaServer::Server
 
 	class LIB_API ServerCore
 	{
+	friend class Cloudflare;
 	public:
 		//Initialize a new server on this process.
 		//Port is where your server connects to Cloudflare.
@@ -124,7 +126,7 @@ namespace KalaServer::Server
 		//this means yourserver.exe is default root, but that is not recommended <--- always adjust that.
 		//Users container lists all user ips and their roles.
 		//Routes container lists all routes and their required role to access them
-		static void Initialize(
+		static bool Initialize(
 			u16 port,
 			const string& serverName,
 			const string& domainName,
@@ -243,5 +245,7 @@ namespace KalaServer::Server
 
 		//Close all sockets and clear all server resources
 		static void Shutdown();
+	private:
+		static void SetCloudflareReadyState(bool state);
 	};
 }

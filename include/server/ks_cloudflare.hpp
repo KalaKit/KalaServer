@@ -5,13 +5,13 @@
 
 #pragma once
 
-#include <string>
+#include <filesystem>
 
 #include "KalaHeaders/core_utils.hpp"
 
 namespace KalaServer::Server
 {
-	using std::string;
+	using std::filesystem::path;
 
 	using u8 = uint8_t;
 
@@ -22,8 +22,8 @@ namespace KalaServer::Server
 		//pass the cloudflare tunnel exe path where its ran from
 		//and pass the cloudflare folder where the json and cert files will live at
 		static bool Initialize(
-			const string& cloudflareExePath,
-			const string& cloudflareFolder);
+			const path& cloudflareExePath,
+			const path& cloudflareFolder);
 
 		static bool IsInitialized();
 		static bool IsHealthy(u8 connection);

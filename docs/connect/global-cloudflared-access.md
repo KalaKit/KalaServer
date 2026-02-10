@@ -18,7 +18,7 @@ This section assumes you already own a domain on cloudflare.
 	- content: yourtunnelname.yourdomain.yourextension (KalaServer.thekalakit.com)
 	- proxied: true
 	
-- copy 'config.yml' template from 'example' folder to your 'Users' path inside a new '.cloudflared' folder and fill the slots that contain template values
+- copy 'example_config.yml' template from the docs folder and rename it to 'config.yaml' and copy it to your 'Users\\username' or '/home/username' path inside a new '.cloudflared' folder and fill the slots that contain template values
 	
 - Add a new cloudflared application
 	- log in to 'https://one.dash.cloudflare.com/'

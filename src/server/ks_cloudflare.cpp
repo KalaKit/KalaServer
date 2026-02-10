@@ -7,6 +7,9 @@
 #include <windows.h>
 #else
 #include <sys/wait.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #endif
 
 #include <filesystem>
@@ -16,9 +19,12 @@
 
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_server.hpp"
+#include "core/ks_core.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
+
+using KalaServer::Core::KalaServerCore;
 
 using std::filesystem::exists;
 using std::filesystem::path;
@@ -39,7 +45,7 @@ static string cloudflareJsonFile{};
 
 static uintptr_t tunnelHandle{};
 
-static bool CreateCertFile();
+static bool CreateCertFile(const path& cloudflareExePath);
 static bool CreateTunnelCredentials();
 static bool RouteTunnel();
 static bool RunTunnel();
@@ -58,9 +64,20 @@ namespace KalaServer::Server
 	static bool isFourthHealthy{};
 
 	bool Cloudflare::Initialize(
-		const string& cloudflareExePath,
-		const string& cloudflareFolder)
+		const path& cloudflareExePath,
+		const path& cloudflareFolder)
 	{
+		if (!ServerCore::IsInitialized())
+		{
+			Log::Print(
+				"Cannot initialize Cloudflare tunnel because server core has not been initialized!",
+				"CLOUDFLARE_INIT",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
 		if (Cloudflare::IsInitialized())
 		{
 			Log::Print(
@@ -75,7 +92,7 @@ namespace KalaServer::Server
 		if (!exists(cloudflareExePath))
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its path '" + cloudflareExePath + "' does not exist!",
+				"Cannot initialize Cloudflare tunnel because its exe path '" + cloudflareExePath.string() + "' does not exist!",
 				"CLOUDFLARE_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -86,7 +103,7 @@ namespace KalaServer::Server
 		if (!exists(cloudflareFolder))
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its cert path '" + cloudflareFolder + "' does not exist!",
+				"Cannot initialize Cloudflare tunnel because its folder path '" + cloudflareFolder.string() + "' does not exist!",
 				"CLOUDFLARE_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -96,11 +113,11 @@ namespace KalaServer::Server
 
 		if (cloudflareCertFile.empty())
 		{
-			cloudflareCertFile = path(path(cloudflareFolder) / "cert.pem").string();
+			cloudflareCertFile = path(cloudflareFolder / "cert.pem").string();
 		}
-		
+
 		if (!exists(cloudflareCertFile)
-			&& !CreateCertFile())
+			&& !CreateCertFile(cloudflareExePath))
 		{
 			return false;
 		}
@@ -123,18 +140,23 @@ namespace KalaServer::Server
 				}
 			}
 
-			cloudflareJsonFile = path(path(cloudflareFolder) / (cloudflareTunnelID + ".json")).string();
+			cloudflareJsonFile = path(cloudflareFolder / (cloudflareTunnelID + ".json")).string();
 		}
 
 		if (exists(cloudflareJsonFile))
 		{
 			Log::Print(
-				"Cloudflare tunnel file already exists, skipping creation and using existing one with ID '" + cloudflareTunnelID + "'.",
+				"Cloudflare tunnel file already exists at '" + cloudflareJsonFile + "', skipping creation and using existing one with ID '" + cloudflareTunnelID + "'.",
 				"CLOUDFLARE_INIT",
 				LogType::LOG_INFO);
 		}
 		else
 		{
+			Log::Print(
+				"Creating new cloudflare json file at '" + cloudflareJsonFile + "'.",
+				"CLOUDFLARE_INIT",
+				LogType::LOG_INFO);
+
 			if (!CreateTunnelCredentials()
 				|| !RouteTunnel())
 			{
@@ -145,6 +167,8 @@ namespace KalaServer::Server
 		if (!RunTunnel()) return false;
 
 		isInitialized = true;
+
+		ServerCore::SetCloudflareReadyState(true);
 
 		Log::Print(
 			"Initialized Cloudflare tunnel!",
@@ -292,7 +316,7 @@ namespace KalaServer::Server
 	}
 }
 
-bool CreateCertFile()
+bool CreateCertFile(const path& cloudflareExePath)
 {
 	Log::Print(
 		"Creating new Cloudflare tunnel cert file at '" + cloudflareCertFile + "'.",
@@ -305,7 +329,8 @@ bool CreateCertFile()
 	si.cb = sizeof(si);
 
 	wstring currParent = ToWide(path(current_path()).string());
-	wstring command = ToWide("cloudflared tunnel login");
+	wstring command =
+		L"\"" + ToWide(cloudflareExePath.string()) + L"\" tunnel login";
 
 	if (!CreateProcessW(
 		nullptr,
@@ -340,7 +365,88 @@ bool CreateCertFile()
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
 #else
-	//TODO: add linux equivalent
+	int pipefd[2];
+	pipe(pipefd);
+
+	fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
+
+	pid_t pid = fork();
+	if (pid < 0)
+	{
+		KalaServerCore::ForceClose(
+			"Cloudflare error",
+			"Failed to create Cloudflare cert because new process for authentication couldn't be created!");
+	}
+	if (pid == 0)
+	{
+		//close child
+		close(pipefd[0]);
+
+		execl(
+			cloudflareExePath.c_str(),
+			cloudflareExePath.c_str(), 
+			"tunnel",
+			"login", 
+			(char*)NULL);
+
+		//exec failed
+		int err = errno;
+		write(pipefd[1], &err, sizeof(err));
+		close(pipefd[1]);
+		_exit(127); //exits child
+	}
+
+	//parent
+	close(pipefd[1]);
+
+	int err{};
+	ssize_t n = read(pipefd[0], &err, sizeof(err));
+	close(pipefd[0]);
+
+	if (n != 0)
+	{
+		Log::Print(
+			"Failed to create Cloudflare cert because authentication process failed to start! Error code: " + to_string(err),
+			"CLOUDFLARE_INIT",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
+
+	//exec succeeded - now wait for user to complete actions
+
+	int status{};
+	waitpid(pid, &status, 0);
+
+	//interpret exit
+	if (WIFEXITED(status))
+	{
+		int exit_code = WEXITSTATUS(status);
+		
+		if (exit_code != 0)
+		{
+			Log::Print(
+				"Failed to create Cloudflare cert because authentication process was exited unexpectedly! Error code: " + to_string(exit_code),
+				"CLOUDFLARE_INIT",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+	}
+	else if (WIFSIGNALED(status))
+	{
+		int sig = WTERMSIG(status);
+
+		Log::Print(
+			"Failed to create Cloudflare cert because authentication process was closed unexpectedly by a signal! Error code: " + to_string(sig),
+			"CLOUDFLARE_INIT",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
 #endif
 
 	if (!exists(cloudflareCertFile))

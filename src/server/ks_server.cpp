@@ -105,7 +105,7 @@ namespace KalaServer::Server
 	static vector<unique_ptr<Connection>> connectSockets{};
 	static mutex m_connectSockets{};
 
-	void ServerCore::Initialize(
+	bool ServerCore::Initialize(
 		u16 newPort,
 		const string& newServerName,
 		const string& newDomainName,
@@ -122,7 +122,7 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
 		if (newServerName.empty()
@@ -134,7 +134,7 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 		if (newDomainName.empty()
 			|| newDomainName.length() > 50)
@@ -145,7 +145,7 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
 		serverName = newServerName;
@@ -158,6 +158,8 @@ namespace KalaServer::Server
 			"Created new server '" + serverName + "'!",
 			"SERVER_INIT",
 			LogType::LOG_SUCCESS);
+
+		return true;
 	}
 
 	bool ServerCore::IsInitialized() { return isInitialized; }
@@ -1585,6 +1587,11 @@ namespace KalaServer::Server
 
 		DisconnectListener();
 		CancelAllPackets();
+	}
+
+	void ServerCore::SetCloudflareReadyState(bool state)
+	{
+		isReady = state;
 	}
 }
 
