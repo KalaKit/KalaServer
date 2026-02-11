@@ -6,12 +6,14 @@
 #pragma once
 
 #include <filesystem>
+#include <string_view>
 
 #include "KalaHeaders/core_utils.hpp"
 
 namespace KalaServer::Server
 {
 	using std::filesystem::path;
+	using std::string_view;
 
 	using u8 = uint8_t;
 
@@ -29,6 +31,12 @@ namespace KalaServer::Server
 		static bool IsHealthy(u8 connection);
 
 		static bool IsTunnelAlive();
+
+		static bool CreateCloudflareProcess(
+			const path& cloudflareExe,
+			string_view command,
+			string_view failureReason
+		);
 
 		//Shut down the Cloudflare tunnel
 		static void Shutdown();

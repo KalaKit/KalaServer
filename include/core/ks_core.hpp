@@ -5,20 +5,22 @@
 
 #pragma once
 
-#include <string>
+#include <string_view>
+#include <filesystem>
 
 #include "KalaHeaders/core_utils.hpp"
 
 namespace KalaServer::Core
 {
-	using std::string;
+	using std::string_view;
+	using std::filesystem::path;
 
 	class LIB_API KalaServerCore
 	{
 	public:
 		//Force-close the program right this very moment with no cleanups
 		static void ForceClose(
-			const string& target,
-			const string& reason);
+			string_view target,
+			string_view reason);
 	};
 }

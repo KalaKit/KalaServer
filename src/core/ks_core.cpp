@@ -3,7 +3,10 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#ifdef _WIN32
+#else
 #include <csignal>
+#endif
 
 #include "KalaHeaders/log_utils.hpp"
 
@@ -14,13 +17,15 @@ using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaLog::TimeFormat;
 using KalaHeaders::KalaLog::DateFormat;
 
+#ifdef __linux__
 using std::raise;
+#endif
 
 namespace KalaServer::Core
 {
 	void KalaServerCore::ForceClose(
-		const string& target,
-		const string& reason)
+		string_view target,
+		string_view reason)
 	{
 		Log::Print(
 			"\n================"

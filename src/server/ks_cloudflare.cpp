@@ -16,6 +16,7 @@
 #include <string>
 
 #include "KalaHeaders/log_utils.hpp"
+#include "KalaHeaders/string_utils.hpp"
 
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_server.hpp"
@@ -23,8 +24,10 @@
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
+using KalaHeaders::KalaString::SplitString;
 
 using KalaServer::Core::KalaServerCore;
+using KalaServer::Server::Cloudflare;
 
 using std::filesystem::exists;
 using std::filesystem::path;
@@ -46,7 +49,7 @@ static string cloudflareJsonFile{};
 static uintptr_t tunnelHandle{};
 
 static bool CreateCertFile(const path& cloudflareExePath);
-static bool CreateTunnelCredentials();
+static bool CreateTunnelCredentials(const path& cloudflareFolder);
 static bool RouteTunnel();
 static bool RunTunnel();
 
@@ -157,7 +160,7 @@ namespace KalaServer::Server
 				"CLOUDFLARE_INIT",
 				LogType::LOG_INFO);
 
-			if (!CreateTunnelCredentials()
+			if (!CreateTunnelCredentials(cloudflareFolder)
 				|| !RouteTunnel())
 			{
 				return false;
@@ -272,6 +275,136 @@ namespace KalaServer::Server
 #endif
 	}
 
+	bool Cloudflare::CreateCloudflareProcess(
+		const path& cloudflareExe,
+		string_view command, 
+		string_view failureReason)
+	{
+#ifdef _WIN32
+	STARTUPINFOW si{};
+	PROCESS_INFORMATION pi{};
+	si.cb = sizeof(si);
+
+	wstring currParent = ToWide(path(current_path()).string());
+	wstring winCommand =
+		L"\"" + ToWide(cloudflareExe.string()) + L"\" " + ToWide(string(command));
+
+	if (!CreateProcessW(
+		nullptr,
+		&winCommand[0],
+		nullptr,
+		nullptr,
+		FALSE,
+		0,
+		nullptr,
+		currParent.c_str(),
+		&si,
+		&pi))
+	{
+		Log::Print(
+			"Failed to " + string(failureReason) + " because Cloudflare tunnel process failed to start!",
+			"PROCESS_ERROR",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
+
+	//wait for user to finish
+
+	WaitForSingleObject(pi.hProcess, INFINITE);
+
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
+#else
+	int pipefd[2];
+	pipe(pipefd);
+
+	fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
+
+	pid_t pid = fork();
+	if (pid < 0)
+	{
+		KalaServerCore::ForceClose(
+			"Process error",
+			"Failed to " + string(failureReason) + " because new process for authentication couldn't be created!");
+	}
+	if (pid == 0)
+	{
+		//close child
+		close(pipefd[0]);
+
+		string targetPathStr = cloudflareExe.string();
+		vector<char*> commands{ targetPathStr.data() };
+		vector<string> split = SplitString(command, " ");
+		for (auto& s : split) commands.push_back(s.data());
+		commands.push_back(nullptr);
+
+		execvp(commands[0], commands.data());
+
+		//exec failed
+		int err = errno;
+		write(pipefd[1], &err, sizeof(err));
+		close(pipefd[1]);
+		_exit(127); //exits child
+	}
+
+	//parent
+	close(pipefd[1]);
+
+	int err{};
+	ssize_t n = read(pipefd[0], &err, sizeof(err));
+	close(pipefd[0]);
+
+	if (n != 0)
+	{
+		Log::Print(
+			"Failed to " + string(failureReason) + " because authentication process failed to start! Error code: " + to_string(err),
+			"PROCESS_ERROR",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
+
+	//wait for user to finish
+
+	int status{};
+	waitpid(pid, &status, 0);
+
+	//interpret exit
+	if (WIFEXITED(status))
+	{
+		int exit_code = WEXITSTATUS(status);
+		
+		if (exit_code != 0)
+		{
+			Log::Print(
+				"Failed to " + string(failureReason) + " because authentication process was exited unexpectedly! Error code: " + to_string(exit_code),
+				"PROCESS_ERROR",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+	}
+	else if (WIFSIGNALED(status))
+	{
+		int sig = WTERMSIG(status);
+
+		Log::Print(
+			"Failed to " + string(failureReason) + " because authentication process was closed unexpectedly by a signal! Error code: " + to_string(sig),
+			"PROCESS_ERROR",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
+#endif
+
+	return true;
+	}
+
 	void Cloudflare::Shutdown()
 	{
 		if (!Cloudflare::IsInitialized())
@@ -319,135 +452,15 @@ namespace KalaServer::Server
 bool CreateCertFile(const path& cloudflareExePath)
 {
 	Log::Print(
-		"Creating new Cloudflare tunnel cert file at '" + cloudflareCertFile + "'.",
+		"Creating new Cloudflare tunnel cert file at '" + cloudflareCertFile + "'. "
+		"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
 		"CLOUDFLARE_INIT",
 		LogType::LOG_INFO);
 
-#ifdef _WIN32
-	STARTUPINFOW si{};
-	PROCESS_INFORMATION pi{};
-	si.cb = sizeof(si);
-
-	wstring currParent = ToWide(path(current_path()).string());
-	wstring command =
-		L"\"" + ToWide(cloudflareExePath.string()) + L"\" tunnel login";
-
-	if (!CreateProcessW(
-		nullptr,
-		command.data(),
-		nullptr,
-		nullptr,
-		FALSE,
-		0,
-		nullptr,
-		currParent.c_str(),
-		&si,
-		&pi))
-	{
-		Log::Print(
-			"Failed to create Cloudflare cert because Cloudflare tunnel process failed to start!",
-			"CLOUDFLARE_INIT",
-			LogType::LOG_ERROR,
-			2);
-
-		return false;
-	}
-
-	Log::Print(
-		"Launched brower to authorize with Cloudflare. PID: " + to_string(pi.dwProcessId),
-		"CLOUDFLARE_INIT",
-		LogType::LOG_INFO);
-
-	//wait for user to do their thing with cloudflare,
-	//and clean up after the process closes
-	WaitForSingleObject(pi.hProcess, INFINITE);
-
-	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
-#else
-	int pipefd[2];
-	pipe(pipefd);
-
-	fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
-
-	pid_t pid = fork();
-	if (pid < 0)
-	{
-		KalaServerCore::ForceClose(
-			"Cloudflare error",
-			"Failed to create Cloudflare cert because new process for authentication couldn't be created!");
-	}
-	if (pid == 0)
-	{
-		//close child
-		close(pipefd[0]);
-
-		execl(
-			cloudflareExePath.c_str(),
-			cloudflareExePath.c_str(), 
-			"tunnel",
-			"login", 
-			(char*)NULL);
-
-		//exec failed
-		int err = errno;
-		write(pipefd[1], &err, sizeof(err));
-		close(pipefd[1]);
-		_exit(127); //exits child
-	}
-
-	//parent
-	close(pipefd[1]);
-
-	int err{};
-	ssize_t n = read(pipefd[0], &err, sizeof(err));
-	close(pipefd[0]);
-
-	if (n != 0)
-	{
-		Log::Print(
-			"Failed to create Cloudflare cert because authentication process failed to start! Error code: " + to_string(err),
-			"CLOUDFLARE_INIT",
-			LogType::LOG_ERROR,
-			2);
-
-		return false;
-	}
-
-	//exec succeeded - now wait for user to complete actions
-
-	int status{};
-	waitpid(pid, &status, 0);
-
-	//interpret exit
-	if (WIFEXITED(status))
-	{
-		int exit_code = WEXITSTATUS(status);
-		
-		if (exit_code != 0)
-		{
-			Log::Print(
-				"Failed to create Cloudflare cert because authentication process was exited unexpectedly! Error code: " + to_string(exit_code),
-				"CLOUDFLARE_INIT",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
-		}
-	}
-	else if (WIFSIGNALED(status))
-	{
-		int sig = WTERMSIG(status);
-
-		Log::Print(
-			"Failed to create Cloudflare cert because authentication process was closed unexpectedly by a signal! Error code: " + to_string(sig),
-			"CLOUDFLARE_INIT",
-			LogType::LOG_ERROR,
-			2);
-
-		return false;
-	}
-#endif
+	Cloudflare::CreateCloudflareProcess(
+		cloudflareExePath,
+		"tunnel login", 
+		"create Cloudflare cert");
 
 	if (!exists(cloudflareCertFile))
 	{
@@ -463,12 +476,14 @@ bool CreateCertFile(const path& cloudflareExePath)
 	return true;
 }
 
-bool CreateTunnelCredentials()
+bool CreateTunnelCredentials(const path& cloudflareFolder)
 {
 	Log::Print(
 		"Creating Cloudflare tunnel credentials.",
 		"CLOUDFLARE_INIT",
 		LogType::LOG_INFO);
+
+	
 
 	return true;
 }
