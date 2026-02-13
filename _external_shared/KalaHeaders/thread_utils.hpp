@@ -32,7 +32,6 @@ namespace KalaHeaders::KalaThread
 	using std::same_as;
 	using std::thread;
 	using std::this_thread::yield;
-	using std::forward;
 	using std::invocable;
 	using std::chrono::milliseconds;
 	using std::chrono::steady_clock;
@@ -50,14 +49,14 @@ namespace KalaHeaders::KalaThread
 	template <invocable F>
     inline thread jthread(F&& func)
 	{
-		return thread(forward<F>(func));
+		return thread(std::forward<F>(func));
 	}
 	
 	//Creates, runs and detaches a non-joinable thread
 	template <invocable F>
 	inline void dthread(F&& func)
 	{
-		thread t(forward<F>(func));
+		thread t(std::forward<F>(func));
 		t.detach();
 	}
 	

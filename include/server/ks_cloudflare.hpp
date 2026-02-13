@@ -9,11 +9,14 @@
 #include <string_view>
 
 #include "KalaHeaders/core_utils.hpp"
+#include "KalaHeaders/thread_utils.hpp"
 
 namespace KalaServer::Server
 {
 	using std::filesystem::path;
 	using std::string_view;
+	using KalaHeaders::KalaThread::thread;
+	using KalaHeaders::KalaThread::abool;
 
 	using u8 = uint8_t;
 
@@ -35,5 +38,8 @@ namespace KalaServer::Server
 
 		//Shut down the Cloudflare tunnel
 		static void Shutdown();
+	private:
+		static thread cfThread;
+		static abool isRunning;
 	};
 }

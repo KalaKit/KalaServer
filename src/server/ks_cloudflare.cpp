@@ -3,6 +3,7 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include "KalaHeaders/core_utils.hpp"
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -20,16 +21,21 @@
 #include <fstream>
 #include <iterator>
 
+#include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/log_utils.hpp"
 #include "KalaHeaders/string_utils.hpp"
+#include "KalaHeaders/thread_utils.hpp"
 
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_server.hpp"
 #include "core/ks_core.hpp"
 
+using KalaHeaders::KalaCore::FromVar;
+using KalaHeaders::KalaCore::ToVar;
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaString::SplitString;
+using KalaHeaders::KalaThread::jthread;
 
 using KalaServer::Core::KalaServerCore;
 using KalaServer::Server::ServerCore;
@@ -69,7 +75,8 @@ static uintptr_t tunnelHandle{};
 static bool CreateCertFile();
 static bool CreateTunnelCredentials();
 static bool RouteTunnel();
-static bool RunTunnel();
+static bool CreateConfigFile(string& outCommand);
+static bool RunTunnel(string_view command);
 
 static bool CreateCloudflareProcess(
 	string_view command,
@@ -124,6 +131,9 @@ static wstring ToWide(const string& input);
 
 namespace KalaServer::Server
 {
+	thread Cloudflare::cfThread{};
+	abool Cloudflare::isRunning{ false };
+
 	static bool isInitialized{};
 
 	static bool isFirstHealthy{};
@@ -220,13 +230,45 @@ namespace KalaServer::Server
 		validCFExePath = cfExePath;
 		validCFFolderPath = cfFolderPath;
 
-		if (!CreateCertFile()
-			|| !CreateTunnelCredentials()
-			|| !RouteTunnel()
-			|| !RunTunnel())
+		if (cfCertFile.empty()) cfCertFile = cfFolderPath / "cert.pem";
+		if (!exists(cfCertFile)
+			&& !CreateCertFile())
 		{
 			return false;
 		}
+
+		if (cfTunnelID.empty()
+			|| cfJsonFile.empty())
+		{
+			cfTunnelID = GetTunnelID(validTunnelName);
+
+			cfJsonFile = cfFolderPath / string(cfTunnelID + ".json");
+		}
+
+		if (!exists(cfJsonFile)
+			&& (!CreateTunnelCredentials()
+			|| !RouteTunnel()))
+		{
+			return false;
+		}
+
+		string command{};
+		if (!CreateConfigFile(command))
+		{
+			return false;
+		}
+
+		isRunning.store(true);
+
+		cfThread = jthread([command]()
+		{
+			if (!RunTunnel(command))
+			{
+				KalaServerCore::ForceClose(
+					"Cloudflare error", 
+					"Failed to create Cloudflare tunnel process!");
+			}
+		});
 
 		isInitialized = true;
 
@@ -396,14 +438,15 @@ namespace KalaServer::Server
 			Log::Print(
 				"Cannot shut down Cloudflare tunnel '" + validTunnelName + "' because it has not been assigned.",
 				"CLOUDFLARE_SHUTDOWN",
-				LogType::LOG_INFO,
-				2);
+				LogType::LOG_WARNING);
 
 			return;
 		}
 
+		isRunning.store(false);
+
 #ifdef _WIN32
-		HANDLE handle = rcast<HANDLE>(tunnelHandle);
+		HANDLE handle = ToVar<HANDLE>(tunnelHandle);
 
 		if (handle == INVALID_HANDLE_VALUE)
 		{
@@ -419,7 +462,7 @@ namespace KalaServer::Server
 		TerminateProcess(handle, 0);
 		CloseHandle(handle);
 #else
-		pid_t pid = scast<pid_t>(tunnelHandle);
+		pid_t pid = ToVar<pid_t>(tunnelHandle);
 
 		if (pid <= 0)
 		{
@@ -433,9 +476,12 @@ namespace KalaServer::Server
 		}
 
 		kill(pid, SIGKILL);
+		waitpid(pid, nullptr, 0);
 #endif
 
 		tunnelHandle = 0;
+
+		if (cfThread.joinable()) cfThread.join();
 
 		isInitialized = false;
 
@@ -499,7 +545,7 @@ bool CreateTunnelCredentials()
 		&& exists(cfJsonFile))
 	{
 		Log::Print(
-			"Cloudflare tunnel file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing tunnel '" + validTunnelName + "'.",
+			"Cloudflare tunnel file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing one.",
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
 
@@ -604,13 +650,8 @@ bool RouteTunnel()
 	return true;
 }
 
-bool RunTunnel()
+bool CreateConfigFile(string& outCommand)
 {
-	Log::Print(
-		"Starting to run Cloudflare tunnel '" + validTunnelName + "'.",
-		"CLOUDFLARE",
-		LogType::LOG_INFO);
-
 	path certPath = validCFFolderPath / "cert.pem";
 	path configPath = validCFFolderPath / "config.yml";
 
@@ -709,8 +750,15 @@ bool RunTunnel()
 
 		file.close();
 	}
+	else
+	{
+		Log::Print(
+			"Cloudflare config file already exists at '" + configPath.string() + "', skipping creation and using existing one.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+	}
 
-	string command = 
+	outCommand = 
 #ifdef _WIN32
 		"--origin-ca-pool \"" + certPath.string() + "\""
 		+ " --config \"" + configPath.string() + "\""
@@ -723,16 +771,14 @@ bool RunTunnel()
 #endif
 		+ " tunnel run " + validTunnelName;
 
-	Log::Print("command: " + command);
-
-	if (!CreateCloudflareProcess(
-			command, 
-			"run tunnel '" + validTunnelName + "'"))
-	{
-		return false;
-	}
-
 	return true;
+}
+
+bool RunTunnel(string_view command)
+{
+	return CreateCloudflareProcess(
+			command, 
+			"run tunnel '" + validTunnelName + "'");
 }
 
 bool CreateCloudflareProcess(
@@ -771,10 +817,19 @@ bool CreateCloudflareProcess(
 
 	//wait for user to finish
 
-	WaitForSingleObject(pi.hProcess, INFINITE);
+	if (failureReason == "run tunnel '" + validTunnelName + "'")
+	{
+		tunnelHandle = FromVar(pi.hProcess);
 
-	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+	}
+	else
+	{
+		WaitForSingleObject(pi.hProcess, INFINITE);
+
+		CloseHandle(pi.hThread);
+		CloseHandle(pi.hProcess);
+	}
 #else
 	int pipefd[2];
 	pipe(pipefd);
@@ -826,38 +881,46 @@ bool CreateCloudflareProcess(
 		return false;
 	}
 
-	//wait for user to finish
-
-	int status{};
-	waitpid(pid, &status, 0);
-
-	//interpret exit
-	if (WIFEXITED(status))
+	if (failureReason == "run tunnel '" + validTunnelName + "'")
 	{
-		int exit_code = WEXITSTATUS(status);
-		
-		if (exit_code != 0)
+		tunnelHandle = FromVar(pid);
+		return true;
+	}
+	else
+	{
+		//wait for user to finish
+
+		int status{};
+		waitpid(pid, &status, 0);
+
+		//interpret exit
+		if (WIFEXITED(status))
 		{
+			int exit_code = WEXITSTATUS(status);
+			
+			if (exit_code != 0)
+			{
+				Log::Print(
+					"Failed to " + string(failureReason) + " because authentication process was exited unexpectedly! Error code: " + to_string(exit_code),
+					"PROCESS_ERROR",
+					LogType::LOG_ERROR,
+					2);
+
+				return false;
+			}
+		}
+		else if (WIFSIGNALED(status))
+		{
+			int sig = WTERMSIG(status);
+
 			Log::Print(
-				"Failed to " + string(failureReason) + " because authentication process was exited unexpectedly! Error code: " + to_string(exit_code),
+				"Failed to " + string(failureReason) + " because authentication process was closed unexpectedly by a signal! Error code: " + to_string(sig),
 				"PROCESS_ERROR",
 				LogType::LOG_ERROR,
 				2);
 
 			return false;
 		}
-	}
-	else if (WIFSIGNALED(status))
-	{
-		int sig = WTERMSIG(status);
-
-		Log::Print(
-			"Failed to " + string(failureReason) + " because authentication process was closed unexpectedly by a signal! Error code: " + to_string(sig),
-			"PROCESS_ERROR",
-			LogType::LOG_ERROR,
-			2);
-
-		return false;
 	}
 #endif
 

@@ -874,8 +874,7 @@ namespace KalaServer::Server
 			Log::Print(
 				"Failed to disconnect listener for server '" + serverName + "' because the server has no listener socket or it is invalid!",
 				"LISTENER_DISCONNECT",
-				LogType::LOG_ERROR,
-				2);
+				LogType::LOG_WARNING);
 
 			return;
 		}
@@ -1006,7 +1005,7 @@ namespace KalaServer::Server
 			Log::Print(
 				"Couldn't cancel all packets for server '" + serverName + "' because there are no active packets.",
 				"SERVER_PACKET",
-				LogType::LOG_INFO);
+				LogType::LOG_WARNING);
 
 			unlock_m(m_connectSockets);
 
