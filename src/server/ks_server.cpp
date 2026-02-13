@@ -107,18 +107,28 @@ namespace KalaServer::Server
 
 	bool ServerCore::Initialize(
 		u16 newPort,
-		const string& newServerName,
-		const string& newDomainName,
-		const string& newServerRoot,
+		string_view newServerName,
+		string_view newDomainName,
+		string_view newServerRoot,
 		const vector<User>& newUsers,
 		const vector<Route>& newRoutes)
 	{
+		Log::Print(
+			"Starting to initialize server '" + string(newServerName) 
+			+ "' at port '" + to_string(newPort) 
+			+ "' with domain '" + string(newDomainName)
+			+ "', server root '" + string(newServerRoot) 
+			+ "', '" + to_string(newUsers.size()) 
+			+ "' role-based users and '" + to_string(newRoutes.size()) + "' routes.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+
 		if (newPort < MIN_PORT_RANGE
 			|| newPort > MAX_PORT_RANGE)
 		{
 			Log::Print(
-				"Failed to initialize server '" + newServerName + "' because its port '" + to_string(newPort) + "' is out of range!",
-				"SERVER_INIT",
+				"Failed to initialize server '" + string(newServerName) + "' because its port '" + to_string(newPort) + "' is out of range!",
+				"SERVER",
 				LogType::LOG_ERROR,
 				2);
 
@@ -129,8 +139,8 @@ namespace KalaServer::Server
 			|| newServerName.length() > 50)
 		{
 			Log::Print(
-				"Failed to initialize server '" + newServerName + "' because its name is empty or too long!",
-				"SERVER_INIT",
+				"Failed to initialize server '" + string(newServerName) + "' because its name is empty or too long!",
+				"SERVER",
 				LogType::LOG_ERROR,
 				2);
 
@@ -140,8 +150,8 @@ namespace KalaServer::Server
 			|| newDomainName.length() > 50)
 		{
 			Log::Print(
-				"Failed to initialize server '" + newServerName + "' because its domain name '" + newDomainName + "' is empty or too long!",
-				"SERVER_INIT",
+				"Failed to initialize server '" + string(newServerName) + "' because its domain name '" + string(newDomainName) + "' is empty or too long!",
+				"SERVER",
 				LogType::LOG_ERROR,
 				2);
 
@@ -156,7 +166,7 @@ namespace KalaServer::Server
 
 		Log::Print(
 			"Created new server '" + serverName + "'!",
-			"SERVER_INIT",
+			"SERVER",
 			LogType::LOG_SUCCESS);
 
 		return true;
@@ -201,7 +211,7 @@ namespace KalaServer::Server
 		{
 			KalaServerCore::ForceClose(
 				"Curl error",
-				"curl_easy_init failed!");
+				"curl_easy failed!");
 		}
 
 		curl_easy_setopt(curl, CURLOPT_URL, testPage.c_str());

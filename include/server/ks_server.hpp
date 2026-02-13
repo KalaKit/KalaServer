@@ -22,6 +22,7 @@ namespace KalaServer::Server
 	using std::unique_ptr;
 	using std::vector;
 	using std::string;
+	using std::string_view;
 	using std::unordered_set;
 	using std::thread;
 	using std::mutex;
@@ -128,9 +129,9 @@ namespace KalaServer::Server
 		//Routes container lists all routes and their required role to access them
 		static bool Initialize(
 			u16 port,
-			const string& serverName,
-			const string& domainName,
-			const string& serverRoot = "/",
+			string_view serverName,
+			string_view domainName,
+			string_view serverRoot = "/",
 			const vector<User>& users = {},
 			const vector<Route>& routes = {});
 

@@ -24,6 +24,7 @@ namespace KalaServer::Server
 		//pass the cloudflare tunnel exe path where its ran from
 		//and pass the cloudflare folder where the json and cert files will live at
 		static bool Initialize(
+			string_view tunnelName,
 			const path& cloudflareExePath,
 			const path& cloudflareFolder);
 
@@ -31,12 +32,6 @@ namespace KalaServer::Server
 		static bool IsHealthy(u8 connection);
 
 		static bool IsTunnelAlive();
-
-		static bool CreateCloudflareProcess(
-			const path& cloudflareExe,
-			string_view command,
-			string_view failureReason
-		);
 
 		//Shut down the Cloudflare tunnel
 		static void Shutdown();

@@ -14,6 +14,11 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
+#include <array>
+#include <sstream>
+#include <fstream>
+#include <iterator>
 
 #include "KalaHeaders/log_utils.hpp"
 #include "KalaHeaders/string_utils.hpp"
@@ -27,6 +32,7 @@ using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaString::SplitString;
 
 using KalaServer::Core::KalaServerCore;
+using KalaServer::Server::ServerCore;
 using KalaServer::Server::Cloudflare;
 
 using std::filesystem::exists;
@@ -36,22 +42,81 @@ using std::filesystem::directory_iterator;
 using std::filesystem::last_write_time;
 using std::filesystem::file_time_type;
 using std::string;
+using std::string_view;
 using std::to_string;
+using std::vector;
+using std::array;
+using std::istringstream;
+using std::ofstream;
+using std::ifstream;
+using std::istreambuf_iterator;
+using std::ios;
 
 #ifdef _WIN32
 using std::wstring;
 #endif
 
-static string cloudflareCertFile{};
-static string cloudflareTunnelID{};
-static string cloudflareJsonFile{};
+static string validTunnelName{};
+static path validCFExePath{};
+static path validCFFolderPath{};
+
+static path cfCertFile{};
+static path cfJsonFile{};
+static string cfTunnelID{};
 
 static uintptr_t tunnelHandle{};
 
-static bool CreateCertFile(const path& cloudflareExePath);
-static bool CreateTunnelCredentials(const path& cloudflareFolder);
+static bool CreateCertFile();
+static bool CreateTunnelCredentials();
 static bool RouteTunnel();
 static bool RunTunnel();
+
+static bool CreateCloudflareProcess(
+	string_view command,
+	string_view failureReason);
+
+static string GetTunnelID(string_view tunnelName)
+{
+	array<char, 4096> buffer{};
+	string output{};
+
+	string command = validCFExePath.string() + " tunnel list";
+
+#ifdef _WIN32
+	FILE* pipe = _popen(command.c_str(), "r");
+#else
+	FILE* pipe = popen(command.c_str(), "r");
+#endif
+
+	if (!pipe) return {};
+
+	while (fgets(buffer.data(), buffer.size(), pipe) != nullptr)
+	{
+		output += buffer.data();
+	}
+
+#ifdef _WIN32
+	_pclose(pipe);
+#else
+	pclose(pipe);
+#endif
+
+	istringstream stream(output);
+	string line{};
+
+	while (getline(stream, line))
+	{
+		if (line.find(tunnelName) != string::npos)
+		{
+			istringstream lineStream(line);
+			string id{}, name{};
+			lineStream >> id >> name;
+			return name == tunnelName ? id : "";
+		}
+	}
+
+	return {};
+}
 
 #ifdef _WIN32
 static wstring ToWide(const string& input);
@@ -67,14 +132,20 @@ namespace KalaServer::Server
 	static bool isFourthHealthy{};
 
 	bool Cloudflare::Initialize(
-		const path& cloudflareExePath,
-		const path& cloudflareFolder)
+		string_view tunnelName,
+		const path& cfExePath,
+		const path& cfFolderPath)
 	{
+		Log::Print(
+			"Starting to initialize Cloudflare tunnel '" + string(tunnelName) + "'",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+
 		if (!ServerCore::IsInitialized())
 		{
 			Log::Print(
 				"Cannot initialize Cloudflare tunnel because server core has not been initialized!",
-				"CLOUDFLARE_INIT",
+				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -85,97 +156,85 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Cannot initialize Cloudflare tunnel because it has already been initialized!",
-				"CLOUDFLARE_INIT",
+				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
 			return false;
 		}
 
-		if (!exists(cloudflareExePath))
+		if (tunnelName.empty())
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its exe path '" + cloudflareExePath.string() + "' does not exist!",
-				"CLOUDFLARE_INIT",
+				"Cannot initialize Cloudflare tunnel because its name cannot be empty!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (tunnelName.size() < 3)
+		{
+			Log::Print(
+				"Cannot initialize Cloudflare tunnel because its name '" + string(tunnelName) + "' is too short!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (tunnelName.size() > 20)
+		{
+			Log::Print(
+				"Cannot initialize Cloudflare tunnel because its name '" + string(tunnelName) + "' is too long!",
+				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
 			return false;
 		}
 
-		if (!exists(cloudflareFolder))
+		validTunnelName = tunnelName;
+
+		if (!exists(cfExePath))
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its folder path '" + cloudflareFolder.string() + "' does not exist!",
-				"CLOUDFLARE_INIT",
+				"Cannot initialize Cloudflare tunnel because its exe path '" + cfExePath.string() + "' does not exist!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (!exists(cfFolderPath))
+		{
+			Log::Print(
+				"Cannot initialize Cloudflare tunnel because its folder path '" + cfFolderPath.string() + "' does not exist!",
+				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
 			return false;
 		}
 
-		if (cloudflareCertFile.empty())
-		{
-			cloudflareCertFile = path(cloudflareFolder / "cert.pem").string();
-		}
+		validCFExePath = cfExePath;
+		validCFFolderPath = cfFolderPath;
 
-		if (!exists(cloudflareCertFile)
-			&& !CreateCertFile(cloudflareExePath))
+		if (!CreateCertFile()
+			|| !CreateTunnelCredentials()
+			|| !RouteTunnel()
+			|| !RunTunnel())
 		{
 			return false;
 		}
-
-		if (cloudflareJsonFile.empty())
-		{
-			file_time_type newestTime{};
-
-			for (const auto& f : directory_iterator(cloudflareFolder))
-			{
-				path tf = path(f);
-				if (tf.extension() == ".json")
-				{
-					auto lastWrite = last_write_time(tf);
-					if (lastWrite > newestTime)
-					{
-						cloudflareTunnelID = tf.stem().string();
-						newestTime = lastWrite;
-					}
-				}
-			}
-
-			cloudflareJsonFile = path(cloudflareFolder / (cloudflareTunnelID + ".json")).string();
-		}
-
-		if (exists(cloudflareJsonFile))
-		{
-			Log::Print(
-				"Cloudflare tunnel file already exists at '" + cloudflareJsonFile + "', skipping creation and using existing one with ID '" + cloudflareTunnelID + "'.",
-				"CLOUDFLARE_INIT",
-				LogType::LOG_INFO);
-		}
-		else
-		{
-			Log::Print(
-				"Creating new cloudflare json file at '" + cloudflareJsonFile + "'.",
-				"CLOUDFLARE_INIT",
-				LogType::LOG_INFO);
-
-			if (!CreateTunnelCredentials(cloudflareFolder)
-				|| !RouteTunnel())
-			{
-				return false;
-			}
-		}
-
-		if (!RunTunnel()) return false;
 
 		isInitialized = true;
 
 		ServerCore::SetCloudflareReadyState(true);
 
 		Log::Print(
-			"Initialized Cloudflare tunnel!",
-			"CLOUDFLARE_INIT",
+			"Initialized Cloudflare tunnel '" + validTunnelName + "'!",
+			"CLOUDFLARE",
 			LogType::LOG_SUCCESS);
 
 		return true;
@@ -209,7 +268,7 @@ namespace KalaServer::Server
 		if (!ServerCore::IsInitialized())
 		{
 			Log::Print(
-				"Cannot check for tunnel status because the server has not been initialized!",
+				"Cannot check for Clouflare tunnel status because the server has not been initialized!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -220,7 +279,7 @@ namespace KalaServer::Server
 		if (!ServerCore::IsReady())
 		{
 			Log::Print(
-				"Cannot check for tunnel status because the server is not ready!",
+				"Cannot check for Clouflare tunnel status because the server is not ready!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -231,7 +290,7 @@ namespace KalaServer::Server
 		if (!Cloudflare::IsInitialized())
 		{
 			Log::Print(
-				"Cannot check for tunnel status because Cloudflare tunnel has not been initialized!",
+				"Cannot check for Clouflare tunnel status because it has not been initialized!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -242,7 +301,7 @@ namespace KalaServer::Server
 		if (tunnelHandle == 0)
 		{
 			Log::Print(
-				"Cannot check for tunnel status because Cloudflare tunnel is NULL!",
+				"Cannot check for Clouflare tunnel status because it has not been assigned!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -256,7 +315,7 @@ namespace KalaServer::Server
 		if (handle == INVALID_HANDLE_VALUE)
 		{
 			Log::Print(
-				"Cannot check for tunnel status because created Cloudflare tunnel is invalid!",
+				"Cannot check for Cloudflare tunnel '" + validTunnelName + "' status because its handle is invalid!",
 				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
@@ -268,15 +327,415 @@ namespace KalaServer::Server
 #else
 		pid_t pid = tunnelHandle;
 
+		if (pid <= 0)
+		{
+			Log::Print(
+				"Cannot check for Clouflare tunnel '" + validTunnelName + "' status because its PID is invalid!",
+				"TUNNEL_STATUS",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
 		int status{};
 		pid_t r = waitpid(pid, &status, WNOHANG);
+
+		if (r == -1)
+		{
+			Log::Print(
+				"Failed to check Cloudflare tunnel '" + validTunnelName + "' status because its PID is wrong, gone or temporarily interrupted!",
+				"TUNNEL_STATUS",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
 
 		return r == 0;
 #endif
 	}
 
-	bool Cloudflare::CreateCloudflareProcess(
-		const path& cloudflareExe,
+	void Cloudflare::Shutdown()
+	{
+		if (!ServerCore::IsInitialized())
+		{
+			Log::Print(
+				"Cannot shut down Clouflare tunnel because the server has not been initialized!",
+				"CLOUDFLARE_SHUTDOWN",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		if (!ServerCore::IsReady())
+		{
+			Log::Print(
+				"Cannot shut down Clouflare tunnel because the server is not ready!",
+				"CLOUDFLARE_SHUTDOWN",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		if (!Cloudflare::IsInitialized())
+		{
+			Log::Print(
+				"Cannot shut down Cloudflare tunnel because it has not been initialized!",
+				"CLOUDFLARE_SHUTDOWN",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		if (tunnelHandle == 0)
+		{
+			Log::Print(
+				"Cannot shut down Cloudflare tunnel '" + validTunnelName + "' because it has not been assigned.",
+				"CLOUDFLARE_SHUTDOWN",
+				LogType::LOG_INFO,
+				2);
+
+			return;
+		}
+
+#ifdef _WIN32
+		HANDLE handle = rcast<HANDLE>(tunnelHandle);
+
+		if (handle == INVALID_HANDLE_VALUE)
+		{
+			Log::Print(
+				"Cannot shut down Cloudflare tunnel '" + validTunnelName + "' because its handle is invalid!",
+				"CLOUDFLARE_SHUTDOWN",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		TerminateProcess(handle, 0);
+		CloseHandle(handle);
+#else
+		pid_t pid = scast<pid_t>(tunnelHandle);
+
+		if (pid <= 0)
+		{
+			Log::Print(
+				"Cannot shut down Cloudflare tunnel '" + validTunnelName + "' because its PID is invalid!",
+				"CLOUDFLARE_SHUTDOWN",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		kill(pid, SIGKILL);
+#endif
+
+		tunnelHandle = 0;
+
+		isInitialized = false;
+
+		Log::Print(
+			"Finished shutting down Cloudflare tunnel '" + validTunnelName + "'!",
+			"CLOUDFLARE_SHUTDOWN",
+			LogType::LOG_SUCCESS);
+	}
+}
+
+bool CreateCertFile()
+{
+	if (cfCertFile.empty())
+	{
+		cfCertFile = path(validCFFolderPath / "cert.pem").string();
+	}
+
+	if (exists(cfCertFile))
+	{
+		Log::Print(
+			"Cloudflare cert file already exists at '" + cfCertFile.string() + "', skipping creation and using existing one.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+
+		return true;
+	}
+
+	Log::Print(
+		"Creating new Cloudflare tunnel cert file for tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
+		"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
+		"CLOUDFLARE",
+		LogType::LOG_INFO);
+
+	if (!CreateCloudflareProcess(
+		"tunnel login", 
+		"create Cloudflare cert"))
+	{
+		return false;
+	}
+
+	if (!exists(cfCertFile))
+	{
+		Log::Print(
+			"Failed to create Cloudflare cert for tunnel '" + validTunnelName + "' because user did not successfully authenticate via browser!",
+			"CLOUDFLARE",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
+
+	return true;
+}
+
+bool CreateTunnelCredentials()
+{
+	cfTunnelID = GetTunnelID(validTunnelName);
+	cfJsonFile = (validCFFolderPath / string(cfTunnelID + ".json"));
+
+	if (!cfTunnelID.empty()
+		&& exists(cfJsonFile))
+	{
+		Log::Print(
+			"Cloudflare tunnel file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing tunnel '" + validTunnelName + "'.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+
+		return true;
+	}
+
+	Log::Print(
+		"Creating Cloudflare tunnel credentials.",
+		"CLOUDFLARE",
+		LogType::LOG_INFO);
+
+	if (!cfTunnelID.empty())
+	{
+		if (!CreateCloudflareProcess(
+			"tunnel delete " + validTunnelName, 
+			"delete Cloudflare tunnel '" + validTunnelName + "'"))
+		{
+			return false;
+		}
+
+		Log::Print(
+			"Deleted existing Cloudflare tunnel '" + validTunnelName + "'.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+	}
+
+	if (!CreateCloudflareProcess(
+		"tunnel create " + validTunnelName, 
+		"create Cloudflare tunnel '" + validTunnelName + "'"))
+	{
+		return false;
+	}
+
+	cfTunnelID = GetTunnelID(validTunnelName);
+
+	if (cfTunnelID.empty())
+	{
+		Log::Print(
+			"Failed to create Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "' because newly created tunnel ID was not found!!",
+			"CLOUDFLARE",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
+
+	cfJsonFile = (validCFFolderPath / string(cfTunnelID + ".json"));
+
+	if (!exists(cfJsonFile))
+	{
+		Log::Print(
+			"Failed to create Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "'!",
+			"CLOUDFLARE",
+			LogType::LOG_ERROR,
+			2);
+
+		return false;
+	}
+
+	Log::Print(
+		"Created new cloudflare json file at '" + cfJsonFile.string() + "'!",
+		"CLOUDFLARE",
+		LogType::LOG_SUCCESS);
+
+	return true;
+}
+
+bool RouteTunnel()
+{
+	Log::Print(
+		"Starting to route Cloudflare tunnel '" + validTunnelName + "'.",
+		"CLOUDFLARE",
+		LogType::LOG_INFO);
+
+	//
+	// ROOT DOMAIN
+	//
+
+	if (!CreateCloudflareProcess(
+		"tunnel route dns " + validTunnelName + " " + ServerCore::GetDomainName(), 
+		"route tunnel '" + validTunnelName + "'"))
+	{
+		return false;
+	}
+
+	//
+	// SUBDOMAIN
+	//
+
+	if (!CreateCloudflareProcess(
+		"tunnel route dns " + validTunnelName + " www." + ServerCore::GetDomainName(), 
+		"route tunnel '" + validTunnelName + "'"))
+	{
+		return false;
+	}
+
+	Log::Print(
+		"Routed Cloudflare tunnel '" + validTunnelName + "'!",
+		"CLOUDFLARE",
+		LogType::LOG_SUCCESS);
+
+	return true;
+}
+
+bool RunTunnel()
+{
+	Log::Print(
+		"Starting to run Cloudflare tunnel '" + validTunnelName + "'.",
+		"CLOUDFLARE",
+		LogType::LOG_INFO);
+
+	path certPath = validCFFolderPath / "cert.pem";
+	path configPath = validCFFolderPath / "config.yml";
+
+	string domainName = ServerCore::GetDomainName();
+	string port = to_string(ServerCore::GetPort());
+
+	string output = 
+		"tunnel: " + cfTunnelID + "\n"
+		+ "credentials-file: " + cfJsonFile.string() + "\n"
+		+ "\n"
+		+ "ingress:\n"
+		+ "  - hostname: " + domainName + "\n"
+		+ "    service: http://localhost:" + port + "\n"
+		+ "    originRequest:\n"
+		+ "      httpHostHeader: " + domainName + "\n"
+		+ "      ipHeaders:\n"
+		+ "        - CF-Connecting-IP\n"
+		+ "\n"
+		+ "  - hostname: www." + domainName + "\n"
+		+ "    service: http://localhost:" + port + "\n"
+		+ "    originRequest:\n"
+		+ "      httpHostHeader: www." + domainName + "\n"
+		+ "      ipHeaders:\n"
+		+ "        - CF-Connecting-IP\n"
+		+ "\n"
+		+ "  - service: http_status:404\n";
+
+	bool needsRewrite = true;
+
+	if (exists(configPath))
+	{
+		ifstream in(configPath);
+
+		if (!in.is_open())
+		{
+			Log::Print(
+				"Failed to check contents of Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' to verify if it is up to date!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		string existing(
+			(istreambuf_iterator<char>(in)),
+			istreambuf_iterator<char>());
+
+		if (existing == output) needsRewrite = false;
+
+		in.close();
+	}
+
+	if (needsRewrite)
+	{
+		if (!exists(configPath))
+		{
+			Log::Print(
+				"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' does not exist and will be made.",
+				"CLOUDFLARE",
+				LogType::LOG_INFO);
+		}
+		else
+		{
+			Log::Print(
+				"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' is out of date and will be rewritten.",
+				"CLOUDFLARE",
+				LogType::LOG_INFO);
+		}
+
+		ofstream file(configPath, ios::trunc);
+
+		if (!file.is_open())
+		{
+			Log::Print(
+				"Failed to create Cloudflare config file to '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		file << output;
+
+		if (!file.good())
+		{
+			Log::Print(
+				"Failed to write into newly created Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		file.close();
+	}
+
+	string command = 
+#ifdef _WIN32
+		"--origin-ca-pool \"" + certPath.string() + "\""
+		+ " --config \"" + configPath.string() + "\""
+#else
+		"--origin-ca-pool " + certPath.string()
+		+ " --config " + configPath.string()
+#endif
+#ifdef _DEBUG
+		+ " --loglevel debug"
+#endif
+		+ " tunnel run " + validTunnelName;
+
+	Log::Print("command: " + command);
+
+	if (!CreateCloudflareProcess(
+			command, 
+			"run tunnel '" + validTunnelName + "'"))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool CreateCloudflareProcess(
 		string_view command, 
 		string_view failureReason)
 	{
@@ -287,7 +746,7 @@ namespace KalaServer::Server
 
 	wstring currParent = ToWide(path(current_path()).string());
 	wstring winCommand =
-		L"\"" + ToWide(cloudflareExe.string()) + L"\" " + ToWide(string(command));
+		L"\"" + ToWide(validCFExePath.string()) + L"\" " + ToWide(string(command));
 
 	if (!CreateProcessW(
 		nullptr,
@@ -334,7 +793,7 @@ namespace KalaServer::Server
 		//close child
 		close(pipefd[0]);
 
-		string targetPathStr = cloudflareExe.string();
+		string targetPathStr = validCFExePath.string();
 		vector<char*> commands{ targetPathStr.data() };
 		vector<string> split = SplitString(command, " ");
 		for (auto& s : split) commands.push_back(s.data());
@@ -401,109 +860,6 @@ namespace KalaServer::Server
 		return false;
 	}
 #endif
-
-	return true;
-	}
-
-	void Cloudflare::Shutdown()
-	{
-		if (!Cloudflare::IsInitialized())
-		{
-			Log::Print(
-				"Cannot shut down Cloudflare tunnel because it has not been initialized!",
-				"CLOUDFLARE_QUIT",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-#ifdef _WIN32
-		HANDLE handle = rcast<HANDLE>(tunnelHandle);
-
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			Log::Print(
-				"Cannot shut down Cloudflare tunnel because its handle is invalid!",
-				"CLOUDFLARE_QUIT",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-		TerminateProcess(handle, 0);
-		CloseHandle(handle);
-#else
-		kill(scast<pid_t>(tunnelHandle), SIGKILL);
-#endif
-
-		tunnelHandle = 0;
-
-		isInitialized = false;
-
-		Log::Print(
-			"Finished shutting down Cloudflare tunnel!",
-			"CLOUDFLARE_QUIT",
-			LogType::LOG_SUCCESS);
-	}
-}
-
-bool CreateCertFile(const path& cloudflareExePath)
-{
-	Log::Print(
-		"Creating new Cloudflare tunnel cert file at '" + cloudflareCertFile + "'. "
-		"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
-		"CLOUDFLARE_INIT",
-		LogType::LOG_INFO);
-
-	Cloudflare::CreateCloudflareProcess(
-		cloudflareExePath,
-		"tunnel login", 
-		"create Cloudflare cert");
-
-	if (!exists(cloudflareCertFile))
-	{
-		Log::Print(
-			"Failed to create Cloudflare cert because user did not successfully authenticate via browser!",
-			"CLOUDFLARE_INIT",
-			LogType::LOG_ERROR,
-			2);
-
-		return false;
-	}
-
-	return true;
-}
-
-bool CreateTunnelCredentials(const path& cloudflareFolder)
-{
-	Log::Print(
-		"Creating Cloudflare tunnel credentials.",
-		"CLOUDFLARE_INIT",
-		LogType::LOG_INFO);
-
-	
-
-	return true;
-}
-
-bool RouteTunnel()
-{
-	Log::Print(
-		"Starting to route Cloudflare tunnel.",
-		"CLOUDFLARE_INIT",
-		LogType::LOG_INFO);
-
-	return true;
-}
-
-bool RunTunnel()
-{
-	Log::Print(
-		"Starting to run Cloudflare tunnel.",
-		"CLOUDFLARE_INIT",
-		LogType::LOG_INFO);
 
 	return true;
 }
