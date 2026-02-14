@@ -247,6 +247,6 @@ namespace KalaServer::Server
 		//Close all sockets and clear all server resources
 		static void Shutdown();
 	private:
-		static void SetCloudflareReadyState(bool state);
+		static void SetServerReadyState(bool state);
 	};
 }

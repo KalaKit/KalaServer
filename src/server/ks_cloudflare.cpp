@@ -3,7 +3,6 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include "KalaHeaders/core_utils.hpp"
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -62,6 +61,8 @@ using std::ios;
 using std::wstring;
 #endif
 
+static bool isVerboseLoggingEnabled{};
+
 static string validTunnelName{};
 static path validCFExePath{};
 static path validCFFolderPath{};
@@ -76,11 +77,11 @@ static bool CreateCertFile();
 static bool CreateTunnelCredentials();
 static bool RouteTunnel();
 static bool CreateConfigFile(string& outCommand);
-static bool RunTunnel(string_view command);
 
 static bool CreateCloudflareProcess(
 	string_view command,
-	string_view failureReason);
+	string_view failureReason,
+	uintptr_t writePipe = {});
 
 static string GetTunnelID(string_view tunnelName)
 {
@@ -132,7 +133,6 @@ static wstring ToWide(const string& input);
 namespace KalaServer::Server
 {
 	thread Cloudflare::cfThread{};
-	abool Cloudflare::isRunning{ false };
 
 	static bool isInitialized{};
 
@@ -141,15 +141,20 @@ namespace KalaServer::Server
 	static bool isThirdHealthy{};
 	static bool isFourthHealthy{};
 
+	void Cloudflare::SetVerboseLoggingState(bool state) { isVerboseLoggingEnabled = state; }
+
 	bool Cloudflare::Initialize(
 		string_view tunnelName,
 		const path& cfExePath,
 		const path& cfFolderPath)
 	{
-		Log::Print(
-			"Starting to initialize Cloudflare tunnel '" + string(tunnelName) + "'",
-			"CLOUDFLARE",
-			LogType::LOG_INFO);
+		if (isVerboseLoggingEnabled)
+		{
+			Log::Print(
+				"Starting to initialize Cloudflare tunnel '" + string(tunnelName) + "'",
+				"CLOUDFLARE",
+				LogType::LOG_INFO);
+		}
 
 		if (!ServerCore::IsInitialized())
 		{
@@ -273,7 +278,12 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		isRunning.store(true);
+		isInitialized = true;
+
+		Log::Print(
+			"Initialized Cloudflare tunnel '" + validTunnelName + "' and starting run process.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
 
 		cfThread = jthread([command]()
 		{
@@ -284,15 +294,6 @@ namespace KalaServer::Server
 					"Failed to create Cloudflare tunnel process!");
 			}
 		});
-
-		isInitialized = true;
-
-		ServerCore::SetCloudflareReadyState(true);
-
-		Log::Print(
-			"Initialized Cloudflare tunnel '" + validTunnelName + "'!",
-			"CLOUDFLARE",
-			LogType::LOG_SUCCESS);
 
 		return true;
 	}
@@ -413,6 +414,232 @@ namespace KalaServer::Server
 #endif
 	}
 
+	bool Cloudflare::RunTunnel(string_view command)
+	{
+#ifdef _WIN32
+		HANDLE readPipe{};
+		HANDLE writePipe{};
+
+		SECURITY_ATTRIBUTES sa{};
+		sa.nLength = sizeof(sa);
+		sa.bInheritHandle = TRUE;
+		sa.lpSecurityDescriptor = {};
+
+		if (!CreatePipe(
+			&readPipe,
+			&writePipe,
+			&sa,
+			0))
+		{
+			Log::Print(
+				"Failed to create read/write pipe for tunnel '" + validTunnelName + "'!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (!SetHandleInformation(
+			readPipe,
+			HANDLE_FLAG_INHERIT,
+			0))
+		{
+			Log::Print(
+				"Failed to set up pipe handle inheritance for tunnel '" + validTunnelName + "'!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+#else
+		uintptr_t readPipe{};
+		uintptr_t writePipe{};
+
+		int pipefd[2];
+		if (pipe(pipefd) == -1)
+		{
+			Log::Print(
+				"Failed to create read/write pipe for tunnel '" + validTunnelName + "'!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		readPipe = scast<uintptr_t>(pipefd[0]);
+		writePipe = scast<uintptr_t>(pipefd[1]);
+
+		int flags = fcntl(pipefd[0], F_GETFD);
+		if (flags == -1
+			|| fcntl(pipefd[0], F_SETFD, flags | FD_CLOEXEC) == -1)
+		{
+			Log::Print(
+				"Failed to set up pipe handle inheritance for tunnel '" + validTunnelName + "'!",
+				"CLOUDFLARE",
+				LogType::LOG_ERROR,
+				2);
+
+			close(pipefd[0]);
+			close(pipefd[1]);
+
+			return false;
+		}
+#endif
+
+		bool runTunnel = CreateCloudflareProcess(
+				command, 
+				"run tunnel '" + validTunnelName + "'",
+				FromVar(writePipe));
+
+		if (!runTunnel) return false;
+
+		PipeCloudflareMessages(FromVar(readPipe));
+
+		return true;
+	}
+
+	void Cloudflare::PipeCloudflareMessages(uintptr_t readPipe)
+	{
+		if (isVerboseLoggingEnabled)
+		{
+			Log::Print(
+				"Piping Cloudflare messages to internal console for tunnel '" + validTunnelName + "'!",
+				"CLOUDFLARE",
+				LogType::LOG_INFO);
+		}
+
+		char buffer[2048]{};	
+
+#ifdef _WIN32
+		HANDLE pipe = ToVar<HANDLE>(readPipe);
+		DWORD bytesRead{};
+
+		auto readLoop = [&bytesRead, &pipe, &buffer]() -> bool
+			{
+				return ReadFile(
+					pipe,
+					buffer,
+					sizeof(buffer) - 1,
+					&bytesRead,
+					nullptr) 
+					&& bytesRead > 0;
+			};
+#else
+		int pipe = scast<int>(readPipe);
+		ssize_t bytesRead{};
+
+		auto readLoop = [&bytesRead, &pipe, &buffer]() -> bool
+			{
+				bytesRead = read(
+					pipe,
+					buffer,
+					sizeof(buffer) - 1);
+
+				return bytesRead > 0;
+			};
+#endif
+		
+		while (readLoop())
+		{
+			buffer[bytesRead] = '\0';
+			istringstream stream(buffer);
+			string line{};
+
+			while (getline(stream, line))
+			{
+				if (line.find("Registered tunnel connection connIndex=") != string::npos)
+				{
+					size_t pos = line.find("connIndex=") + strlen("connIndex=");
+					int index = stoi(line.substr(pos));
+
+					if (index == 0) KalaServer::Server::isFirstHealthy = true;
+					else if (index == 1) KalaServer::Server::isSecondHealthy = true;
+					else if (index == 2) KalaServer::Server::isThirdHealthy = true;
+					else if (index == 3) KalaServer::Server::isFourthHealthy = true;
+
+					Log::Print(
+						"Connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked healthy!",
+						"CLOUDFLARE",
+						LogType::LOG_INFO);
+
+					if (KalaServer::Server::isFirstHealthy
+						&& KalaServer::Server::isSecondHealthy
+						&& KalaServer::Server::isThirdHealthy
+						&& KalaServer::Server::isFourthHealthy
+						&& !ServerCore::IsReady())
+					{
+						ServerCore::SetServerReadyState(true);
+
+						Log::Print(
+							"Cloudflare tunnel '" + validTunnelName + "' has connected successfully and server '" + ServerCore::GetServerName() + "' is ready!",
+							"CLOUDFLARE",
+							LogType::LOG_SUCCESS);
+					}
+				}
+
+				if (line.find("Unregistered tunnel connection connIndex=") != string::npos)
+				{
+					size_t pos = line.find("connIndex=") + strlen("connIndex=");
+					int index = stoi(line.substr(pos));
+
+					if (index == 0) KalaServer::Server::isFirstHealthy = false;
+					else if (index == 1) KalaServer::Server::isSecondHealthy = false;
+					else if (index == 2) KalaServer::Server::isThirdHealthy = false;
+					else if (index == 3) KalaServer::Server::isFourthHealthy = false;
+
+					Log::Print(
+						"Connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked unhealthy.",
+						"CLOUDFLARE",
+						LogType::LOG_WARNING);
+				}
+
+				//regular cloudflare message
+
+				size_t prefixEnd = line.find(' ', 24);
+				if (line.size() < 28
+					&& isVerboseLoggingEnabled)
+				{
+					Log::Print(
+						line,
+						"CLOUDFLARE_TUNNEL",
+						LogType::LOG_INFO);
+
+					continue;
+				}
+
+				//cloudflare message with a type
+
+				string typeStr = line.substr(21, 3);
+				LogType type = LogType::LOG_INFO;
+
+				if (typeStr == "ERR") type = LogType::LOG_ERROR;
+				if (typeStr == "WRN") type = LogType::LOG_WARNING;
+				if (typeStr == "DBG") type = LogType::LOG_DEBUG;
+
+				string message = line.substr(25);
+
+				bool debugEnabled{};
+#ifdef _DEBUG
+				debugEnabled = true;
+#endif
+
+				if (isVerboseLoggingEnabled
+					|| (!isVerboseLoggingEnabled
+					&& type == LogType::LOG_ERROR
+					|| (type == LogType::LOG_DEBUG
+					&& debugEnabled)))
+				{
+					Log::Print(
+						line,
+						"CLOUDFLARE_TUNNEL",
+						type);		
+				}
+			}
+		}
+	}
+
 	void Cloudflare::Shutdown()
 	{
 		if (!ServerCore::IsInitialized())
@@ -457,8 +684,6 @@ namespace KalaServer::Server
 
 			return;
 		}
-
-		isRunning.store(false);
 
 #ifdef _WIN32
 		HANDLE handle = ToVar<HANDLE>(tunnelHandle);
@@ -509,11 +734,14 @@ namespace KalaServer::Server
 
 bool CreateCertFile()
 {
-	Log::Print(
-		"Creating new Cloudflare tunnel cert file for tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
-		"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
-		"CLOUDFLARE",
-		LogType::LOG_INFO);
+	if (isVerboseLoggingEnabled)
+	{
+		Log::Print(
+			"Creating new Cloudflare tunnel cert file for tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
+			"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+	}
 
 	if (!CreateCloudflareProcess(
 		"tunnel login", 
@@ -541,10 +769,13 @@ bool CreateTunnelCredentials()
 	cfTunnelID = GetTunnelID(validTunnelName);
 	cfJsonFile = (validCFFolderPath / string(cfTunnelID + ".json"));
 
-	Log::Print(
-		"Creating Cloudflare tunnel credentials.",
-		"CLOUDFLARE",
-		LogType::LOG_INFO);
+	if (isVerboseLoggingEnabled)
+	{
+		Log::Print(
+			"Creating Cloudflare tunnel credentials.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+	}
 
 	if (!cfTunnelID.empty())
 	{
@@ -604,10 +835,13 @@ bool CreateTunnelCredentials()
 
 bool RouteTunnel()
 {
-	Log::Print(
-		"Starting to route Cloudflare tunnel '" + validTunnelName + "'.",
-		"CLOUDFLARE",
-		LogType::LOG_INFO);
+	if (isVerboseLoggingEnabled)
+	{
+		Log::Print(
+			"Starting to route Cloudflare tunnel '" + validTunnelName + "'.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+	}
 
 	//
 	// ROOT DOMAIN
@@ -698,17 +932,23 @@ bool CreateConfigFile(string& outCommand)
 	{
 		if (!exists(configPath))
 		{
-			Log::Print(
-				"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' does not exist and will be made.",
-				"CLOUDFLARE",
-				LogType::LOG_INFO);
+			if (isVerboseLoggingEnabled)
+			{
+				Log::Print(
+					"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' does not exist and will be made.",
+					"CLOUDFLARE",
+					LogType::LOG_INFO);
+			}
 		}
 		else
 		{
-			Log::Print(
-				"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' is out of date and will be rewritten.",
-				"CLOUDFLARE",
-				LogType::LOG_INFO);
+			if (isVerboseLoggingEnabled)
+			{
+				Log::Print(
+					"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' is out of date and will be rewritten.",
+					"CLOUDFLARE",
+					LogType::LOG_INFO);
+			}
 		}
 
 		ofstream file(configPath, ios::trunc);
@@ -763,21 +1003,30 @@ bool CreateConfigFile(string& outCommand)
 	return true;
 }
 
-bool RunTunnel(string_view command)
-{
-	return CreateCloudflareProcess(
-			command, 
-			"run tunnel '" + validTunnelName + "'");
-}
-
 bool CreateCloudflareProcess(
 		string_view command, 
-		string_view failureReason)
+		string_view failureReason,
+		uintptr_t writePipe)
 	{
+		if (isVerboseLoggingEnabled)
+		{
+			Log::Print(
+				"Starting to create process with command '" + string(command) + "' for tunnel '" + validTunnelName + "'",
+				"CLOUDFLARE",
+				LogType::LOG_INFO);
+		}
+
 #ifdef _WIN32
 	STARTUPINFOW si{};
 	PROCESS_INFORMATION pi{};
 	si.cb = sizeof(si);
+
+	if (writePipe != 0)
+	{
+		si.dwFlags |= STARTF_USESTDHANDLES;
+		si.hStdOutput = ToVar<HANDLE>(writePipe);
+		si.hStdError = ToVar<HANDLE>(writePipe);
+	}
 
 	wstring currParent = ToWide(path(current_path()).string());
 	wstring winCommand =
@@ -804,16 +1053,17 @@ bool CreateCloudflareProcess(
 		return false;
 	}
 
-	//wait for user to finish
-
 	if (failureReason == "run tunnel '" + validTunnelName + "'")
 	{
-		tunnelHandle = FromVar(pi.hProcess);
-
 		CloseHandle(pi.hThread);
+		CloseHandle(ToVar<HANDLE>(writePipe));
+
+		tunnelHandle = FromVar(pi.hProcess);
 	}
 	else
 	{
+		//wait for user to finish
+
 		WaitForSingleObject(pi.hProcess, INFINITE);
 
 		CloseHandle(pi.hThread);
@@ -837,6 +1087,16 @@ bool CreateCloudflareProcess(
 		//close child
 		close(pipefd[0]);
 
+		if (writePipe != 0)
+		{
+			if (dup2(writePipe, STDOUT_FILENO) == -1
+				|| dup2(writePipe, STDERR_FILENO) == -1)
+			{
+				_exit(-130);
+			}
+			close(writePipe);
+		}
+
 		string targetPathStr = validCFExePath.string();
 		vector<char*> commands{ targetPathStr.data() };
 		vector<string> split = SplitString(command, " ");
@@ -854,6 +1114,8 @@ bool CreateCloudflareProcess(
 
 	//parent
 	close(pipefd[1]);
+
+	if (writePipe != 0) close(writePipe);
 
 	int err{};
 	ssize_t n = read(pipefd[0], &err, sizeof(err));

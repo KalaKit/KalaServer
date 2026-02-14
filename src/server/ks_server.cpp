@@ -1598,7 +1598,7 @@ namespace KalaServer::Server
 		CancelAllPackets();
 	}
 
-	void ServerCore::SetCloudflareReadyState(bool state)
+	void ServerCore::SetServerReadyState(bool state)
 	{
 		isReady = state;
 	}
