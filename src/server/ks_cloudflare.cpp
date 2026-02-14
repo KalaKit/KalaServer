@@ -3,6 +3,7 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include <atomic>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -35,6 +36,8 @@ using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaString::SplitString;
 using KalaHeaders::KalaThread::jthread;
+using KalaHeaders::KalaThread::abool;
+using KalaHeaders::KalaThread::memory_order_relaxed;
 
 using KalaServer::Core::KalaServerCore;
 using KalaServer::Server::ServerCore;
@@ -61,7 +64,7 @@ using std::ios;
 using std::wstring;
 #endif
 
-static bool isVerboseLoggingEnabled{};
+static abool isVerboseLoggingEnabled{ false };
 
 static string validTunnelName{};
 static path validCFExePath{};
@@ -141,20 +144,19 @@ namespace KalaServer::Server
 	static bool isThirdHealthy{};
 	static bool isFourthHealthy{};
 
-	void Cloudflare::SetVerboseLoggingState(bool state) { isVerboseLoggingEnabled = state; }
+	void Cloudflare::SetVerboseLoggingState(bool state) { isVerboseLoggingEnabled.store(state, memory_order_relaxed); }
 
 	bool Cloudflare::Initialize(
 		string_view tunnelName,
 		const path& cfExePath,
 		const path& cfFolderPath)
 	{
-		if (isVerboseLoggingEnabled)
-		{
-			Log::Print(
-				"Starting to initialize Cloudflare tunnel '" + string(tunnelName) + "'",
-				"CLOUDFLARE",
-				LogType::LOG_INFO);
-		}
+		//Log::Print("verbose state: " + to_string(isVerboseLoggingEnabled.load(memory_order_relaxed)));
+
+		Log::Print(
+			"Starting to initialize Cloudflare tunnel '" + string(tunnelName) + "'",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
 
 		if (!ServerCore::IsInitialized())
 		{
@@ -502,7 +504,7 @@ namespace KalaServer::Server
 
 	void Cloudflare::PipeCloudflareMessages(uintptr_t readPipe)
 	{
-		if (isVerboseLoggingEnabled)
+		if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 		{
 			Log::Print(
 				"Piping Cloudflare messages to internal console for tunnel '" + validTunnelName + "'!",
@@ -599,7 +601,7 @@ namespace KalaServer::Server
 
 				size_t prefixEnd = line.find(' ', 24);
 				if (line.size() < 28
-					&& isVerboseLoggingEnabled)
+					&& isVerboseLoggingEnabled.load(memory_order_relaxed))
 				{
 					Log::Print(
 						line,
@@ -625,8 +627,8 @@ namespace KalaServer::Server
 				debugEnabled = true;
 #endif
 
-				if (isVerboseLoggingEnabled
-					|| (!isVerboseLoggingEnabled
+				if (isVerboseLoggingEnabled.load(memory_order_relaxed)
+					|| (!isVerboseLoggingEnabled.load(memory_order_relaxed)
 					&& type == LogType::LOG_ERROR
 					|| (type == LogType::LOG_DEBUG
 					&& debugEnabled)))
@@ -734,7 +736,7 @@ namespace KalaServer::Server
 
 bool CreateCertFile()
 {
-	if (isVerboseLoggingEnabled)
+	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 	{
 		Log::Print(
 			"Creating new Cloudflare tunnel cert file for tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
@@ -769,7 +771,7 @@ bool CreateTunnelCredentials()
 	cfTunnelID = GetTunnelID(validTunnelName);
 	cfJsonFile = (validCFFolderPath / string(cfTunnelID + ".json"));
 
-	if (isVerboseLoggingEnabled)
+	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 	{
 		Log::Print(
 			"Creating Cloudflare tunnel credentials.",
@@ -835,7 +837,7 @@ bool CreateTunnelCredentials()
 
 bool RouteTunnel()
 {
-	if (isVerboseLoggingEnabled)
+	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 	{
 		Log::Print(
 			"Starting to route Cloudflare tunnel '" + validTunnelName + "'.",
@@ -932,7 +934,7 @@ bool CreateConfigFile(string& outCommand)
 	{
 		if (!exists(configPath))
 		{
-			if (isVerboseLoggingEnabled)
+			if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 			{
 				Log::Print(
 					"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' does not exist and will be made.",
@@ -942,7 +944,7 @@ bool CreateConfigFile(string& outCommand)
 		}
 		else
 		{
-			if (isVerboseLoggingEnabled)
+			if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 			{
 				Log::Print(
 					"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' is out of date and will be rewritten.",
@@ -1008,7 +1010,7 @@ bool CreateCloudflareProcess(
 		string_view failureReason,
 		uintptr_t writePipe)
 	{
-		if (isVerboseLoggingEnabled)
+		if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 		{
 			Log::Print(
 				"Starting to create process with command '" + string(command) + "' for tunnel '" + validTunnelName + "'",

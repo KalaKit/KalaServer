@@ -82,10 +82,9 @@ namespace KalaServer::Server
 	static u32 ID{};
 
 	static u16 port{};
-
 	static string serverName{};
 	static string domainName{};
-	static string serverRoot{};
+	static path serverRoot{};
 
 	static vector<User> users{};
 	static mutex m_users{};
@@ -109,7 +108,7 @@ namespace KalaServer::Server
 		u16 newPort,
 		string_view newServerName,
 		string_view newDomainName,
-		string_view newServerRoot,
+		const path& newServerRoot,
 		const vector<User>& newUsers,
 		const vector<Route>& newRoutes)
 	{
@@ -117,7 +116,7 @@ namespace KalaServer::Server
 			"Starting to initialize server '" + string(newServerName) 
 			+ "' at port '" + to_string(newPort) 
 			+ "' with domain '" + string(newDomainName)
-			+ "', server root '" + string(newServerRoot) 
+			+ "', server root '" + newServerRoot.string() 
 			+ "', '" + to_string(newUsers.size()) 
 			+ "' role-based users and '" + to_string(newRoutes.size()) + "' routes.",
 			"CLOUDFLARE",
@@ -158,9 +157,21 @@ namespace KalaServer::Server
 			return false;
 		}
 
+		if (!exists(newServerRoot))
+		{
+			Log::Print(
+				"Failed to initialize server '" + string(newServerName) + "' because its server root '" + newServerRoot.string() + "' is empty or does not exist!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		port = newPort;
 		serverName = newServerName;
 		domainName = newDomainName;
-		port = newPort;
+		serverRoot = newServerRoot;
 
 		isInitialized = true;
 
@@ -238,10 +249,9 @@ namespace KalaServer::Server
 	u32 ServerCore::GetID() { return ID; }
 
 	u16 ServerCore::GetPort() { return port; }
-
 	const string& ServerCore::GetServerName() { return serverName; }
 	const string& ServerCore::GetDomainName() { return domainName; }
-	const string& ServerCore::GetServerRoot() { return serverRoot; }
+	const path& ServerCore::GetServerRoot() { return serverRoot; }
 
 	void ServerCore::CreateListenerSocket(
 		bool isLocal,

@@ -12,6 +12,7 @@
 #include <thread>
 #include <mutex>
 #include <functional>
+#include <filesystem>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
@@ -27,6 +28,7 @@ namespace KalaServer::Server
 	using std::thread;
 	using std::mutex;
 	using std::function;
+	using std::filesystem::path;
 
 	using KalaHeaders::KalaThread::abool;
 
@@ -131,7 +133,7 @@ namespace KalaServer::Server
 			u16 port,
 			string_view serverName,
 			string_view domainName,
-			string_view serverRoot = "/",
+			const path& serverRoot = "/",
 			const vector<User>& users = {},
 			const vector<Route>& routes = {});
 
@@ -150,10 +152,9 @@ namespace KalaServer::Server
 		static u32 GetID();
 
 		static u16 GetPort();
-
 		static const string& GetServerName();
 		static const string& GetDomainName();
-		static const string& GetServerRoot();
+		static const path& GetServerRoot();
 
 		//Create a new listener socket, the sole purpose of this socket is to be able to receive
 		//incoming traffic so others with internet access can communicate with this server.
