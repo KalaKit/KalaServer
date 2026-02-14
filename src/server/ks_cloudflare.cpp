@@ -231,10 +231,16 @@ namespace KalaServer::Server
 		validCFFolderPath = cfFolderPath;
 
 		if (cfCertFile.empty()) cfCertFile = cfFolderPath / "cert.pem";
-		if (!exists(cfCertFile)
-			&& !CreateCertFile())
+		if (exists(cfCertFile))
 		{
-			return false;
+			Log::Print(
+				"Cloudflare tunnel cert file already exists at '" + cfCertFile.string() + "', skipping creation and using existing one.",
+				"CLOUDFLARE",
+				LogType::LOG_INFO);
+		}
+		else
+		{
+			if (!CreateCertFile()) return false;
 		}
 
 		if (cfTunnelID.empty()
@@ -245,11 +251,20 @@ namespace KalaServer::Server
 			cfJsonFile = cfFolderPath / string(cfTunnelID + ".json");
 		}
 
-		if (!exists(cfJsonFile)
-			&& (!CreateTunnelCredentials()
-			|| !RouteTunnel()))
+		if (exists(cfJsonFile))
 		{
-			return false;
+			Log::Print(
+				"Cloudflare tunnel json file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing one.",
+				"CLOUDFLARE",
+				LogType::LOG_INFO);
+		}
+		else
+		{
+			if (!CreateTunnelCredentials()
+				|| !RouteTunnel())
+			{
+				return false;
+			}
 		}
 
 		string command{};
@@ -494,21 +509,6 @@ namespace KalaServer::Server
 
 bool CreateCertFile()
 {
-	if (cfCertFile.empty())
-	{
-		cfCertFile = path(validCFFolderPath / "cert.pem").string();
-	}
-
-	if (exists(cfCertFile))
-	{
-		Log::Print(
-			"Cloudflare cert file already exists at '" + cfCertFile.string() + "', skipping creation and using existing one.",
-			"CLOUDFLARE",
-			LogType::LOG_INFO);
-
-		return true;
-	}
-
 	Log::Print(
 		"Creating new Cloudflare tunnel cert file for tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
 		"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
@@ -540,17 +540,6 @@ bool CreateTunnelCredentials()
 {
 	cfTunnelID = GetTunnelID(validTunnelName);
 	cfJsonFile = (validCFFolderPath / string(cfTunnelID + ".json"));
-
-	if (!cfTunnelID.empty()
-		&& exists(cfJsonFile))
-	{
-		Log::Print(
-			"Cloudflare tunnel file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing one.",
-			"CLOUDFLARE",
-			LogType::LOG_INFO);
-
-		return true;
-	}
 
 	Log::Print(
 		"Creating Cloudflare tunnel credentials.",

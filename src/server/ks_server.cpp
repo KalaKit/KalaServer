@@ -515,9 +515,9 @@ namespace KalaServer::Server
 
 	void ServerCore::DisconnectTarget(
 		uintptr_t targetSocket,
-		const vector<u8>& reason)
+		string_view reason)
 	{
-		//TODO: use callback
+		//TODO: send reason
 
 		if (!ServerCore::IsInitialized())
 		{
@@ -691,9 +691,9 @@ namespace KalaServer::Server
 
 	void ServerCore::DisconnectTarget(
 		const string& targetIP,
-		const vector<u8>& reason)
+		string_view reason)
 	{
-		//TODO: use callback
+		//TODO: send reason
 
 		if (!ServerCore::IsInitialized())
 		{
@@ -860,9 +860,9 @@ namespace KalaServer::Server
 			2);
 	}
 
-	void ServerCore::DisconnectListener(const vector<u8>& reason)
+	void ServerCore::DisconnectListener(string_view reason)
 	{
-		//TODO: use callback
+		//TODO: send reason
 
 		if (listenerSocket == 0 
 #ifdef _WIN32
@@ -970,9 +970,9 @@ namespace KalaServer::Server
 			LogType::LOG_SUCCESS);
 	}
 
-	void ServerCore::CancelAllPackets(const vector<u8>& reason)
+	void ServerCore::CancelAllPackets(string_view reason)
 	{
-		//TODO: use callback
+		//TODO: send reason
 
 		if (!ServerCore::IsInitialized())
 		{

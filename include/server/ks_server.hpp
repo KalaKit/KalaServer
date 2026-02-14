@@ -201,20 +201,20 @@ namespace KalaServer::Server
 		//Disconnect the target via socket with an optional reason sent as payload
 		static void DisconnectTarget(
 			uintptr_t targetSocket,
-			const vector<u8>& reason = {});
+			string_view reason = {});
 
 		//Disconnect the target via IP with an optional reason sent as payload
 		static void DisconnectTarget(
 			const string& targetIP,
-			const vector<u8>& reason = {});
+			string_view reason = {});
 
 		//Closes the server listener socket and all inbound sockets,
 		//with optional reason sent as payload to all inbound sockets
-		static void DisconnectListener(const vector<u8>& reason = {});
+		static void DisconnectListener(string_view reason = {});
 
 		//Closes all outgoing packet sockets,
 		//with optional reason sent as payload
-		static void CancelAllPackets(const vector<u8>& reason = {});
+		static void CancelAllPackets(string_view reason = {});
 
 		static IPResult IsValidIP(const string& targetIP);
 
