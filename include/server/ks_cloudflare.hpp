@@ -33,8 +33,8 @@ namespace KalaServer::Server
 			const path& cloudflareFolder);
 
 		static bool IsInitialized();
-		static bool IsHealthy(u8 connection);
 
+		static bool IsTunnelHealthy();
 		static bool IsTunnelAlive();
 
 		//Shut down the Cloudflare tunnel

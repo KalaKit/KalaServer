@@ -6,10 +6,6 @@ build/
 .cache/
 compile_commands.json
 
-# Release and Debug in root folder
-/release/
-/debug/
-
 # Large files
 *.pdb
 *.obj

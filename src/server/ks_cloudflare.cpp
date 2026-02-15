@@ -35,7 +35,7 @@ using KalaHeaders::KalaCore::ToVar;
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaString::SplitString;
-using KalaHeaders::KalaThread::jthread;
+using KalaHeaders::KalaThread::joinable_thread;
 using KalaHeaders::KalaThread::abool;
 using KalaHeaders::KalaThread::memory_order_relaxed;
 
@@ -287,7 +287,7 @@ namespace KalaServer::Server
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
 
-		cfThread = jthread([command]()
+		cfThread = joinable_thread([command]()
 		{
 			if (!RunTunnel(command))
 			{
@@ -301,28 +301,14 @@ namespace KalaServer::Server
 	}
 
 	bool Cloudflare::IsInitialized() { return isInitialized; }
-	bool Cloudflare::IsHealthy(u8 connection)
-	{
-		switch (connection)
-		{
-		default:
-			return false;
-		case 0:
-			return isFirstHealthy;
-			break;
-		case 1:
-			return isSecondHealthy;
-			break;
-		case 2:
-			return isThirdHealthy;
-			break;
-		case 3:
-			return isFourthHealthy;
-			break;
-		}
-		return false;
-	}
 
+	bool Cloudflare::IsTunnelHealthy()
+	{
+		return isFirstHealthy
+			&& isSecondHealthy
+			&& isThirdHealthy
+			&& isFourthHealthy;
+	}
 	bool Cloudflare::IsTunnelAlive()
 	{
 		if (!ServerCore::IsInitialized())
