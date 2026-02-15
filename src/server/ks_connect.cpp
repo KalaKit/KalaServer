@@ -25,6 +25,7 @@
 
 #include "server/ks_connect.hpp"
 #include "server/ks_server.hpp"
+#include "server/ks_response.hpp"
 #include "core/ks_core.hpp"
 
 using KalaHeaders::KalaCore::FromVar;
@@ -69,7 +70,7 @@ using std::wstring;
 static wstring ToWide(const string& input);
 #endif
 
-static void _HandleWebRequest(Connection* c);
+static void ConnectStart(Connection* c);
 
 namespace KalaServer::Server
 {
@@ -115,7 +116,14 @@ namespace KalaServer::Server
 		if (connectionThread.joinable()) listenerSocket->connectionThread.join();
 	}
 
-	void Connect::CreateListenerSocket(bool isLocal)
+	void Connect::HandleListenerCallback(Connection& c)
+	{
+
+	}
+
+	void Connect::CreateListenerSocket(
+		bool isLocal,
+		function<void(Connection&)> onConnect)
 	{
 		if (!ServerCore::IsInitialized())
 		{
@@ -300,124 +308,113 @@ namespace KalaServer::Server
 			"LISTENER_SOCKET",
 			LogType::LOG_SUCCESS);
 
-		if (!localListener)
-		{
-			Log::Print(
-				"Failed to start accept loop because listener dissapeared before accept loop could start!",
-				"LISTENER_SOCKET",
-				LogType::LOG_ERROR,
-				2);
-
-#ifdef _WIN32
-			closesocket(newSocket);
-			WSACleanup();
-#else
-			close(newSocket);
-#endif
-
-			return;
-		}
-		else
-		{
-			localListener->connectionThread = joinable_thread([localListener, isLocal]
+		localListener->connectionThread = joinable_thread([
+			localListener, 
+			isLocal,
+			onConnect]
+			{
+				while (true)
 				{
-					while (true)
+					if (!localListener->isRunning.load(memory_order_acquire))
 					{
-						if (!localListener)
-						{
-							Log::Print(
-								"Listener socket for server '" + ServerCore::GetServerName() + "' became invalid during accept loop lifetime!",
-								"ACCEPT_LOOP",
-								LogType::LOG_WARNING);
-
-							return;
-						}
-						if (!localListener->isRunning.load(memory_order_acquire))
-						{
-							Log::Print(
-								"Listener socket for server '" + ServerCore::GetServerName() + "' has been shut down.",
-								"ACCEPT_LOOP",
-								LogType::LOG_INFO);
-
-							return;
-						}
-
-						if (!Cloudflare::IsTunnelHealthy())
-						{
-							bool isOnline =
-								Cloudflare::IsTunnelAlive()
-								&& ServerCore::HasInternet();
-
-							//wait a second instead of spamming full check every frame
-							if (!isOnline) sleep_for(seconds(SERVER_HEALTH_SLEEP_SECONDS));
-
-							continue;
-						}
-						
-#ifdef _WIN32
-						ksocket ls = ToVar<SOCKET>(localListener->connectionSocket.load(memory_order_acquire));
-
-						SOCKET client = accept(
-							ls,
-							nullptr,
-							nullptr);
-
-						if (client == invalid_socket)
-						{
-							int err = WSAGetLastError();
-
-							Log::Print(
-								"Connection failed! Reason: " + to_string(err),
-								"ACCEPT_LOOP",
-								LogType::LOG_ERROR,
-								2);
-
-							continue;
-						}
-#else
-						ksocket ls = ToVar<int>(localListener->connectionSocket.load(memory_order_acquire));
-
-						int client = accept(
-							ls,
-							nullptr,
-							nullptr);
-
-						if (client == invalid_socket)
-						{
-							int err = errno;
-
-							Log::Print(
-								"Connection failed! Reason: " + to_string(err),
-								"ACCEPT_LOOP",
-								LogType::LOG_ERROR,
-								2);
-
-							continue;
-						}
-#endif
-
 						Log::Print(
-							"Connection received.",
+							"Listener socket for server '" + ServerCore::GetServerName() + "' has been shut down.",
 							"ACCEPT_LOOP",
 							LogType::LOG_INFO);
 
-						unique_ptr<Connection> c = make_unique<Connection>();
+						return;
+					}
 
-						c->isLocal.store(isLocal, memory_order_release);
-						c->connectionSocket.store(FromVar(client), memory_order_release);
+					if (!Cloudflare::IsTunnelHealthy())
+					{
+						bool isOnline =
+							Cloudflare::IsTunnelAlive()
+							&& ServerCore::HasInternet();
 
-						lockwait_m(m_connectSockets);
-						connectSockets.push_back(std::move(c));
-						unlock_m(m_connectSockets);
-
-						//TODO: handle socket here
-						
-						sleep_for(milliseconds(SERVER_ACCEPT_SLEEP_MILLISECONDS));
+						//wait a moment instead of spamming full check every frame
+						if (!isOnline) sleep_for(seconds(SERVER_HEALTH_SLEEP_SECONDS));
 
 						continue;
 					}
-				});
-		}
+						
+#ifdef _WIN32
+					ksocket ls = ToVar<SOCKET>(localListener->connectionSocket.load(memory_order_acquire));
+
+					SOCKET client = accept(
+						ls,
+						nullptr,
+						nullptr);
+
+					if (client == invalid_socket)
+					{
+						int err = WSAGetLastError();
+
+						Log::Print(
+							"Connection failed! Reason: " + to_string(err),
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						continue;
+					}
+#else
+					ksocket ls = ToVar<int>(localListener->connectionSocket.load(memory_order_acquire));
+
+					int client = accept(
+						ls,
+						nullptr,
+						nullptr);
+
+					if (client == invalid_socket)
+					{
+						int err = errno;
+
+						Log::Print(
+							"Connection failed! Reason: " + to_string(err),
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						continue;
+					}
+#endif
+
+					Log::Print(
+						"Connection received.",
+						"ACCEPT_LOOP",
+						LogType::LOG_INFO);
+
+					unique_ptr<Connection> c = make_unique<Connection>();
+					Connection* raw = c.get();
+
+					raw->isLocal.store(isLocal, memory_order_release);
+					raw->connectionSocket.store(FromVar(client), memory_order_release);
+
+					lockwait_m(m_connectSockets);
+					if (connectSockets.size() >= MAX_ACTIVE_CONNECTIONS)
+					{
+						unlock_m(m_connectSockets);
+
+						Log::Print(
+							"Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' reached, kicking new connection.",
+							"ACCEPT_LOOP",
+							LogType::LOG_WARNING);
+						
+						Response::SendResponse({
+							
+						});
+
+						continue;
+					}
+					connectSockets.push_back(std::move(c));
+					unlock_m(m_connectSockets);
+
+					raw->connectionThread = joinable_thread([onConnect, raw]
+						{
+							if (onConnect) onConnect(*raw);
+						});
+				}
+			});
 	}
 
 	bool Connect::IsListenerRunning()
@@ -773,11 +770,7 @@ namespace KalaServer::Server
 		}
 
 		lockwait_m(m_listenerSocket);
-		if (listenerSocket)
-		{
-			listenerSocket.reset();
-			listenerSocket = nullptr;
-		}
+		if (listenerSocket) listenerSocket = nullptr;
 		unlock_m(m_listenerSocket);
 
 		lockwait_m(m_connectSockets);
@@ -1400,7 +1393,7 @@ namespace KalaServer::Server
 	}
 }
 
-void _HandleWebRequest(Connection* c)
+void ConnectStart(Connection* c)
 {
 
 }

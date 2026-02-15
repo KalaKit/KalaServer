@@ -22,6 +22,7 @@ namespace KalaServer::Server
     using std::function;
 
     using u8 = uint8_t;
+	using u16 = uint16_t;
     using u32 = uint32_t;
 
     using KalaHeaders::KalaThread::thread;
@@ -32,12 +33,12 @@ namespace KalaServer::Server
 	//Unreachable socket value for unassigned socket
 	constexpr u32 UNASSIGNED_SOCKET_VALUE = 1000000u;
 
+	//All further connect sockets are closed if this amount of total connections is reached
+	constexpr u16 MAX_ACTIVE_CONNECTIONS = 1000u;
+
 	//Sleep this many seconds on the listener thread before retrying from start
 	//if internet checks failed at the top of the listener thread
 	constexpr u8 SERVER_HEALTH_SLEEP_SECONDS = 1;
-
-	//Sleep this many milliseconds after each successful accept loop
-	constexpr u8 SERVER_ACCEPT_SLEEP_MILLISECONDS = 5;
 
 	enum class IPResult : u8
 	{
@@ -116,12 +117,16 @@ namespace KalaServer::Server
     class LIB_API Connect 
     {
     public:
+		static void HandleListenerCallback(Connection& c);
+
         //Create a new listener socket, the sole purpose of this socket is to be able to receive
 		//incoming traffic so others with internet access can communicate with this server.
 		//Only one listener socket is allowed, it is created on a separate thread.
 		//Setting isLocal to false will keep each connected socket alive after it has completed its first loop,
 		//otherwise that socket dies once its done which is ideal for website inbound sockets
-		static void CreateListenerSocket(bool isLocal = true);
+		static void CreateListenerSocket(
+			bool isLocal = true,
+			function<void(Connection&)> onConnect = {});
 
         static bool IsListenerRunning();
 		//Create a new socket for sending packets to a specific target IP,

@@ -1,0 +1,200 @@
+//Copyright(C) 2026 Lost Empire Entertainment
+//This program comes with ABSOLUTELY NO WARRANTY.
+//This is free software, and you are welcome to redistribute it under certain conditions.
+//Read LICENSE.md for more information.
+
+#pragma once
+
+#include <string>
+
+#include "KalaHeaders/core_utils.hpp"
+
+namespace KalaServer::Server
+{
+    using std::string;
+    using std::string_view;
+
+    using u8 = uint8_t;
+
+    enum class ResponseType : u8
+    {
+        R_INVALID = 0u,
+
+        //OK
+        R_200 = 1u,
+        //No content
+        R_204 = 2u,
+        //Partial content
+        R_206 = 3u,
+
+        //Bad request
+        R_400 = 4u,
+        //Unauthorized
+        R_401 = 5u,
+        //Not found
+        R_404 = 6u,
+        //Method not allowed
+        R_405 = 7u,
+        //Payload too large
+        R_413 = 8u,
+        //I'm a teapot
+        R_418 = 9u,
+
+        //Internal server error
+        R_500 = 10u,
+        //Service unavailable
+        R_503 = 11u
+    };
+
+    enum class ContentType : u8
+    {
+        CT_INVALID = 0u,
+
+        //
+        // SCRIPTS
+        //
+
+        //.html, text/html
+        CT_HTML = 1u,
+        //.css, text/css
+        CT_CSS = 2u,
+        //.js, application/javascript
+        CT_JS = 3u,
+
+        //
+        // IMAGES
+        //
+
+        //.png, image/png
+        CT_PNG = 4u,
+        //.jpeg, image/jpeg
+        CT_JPEG = 5u,
+        //.jpg, image/jpeg
+        CT_JPG = 6u,
+        //.gif, image/gif
+        CT_GIF = 7u,
+        //.webp, image/webp
+        CT_WEBP = 8u,
+        //.ico, image/vnd.microsoft.icon
+        CT_ICO = 9u,
+        //.svg, image/svg+xml
+        CT_SVG_XML = 10u,
+
+        //
+        // AUDIO
+        //
+
+        //.mp3, audio/mpeg
+        CT_MP3 = 11u,
+        //.m4a, audio/mp4
+        CT_M4A = 12u,
+        //.aac, audio/aac
+        CT_AAC = 13u,
+        //.ogg, audio/ogg
+        CT_OGG = 14u,
+        //.opus, audio/opus
+        CT_OPUS = 15u,
+        //.flac, audio/flac
+        CT_FLAC = 16u,
+        //.wav, audio/wav
+        CT_WAV = 17u,
+
+        //
+        // VIDEO
+        //
+
+        //.mp4, video/mp4
+        CT_MP4 = 18u,
+        //.webm, video/webm
+        CT_WEBM = 19u,
+        //.mkv, video/x-matroska
+        CT_MKV = 20u,
+        //.mov, video/quicktime
+        CT_MOV = 21u,
+        //.avi, video/x-msvideo
+        CT_AVI = 22u,
+
+        //
+        // FONTS
+        //
+
+        //.woff, font/woff
+        CT_WOFF = 23u,
+        //.woff2, font/woff2
+        CT_WOFF2 = 24u,
+        //.ttf, font/ttf
+        CT_TTF = 25u,
+        //.otf, font/otf
+        CT_OTF = 26u,
+
+        //
+        // DOCUMENTS AND TEXT
+        //
+
+        //.txt, text/plain
+        CT_PLAIN = 27u,
+        //.json, application/json
+        CT_JSON = 28u,
+        //.xml, application/xml
+        CT_XML = 29u,
+        //.csv, text/csv
+        CT_CSV = 30u,
+        //.md, text/markdown
+        CT_MARKDOWN = 31u,
+
+        //
+        // ARCHIVES AND BINARIES
+        //
+
+        //.zip, application/zip
+        CT_ZIP = 32u,
+        //.gz, application/gzip
+        CT_GZ = 33u,
+        //.tar, application/x-tar
+        CT_TAR = 34u,
+        //.7z, application/x-7z-compressed
+        CT_7Z = 35u,
+        //.rar, application/vnd.rar
+        CT_RAR = 36u,
+        //.pdf, application/pdf
+        CT_PDF = 37u,
+        //.wasm, application/wasm
+        CT_WASM = 38u,
+
+        //unknown types, application/octet-stream
+        CT_OCTET = 39u
+    };
+
+    //Who receives what response
+    struct LIB_API ResponseData
+    {
+        ResponseType responseType{};
+        ContentType contentType{};
+
+        //If left empty then this is filled with placeholder data for the target response type.
+        //Exceptions:
+        //200 or 206 but empty body = 204
+        //200 or 206 but generation failed = 500
+        string responseBody{};
+
+        uintptr_t clientSocket{};
+        string clientIP{};
+        string clientRoute{};
+    };
+
+    class LIB_API Response
+    {
+    public:
+        static void SendResponse(const ResponseData& data);
+
+        static ContentType ExtensionToContentType(string_view input);
+        static ContentType MimeTypeToContentType(string_view input);
+
+        static string_view ContentTypeToExtension(ContentType type);
+        static string_view ContentTypeToMimeType(ContentType type);
+
+        static ResponseType StringToResponseType(string_view input);
+
+        static string_view ResponseTypeToString(ResponseType type);
+    };
+}
