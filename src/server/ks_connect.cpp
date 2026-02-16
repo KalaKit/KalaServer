@@ -3,7 +3,6 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include <atomic>
 #ifdef _WIN32
 #include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
@@ -121,9 +120,7 @@ namespace KalaServer::Server
 
 	}
 
-	void Connect::CreateListenerSocket(
-		bool isLocal,
-		function<void(Connection&)> onConnect)
+	void Connect::CreateListenerSocket(function<void(Connection&)> onConnect)
 	{
 		if (!ServerCore::IsInitialized())
 		{
@@ -308,10 +305,7 @@ namespace KalaServer::Server
 			"LISTENER_SOCKET",
 			LogType::LOG_SUCCESS);
 
-		localListener->connectionThread = joinable_thread([
-			localListener, 
-			isLocal,
-			onConnect]
+		localListener->connectionThread = joinable_thread([localListener, onConnect]
 			{
 				while (true)
 				{
@@ -379,6 +373,17 @@ namespace KalaServer::Server
 					}
 #endif
 
+					if (!onConnect)
+					{
+						Log::Print(
+							"Connection received but no connection callback was assigned!",
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						continue;
+					}
+
 					Log::Print(
 						"Connection received.",
 						"ACCEPT_LOOP",
@@ -387,7 +392,6 @@ namespace KalaServer::Server
 					unique_ptr<Connection> c = make_unique<Connection>();
 					Connection* raw = c.get();
 
-					raw->isLocal.store(isLocal, memory_order_release);
 					raw->connectionSocket.store(FromVar(client), memory_order_release);
 
 					lockwait_m(m_connectSockets);
@@ -401,7 +405,12 @@ namespace KalaServer::Server
 							LogType::LOG_WARNING);
 						
 						Response::SendResponse({
-							
+							.responseType = ResponseType::R_503,
+							.contentType = ContentType::CT_HTML,
+							.responseBody = 
+								"<html><body><h1>Service unavailable</h1>\n"
+								"<p>Server limit reached! Try again later.</p></body></html>",
+							.connection = raw
 						});
 
 						continue;
@@ -411,7 +420,7 @@ namespace KalaServer::Server
 
 					raw->connectionThread = joinable_thread([onConnect, raw]
 						{
-							if (onConnect) onConnect(*raw);
+							onConnect(*raw);
 						});
 				}
 			});

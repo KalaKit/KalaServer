@@ -90,10 +90,12 @@ namespace KalaServer::Server
 	struct LIB_API Connection
 	{
 		abool isRunning{};
-		abool isLocal{};
 
 		string connectionIP{};
 		mutex m_connectionIP{};
+
+		string connectionRoute{};
+		mutex m_connectionRoute{};
 
 		auptr connectionSocket = UNASSIGNED_SOCKET_VALUE;
 
@@ -122,11 +124,7 @@ namespace KalaServer::Server
         //Create a new listener socket, the sole purpose of this socket is to be able to receive
 		//incoming traffic so others with internet access can communicate with this server.
 		//Only one listener socket is allowed, it is created on a separate thread.
-		//Setting isLocal to false will keep each connected socket alive after it has completed its first loop,
-		//otherwise that socket dies once its done which is ideal for website inbound sockets
-		static void CreateListenerSocket(
-			bool isLocal = true,
-			function<void(Connection&)> onConnect = {});
+		static void CreateListenerSocket(function<void(Connection&)> onConnect = {});
 
         static bool IsListenerRunning();
 		//Create a new socket for sending packets to a specific target IP,

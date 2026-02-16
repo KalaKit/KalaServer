@@ -3,11 +3,35 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#ifdef _WIN32
+#include <winsock2.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#endif
+
 #include <unordered_map>
 
+#include "KalaHeaders/core_utils.hpp"
+#include "KalaHeaders/log_utils.hpp"
+
 #include "server/ks_response.hpp"
+#include "server/ks_connect.hpp"
+
+using KalaHeaders::KalaCore::ToVar;
+using KalaHeaders::KalaCore::FromVar;
+
+using KalaHeaders::KalaLog::Log;
+using KalaHeaders::KalaLog::LogType;
+
+using KalaServer::Server::UNASSIGNED_SOCKET_VALUE;
+using KalaServer::Server::ResponseData;
 
 using std::unordered_map;
+
+static void Send(const ResponseData& data);
 
 namespace KalaServer::Server
 {
@@ -86,7 +110,77 @@ namespace KalaServer::Server
 
     void Response::SendResponse(const ResponseData& data)
     {
+        auto close_socket = [data]()
+            {
+                if (data.connection->connectionSocket == UNASSIGNED_SOCKET_VALUE)
+                {
+                    Log::Print(
+                        "Cannot close socket because its unassigned!",
+                        "SEND_RESPONSE",
+                        LogType::LOG_ERROR,
+                        2);
 
+                    return;
+                }
+
+#ifdef _WIN32
+                closesocket(ToVar<SOCKET>(data.connection->connectionSocket));
+#else
+                close(ToVar<int>(data.connection->connectionSocket));
+#endif
+            };
+
+        bool invalidResponseType = data.responseType == ResponseType::R_INVALID;
+        bool invalidContentType = data.contentType == ContentType::CT_INVALID;
+        bool emptyBody = data.responseBody.empty();
+
+        if (invalidResponseType)
+        {
+            Log::Print(
+                "Failed to send response because response type was invalid or unassigned!",
+                "SEND_RESPONSE",
+                LogType::LOG_ERROR,
+                2);
+
+            SendResponse(data);
+
+            close_socket();
+
+            return;
+        }
+        if (invalidContentType)
+        {
+            Log::Print(
+                "Failed to send response because content type was invalid or unassigned!",
+                "SEND_RESPONSE",
+                LogType::LOG_ERROR,
+                2);
+
+            SendResponse(data);
+
+            close_socket();
+
+            return;
+        }
+        if (emptyBody)
+        {
+            Log::Print(
+                "No response body was assigned, using placeholder.",
+                "SEND_RESPONSE",
+                LogType::LOG_WARNING);
+
+            SendResponse(data);
+
+            close_socket();
+        }
+
+        if (!invalidResponseType
+            && !invalidContentType)
+        {
+            SendResponse(data);
+
+            close_socket();
+        }
     }
 
     ContentType Response::ExtensionToContentType(string_view input)

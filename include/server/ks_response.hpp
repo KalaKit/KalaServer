@@ -9,12 +9,49 @@
 
 #include "KalaHeaders/core_utils.hpp"
 
+#include "server/ks_connect.hpp"
+
 namespace KalaServer::Server
 {
     using std::string;
     using std::string_view;
 
     using u8 = uint8_t;
+
+    enum class SendType : u8
+    {
+        S_INVALID = 0u,
+
+        //regular send type, no special actions taken
+        S_DEFAULT = 1u,
+        //forces a download
+        //adds:
+        //  Content-Disposition: attachment; filename="..."
+        S_DOWNLOAD = 2u,
+        //sends unknown data sizes in chunks for long-lived connections,
+        //body sent in hex-sized chunks, does not use Content-Length
+        //adds:
+        //  Transfer-Encoding: chunked
+        S_STREAM = 3u,
+        //prevents browser from caching this, good for sensitive data
+        //adds:
+        //  Cache-Control: no-store, no-cache, must-revalidate
+        //  Pragma: no-cache
+        //  Expires: 0
+        S_NO_CACHE = 4u,
+        //force-closes the socket, ignores all other send types
+        //should be used when:
+        //  client uses blacklisted keyword
+        //  client abuses connection (rate limit etc)
+        //  client sends malformed request
+        //  client requests invalid content length size for Content-Length
+        //  client sends garbage instead of valid hex chunk size
+        //  client sends both Content-Length and Transfer-Encoding: chunked
+        //  server cannot trust where next TCP stream request begins
+        //adds:
+        //  Connection: close
+        S_FORCE_CLOSE = 5u
+    };
 
     enum class ResponseType : u8
     {
@@ -177,9 +214,7 @@ namespace KalaServer::Server
         //200 or 206 but generation failed = 500
         string responseBody{};
 
-        uintptr_t clientSocket{};
-        string clientIP{};
-        string clientRoute{};
+        Connection* connection{};
     };
 
     class LIB_API Response
