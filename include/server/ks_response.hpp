@@ -8,6 +8,7 @@
 #include <string>
 
 #include "KalaHeaders/core_utils.hpp"
+#include "KalaHeaders/thread_utils.hpp"
 
 #include "server/ks_connect.hpp"
 
@@ -18,27 +19,19 @@ namespace KalaServer::Server
 
     using u8 = uint8_t;
 
-    enum class SendType : u8
+    using KalaHeaders::KalaThread::auptr;
+
+    enum class OptionalSendType : u8
     {
         S_INVALID = 0u,
 
-        //regular send type, no special actions taken
-        S_DEFAULT = 1u,
-        //forces a download
-        //adds:
-        //  Content-Disposition: attachment; filename="..."
-        S_DOWNLOAD = 2u,
-        //sends unknown data sizes in chunks for long-lived connections,
-        //body sent in hex-sized chunks, does not use Content-Length
-        //adds:
-        //  Transfer-Encoding: chunked
-        S_STREAM = 3u,
+        S_DOWNLOAD = 1u,
         //prevents browser from caching this, good for sensitive data
         //adds:
         //  Cache-Control: no-store, no-cache, must-revalidate
         //  Pragma: no-cache
         //  Expires: 0
-        S_NO_CACHE = 4u,
+        S_NO_CACHE = 2u,
         //force-closes the socket, ignores all other send types
         //should be used when:
         //  client uses blacklisted keyword
@@ -50,7 +43,7 @@ namespace KalaServer::Server
         //  server cannot trust where next TCP stream request begins
         //adds:
         //  Connection: close
-        S_FORCE_CLOSE = 5u
+        S_FORCE_CLOSE = 3u
     };
 
     enum class ResponseType : u8
@@ -207,6 +200,7 @@ namespace KalaServer::Server
     {
         ResponseType responseType{};
         ContentType contentType{};
+        vector<OptionalSendType> optionalSendTypes{};
 
         //If left empty then this is filled with placeholder data for the target response type.
         //Exceptions:
@@ -215,21 +209,24 @@ namespace KalaServer::Server
         string responseBody{};
 
         Connection* connection{};
+        auptr connectionSocket{};
     };
 
     class LIB_API Response
     {
     public:
         static void SendResponse(const ResponseData& data);
-
+        
         static ContentType ExtensionToContentType(string_view input);
-        static ContentType MimeTypeToContentType(string_view input);
-
         static string_view ContentTypeToExtension(ContentType type);
+
+        static ContentType MimeTypeToContentType(string_view input);
         static string_view ContentTypeToMimeType(ContentType type);
 
         static ResponseType StringToResponseType(string_view input);
-
         static string_view ResponseTypeToString(ResponseType type);
+
+        static OptionalSendType StringToSendType(string_view input);
+        static string_view SendTypeToString(OptionalSendType type);
     };
 }

@@ -23,8 +23,10 @@ namespace KalaServer::Server
 	using u16 = uint16_t;
 	using u32 = uint32_t;
 
-	constexpr u16 MIN_PORT_RANGE = 1024;
-	constexpr u16 MAX_PORT_RANGE = 65535;
+	//Minimum port, 1-1023 requires admin/root
+	constexpr u16 MIN_PORT_RANGE = 1u;
+	//Maximum port, cannot go past 16-bit unsigned integer TCP and UDP port fields
+	constexpr u16 MAX_PORT_RANGE = 65535u;
 
 	class LIB_API ServerCore
 	{
@@ -34,12 +36,16 @@ namespace KalaServer::Server
 		//Port is where your server connects to Cloudflare.
 		//Server name helps distinguish this server from other servers.
 		//Domain name is th domain name with extension inserted to url path in browser.
-		//Server root is the true origin where the server will expose routes from relative to where the process was ran from.
+		//Server root is the true origin where the server will expose
+		//routes fromrelative to where the process was ran from.
+		//Set requireCloudflare to false if you dont want to use it,
+		//otherwise it must be enabled before connections are accepted.
 		static bool Initialize(
 			u16 port,
 			string_view serverName,
 			string_view domainName,
-			const path& serverRoot);
+			const path& serverRoot,
+			bool requireCloudflare);
 
 		//Returns true if this server instance has been initialized successfully
 		static bool IsInitialized();
@@ -48,10 +54,15 @@ namespace KalaServer::Server
 		//the server cannot be started if its not ready yet, even if its instance is already initialized
 		static bool IsReady();
 
-		//Returns false if the server fails to connect to google.com
+		//Returns true if user set requireCloudflare as true during ServerCore::Initialize
+		static bool IsCloudflareRequired();
+
+		//Returns true if this process can reach http://1.1.1.1 on port 53
 		static bool HasInternet();
 
-		static u32 GetID();
+		//Returns false if server cannot connect to google.com
+		//or if cloudflare tunnel is not healthy if cloudflare is required
+		static bool IsHealthy();
 
 		static u16 GetPort();
 		static const string& GetServerName();

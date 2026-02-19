@@ -21,6 +21,7 @@ namespace KalaServer::Server
 
 	class LIB_API Cloudflare
 	{
+	friend class ServerCore;
 	public:
 		static void SetVerboseLoggingState(bool state);
 
@@ -34,14 +35,14 @@ namespace KalaServer::Server
 
 		static bool IsInitialized();
 
-		static bool IsTunnelHealthy();
-		static bool IsTunnelAlive();
-
 		//Shut down the Cloudflare tunnel
 		static void Shutdown();
 	private:
 		static bool RunTunnel(string_view command);
 		static void PipeCloudflareMessages(uintptr_t readPipe);
+
+		static bool IsTunnelHealthy();
+		static bool IsTunnelAlive();
 
 		static thread cfThread;
 	};

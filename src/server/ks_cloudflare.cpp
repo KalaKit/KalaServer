@@ -151,17 +151,15 @@ namespace KalaServer::Server
 		const path& cfExePath,
 		const path& cfFolderPath)
 	{
-		//Log::Print("verbose state: " + to_string(isVerboseLoggingEnabled.load(memory_order_relaxed)));
-
 		Log::Print(
-			"Starting to initialize Cloudflare tunnel '" + string(tunnelName) + "'",
+			"Starting to initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + string(tunnelName) + "'",
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
 
-		if (!ServerCore::IsInitialized())
+		if (Cloudflare::IsInitialized())
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because server core has not been initialized!",
+				"Cannot initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because it has already been initialized!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -169,10 +167,10 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		if (Cloudflare::IsInitialized())
+		if (!ServerCore::IsInitialized())
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because it has already been initialized!",
+				"Cannot initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because server core has not been initialized!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -183,7 +181,7 @@ namespace KalaServer::Server
 		if (tunnelName.empty())
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its name cannot be empty!",
+				"Cannot initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because its name cannot be empty!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -193,7 +191,7 @@ namespace KalaServer::Server
 		if (tunnelName.size() < 3)
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its name '" + string(tunnelName) + "' is too short!",
+				"Cannot initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because its name '" + string(tunnelName) + "' is too short!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -203,7 +201,7 @@ namespace KalaServer::Server
 		if (tunnelName.size() > 20)
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its name '" + string(tunnelName) + "' is too long!",
+				"Cannot initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because its name '" + string(tunnelName) + "' is too long!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -216,7 +214,7 @@ namespace KalaServer::Server
 		if (!exists(cfExePath))
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its exe path '" + cfExePath.string() + "' does not exist!",
+				"Cannot initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because its exe path '" + cfExePath.string() + "' does not exist!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -226,7 +224,7 @@ namespace KalaServer::Server
 		if (!exists(cfFolderPath))
 		{
 			Log::Print(
-				"Cannot initialize Cloudflare tunnel because its folder path '" + cfFolderPath.string() + "' does not exist!",
+				"Cannot initialize server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because its folder path '" + cfFolderPath.string() + "' does not exist!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -241,7 +239,7 @@ namespace KalaServer::Server
 		if (exists(cfCertFile))
 		{
 			Log::Print(
-				"Cloudflare tunnel cert file already exists at '" + cfCertFile.string() + "', skipping creation and using existing one.",
+				"Server '" + ServerCore::GetServerName() + "' Cloudflare tunnel cert file already exists at '" + cfCertFile.string() + "', skipping creation and using existing one.",
 				"CLOUDFLARE",
 				LogType::LOG_INFO);
 		}
@@ -261,7 +259,7 @@ namespace KalaServer::Server
 		if (exists(cfJsonFile))
 		{
 			Log::Print(
-				"Cloudflare tunnel json file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing one.",
+				"Server '" + ServerCore::GetServerName() + "' Cloudflare tunnel json file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing one.",
 				"CLOUDFLARE",
 				LogType::LOG_INFO);
 		}
@@ -283,7 +281,7 @@ namespace KalaServer::Server
 		isInitialized = true;
 
 		Log::Print(
-			"Initialized Cloudflare tunnel '" + validTunnelName + "' and starting run process.",
+			"Initialized server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "' and starting run process.",
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
 
@@ -293,7 +291,7 @@ namespace KalaServer::Server
 			{
 				KalaServerCore::ForceClose(
 					"Cloudflare error", 
-					"Failed to create Cloudflare tunnel process!");
+					"Failed to create server '" + ServerCore::GetServerName() + "' Cloudflare tunnel process!");
 			}
 		});
 
@@ -302,104 +300,95 @@ namespace KalaServer::Server
 
 	bool Cloudflare::IsInitialized() { return isInitialized; }
 
-	bool Cloudflare::IsTunnelHealthy()
-	{
-		return isFirstHealthy
-			&& isSecondHealthy
-			&& isThirdHealthy
-			&& isFourthHealthy;
-	}
-	bool Cloudflare::IsTunnelAlive()
+	void Cloudflare::Shutdown()
 	{
 		if (!ServerCore::IsInitialized())
 		{
 			Log::Print(
-				"Cannot check for Clouflare tunnel status because the server has not been initialized!",
-				"TUNNEL_STATUS",
+				"Cannot shut down server '" + ServerCore::GetServerName() + "' Clouflare tunnel because the server has not been initialized!",
+				"CLOUDFLARE_SHUTDOWN",
 				LogType::LOG_ERROR,
 				2);
 
-			return false;
+			return;
 		}
 
 		if (!ServerCore::IsReady())
 		{
 			Log::Print(
-				"Cannot check for Clouflare tunnel status because the server is not ready!",
-				"TUNNEL_STATUS",
+				"Cannot shut down server '" + ServerCore::GetServerName() + "' Clouflare tunnel because the server is not ready!",
+				"CLOUDFLARE_SHUTDOWN",
 				LogType::LOG_ERROR,
 				2);
 
-			return false;
+			return;
 		}
 
 		if (!Cloudflare::IsInitialized())
 		{
 			Log::Print(
-				"Cannot check for Clouflare tunnel status because it has not been initialized!",
-				"TUNNEL_STATUS",
+				"Cannot shut down server '" + ServerCore::GetServerName() + "' Cloudflare tunnel because it has not been initialized!",
+				"CLOUDFLARE_SHUTDOWN",
 				LogType::LOG_ERROR,
 				2);
 
-			return false;
+			return;
 		}
 
 		if (tunnelHandle == 0)
 		{
 			Log::Print(
-				"Cannot check for Clouflare tunnel status because it has not been assigned!",
-				"TUNNEL_STATUS",
-				LogType::LOG_ERROR,
-				2);
+				"Cannot shut down server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "' because it has not been assigned.",
+				"CLOUDFLARE_SHUTDOWN",
+				LogType::LOG_WARNING);
 
-			return false;
+			return;
 		}
 
 #ifdef _WIN32
-		HANDLE handle = rcast<HANDLE>(tunnelHandle);
+		HANDLE handle = ToVar<HANDLE>(tunnelHandle);
 
 		if (handle == INVALID_HANDLE_VALUE)
 		{
 			Log::Print(
-				"Cannot check for Cloudflare tunnel '" + validTunnelName + "' status because its handle is invalid!",
-				"TUNNEL_STATUS",
+				"Cannot shut down server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "' because its handle is invalid!",
+				"CLOUDFLARE_SHUTDOWN",
 				LogType::LOG_ERROR,
 				2);
 
-			return false;
+			return;
 		}
 
-		return WaitForSingleObject(handle, 0) == WAIT_TIMEOUT;
+		TerminateProcess(handle, 0);
+		CloseHandle(handle);
 #else
-		pid_t pid = tunnelHandle;
+		pid_t pid = ToVar<pid_t>(tunnelHandle);
 
 		if (pid <= 0)
 		{
 			Log::Print(
-				"Cannot check for Clouflare tunnel '" + validTunnelName + "' status because its PID is invalid!",
-				"TUNNEL_STATUS",
+				"Cannot shut down server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "' because its PID is invalid!",
+				"CLOUDFLARE_SHUTDOWN",
 				LogType::LOG_ERROR,
 				2);
 
-			return false;
+			return;
 		}
 
-		int status{};
-		pid_t r = waitpid(pid, &status, WNOHANG);
-
-		if (r == -1)
-		{
-			Log::Print(
-				"Failed to check Cloudflare tunnel '" + validTunnelName + "' status because its PID is wrong, gone or temporarily interrupted!",
-				"TUNNEL_STATUS",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
-		}
-
-		return r == 0;
+		kill(pid, SIGKILL);
+		waitpid(pid, nullptr, 0);
 #endif
+
+		tunnelHandle = 0;
+
+		if (cfThread.joinable()) cfThread.join();
+
+		isInitialized = false;
+
+		Log::Print(
+			"Finished shutting down server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "'!",
+			"CLOUDFLARE_SHUTDOWN",
+			LogType::LOG_SUCCESS);
 	}
 
 	bool Cloudflare::RunTunnel(string_view command)
@@ -420,7 +409,7 @@ namespace KalaServer::Server
 			0))
 		{
 			Log::Print(
-				"Failed to create read/write pipe for tunnel '" + validTunnelName + "'!",
+				"Failed to create server '" + ServerCore::GetServerName() + "' read/write pipe for tunnel '" + validTunnelName + "'!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -433,7 +422,7 @@ namespace KalaServer::Server
 			0))
 		{
 			Log::Print(
-				"Failed to set up pipe handle inheritance for tunnel '" + validTunnelName + "'!",
+				"Failed to set up server '" + ServerCore::GetServerName() + "' pipe handle inheritance for tunnel '" + validTunnelName + "'!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -448,7 +437,7 @@ namespace KalaServer::Server
 		if (pipe(pipefd) == -1)
 		{
 			Log::Print(
-				"Failed to create read/write pipe for tunnel '" + validTunnelName + "'!",
+				"Failed to create server '" + ServerCore::GetServerName() + "' read/write pipe for tunnel '" + validTunnelName + "'!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -464,7 +453,7 @@ namespace KalaServer::Server
 			|| fcntl(pipefd[0], F_SETFD, flags | FD_CLOEXEC) == -1)
 		{
 			Log::Print(
-				"Failed to set up pipe handle inheritance for tunnel '" + validTunnelName + "'!",
+				"Failed to set up server '" + ServerCore::GetServerName() + "' pipe handle inheritance for tunnel '" + validTunnelName + "'!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -493,7 +482,7 @@ namespace KalaServer::Server
 		if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 		{
 			Log::Print(
-				"Piping Cloudflare messages to internal console for tunnel '" + validTunnelName + "'!",
+				"Piping server '" + ServerCore::GetServerName() + "' Cloudflare messages to internal console for tunnel '" + validTunnelName + "'!",
 				"CLOUDFLARE",
 				LogType::LOG_INFO);
 		}
@@ -548,7 +537,7 @@ namespace KalaServer::Server
 					else if (index == 3) KalaServer::Server::isFourthHealthy = true;
 
 					Log::Print(
-						"Connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked healthy!",
+						"Server '" + ServerCore::GetServerName() + "' connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked healthy!",
 						"CLOUDFLARE",
 						LogType::LOG_INFO);
 
@@ -561,7 +550,7 @@ namespace KalaServer::Server
 						ServerCore::SetServerReadyState(true);
 
 						Log::Print(
-							"Cloudflare tunnel '" + validTunnelName + "' has connected successfully and server '" + ServerCore::GetServerName() + "' is ready!",
+							"Server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "' has connected successfully and server '" + ServerCore::GetServerName() + "' is ready!",
 							"CLOUDFLARE",
 							LogType::LOG_SUCCESS);
 					}
@@ -578,7 +567,7 @@ namespace KalaServer::Server
 					else if (index == 3) KalaServer::Server::isFourthHealthy = false;
 
 					Log::Print(
-						"Connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked unhealthy.",
+						"Server '" + ServerCore::GetServerName() + "' connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked unhealthy.",
 						"CLOUDFLARE",
 						LogType::LOG_WARNING);
 				}
@@ -628,95 +617,94 @@ namespace KalaServer::Server
 		}
 	}
 
-	void Cloudflare::Shutdown()
+	bool Cloudflare::IsTunnelHealthy()
 	{
-		if (!ServerCore::IsInitialized())
+		return isFirstHealthy
+			&& isSecondHealthy
+			&& isThirdHealthy
+			&& isFourthHealthy;
+	}
+
+	bool Cloudflare::IsTunnelAlive()
+	{
+		if (!ServerCore::IsCloudflareRequired())
 		{
 			Log::Print(
-				"Cannot shut down Clouflare tunnel because the server has not been initialized!",
-				"CLOUDFLARE_SHUTDOWN",
+				"Cannot check for server '" + ServerCore::GetServerName() + "' Clouflare tunnel alive state because the server does not require a Cloudflare tunnel!",
+				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
 		if (!ServerCore::IsReady())
 		{
 			Log::Print(
-				"Cannot shut down Clouflare tunnel because the server is not ready!",
-				"CLOUDFLARE_SHUTDOWN",
+				"Cannot check for server '" + ServerCore::GetServerName() + "' Clouflare tunnel alive state because the server is not running or not ready!",
+				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
-		}
-
-		if (!Cloudflare::IsInitialized())
-		{
-			Log::Print(
-				"Cannot shut down Cloudflare tunnel because it has not been initialized!",
-				"CLOUDFLARE_SHUTDOWN",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
+			return false;
 		}
 
 		if (tunnelHandle == 0)
 		{
 			Log::Print(
-				"Cannot shut down Cloudflare tunnel '" + validTunnelName + "' because it has not been assigned.",
-				"CLOUDFLARE_SHUTDOWN",
-				LogType::LOG_WARNING);
+				"Cannot check for server '" + ServerCore::GetServerName() + "' Clouflare tunnel alive state because it has not been assigned!",
+				"TUNNEL_STATUS",
+				LogType::LOG_ERROR,
+				2);
 
-			return;
+			return false;
 		}
 
 #ifdef _WIN32
-		HANDLE handle = ToVar<HANDLE>(tunnelHandle);
+		HANDLE handle = rcast<HANDLE>(tunnelHandle);
 
 		if (handle == INVALID_HANDLE_VALUE)
 		{
 			Log::Print(
-				"Cannot shut down Cloudflare tunnel '" + validTunnelName + "' because its handle is invalid!",
-				"CLOUDFLARE_SHUTDOWN",
+				"Cannot check for server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "' alive state because its handle is invalid!",
+				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
-		TerminateProcess(handle, 0);
-		CloseHandle(handle);
+		return WaitForSingleObject(handle, 0) == WAIT_TIMEOUT;
 #else
-		pid_t pid = ToVar<pid_t>(tunnelHandle);
+		pid_t pid = tunnelHandle;
 
 		if (pid <= 0)
 		{
 			Log::Print(
-				"Cannot shut down Cloudflare tunnel '" + validTunnelName + "' because its PID is invalid!",
-				"CLOUDFLARE_SHUTDOWN",
+				"Cannot check for server '" + ServerCore::GetServerName() + "' Clouflare tunnel '" + validTunnelName + "' alive state because its PID is invalid!",
+				"TUNNEL_STATUS",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
-		kill(pid, SIGKILL);
-		waitpid(pid, nullptr, 0);
+		int status{};
+		pid_t r = waitpid(pid, &status, WNOHANG);
+
+		if (r == -1)
+		{
+			Log::Print(
+				"Failed to check server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "' alive state because its PID is wrong, gone or temporarily interrupted!",
+				"TUNNEL_STATUS",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		return r == 0;
 #endif
-
-		tunnelHandle = 0;
-
-		if (cfThread.joinable()) cfThread.join();
-
-		isInitialized = false;
-
-		Log::Print(
-			"Finished shutting down Cloudflare tunnel '" + validTunnelName + "'!",
-			"CLOUDFLARE_SHUTDOWN",
-			LogType::LOG_SUCCESS);
 	}
 }
 
@@ -725,7 +713,7 @@ bool CreateCertFile()
 	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 	{
 		Log::Print(
-			"Creating new Cloudflare tunnel cert file for tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
+			"Creating new Cloudflare tunnel cert file for server '" + ServerCore::GetServerName() + "' tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
 			"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
@@ -741,7 +729,7 @@ bool CreateCertFile()
 	if (!exists(cfCertFile))
 	{
 		Log::Print(
-			"Failed to create Cloudflare cert for tunnel '" + validTunnelName + "' because user did not successfully authenticate via browser!",
+			"Failed to create Cloudflare cert for server '" + ServerCore::GetServerName() + "' tunnel '" + validTunnelName + "' because user did not successfully authenticate via browser!",
 			"CLOUDFLARE",
 			LogType::LOG_ERROR,
 			2);
@@ -760,7 +748,7 @@ bool CreateTunnelCredentials()
 	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 	{
 		Log::Print(
-			"Creating Cloudflare tunnel credentials.",
+			"Creating server '" + ServerCore::GetServerName() + "' Cloudflare tunnel credentials.",
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
@@ -792,7 +780,7 @@ bool CreateTunnelCredentials()
 	if (cfTunnelID.empty())
 	{
 		Log::Print(
-			"Failed to create Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "' because newly created tunnel ID was not found!!",
+			"Failed to create server '" + ServerCore::GetServerName() + "' Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "' because newly created tunnel ID was not found!!",
 			"CLOUDFLARE",
 			LogType::LOG_ERROR,
 			2);
@@ -805,7 +793,7 @@ bool CreateTunnelCredentials()
 	if (!exists(cfJsonFile))
 	{
 		Log::Print(
-			"Failed to create Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "'!",
+			"Failed to create server '" + ServerCore::GetServerName() + "' Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "'!",
 			"CLOUDFLARE",
 			LogType::LOG_ERROR,
 			2);
@@ -814,7 +802,7 @@ bool CreateTunnelCredentials()
 	}
 
 	Log::Print(
-		"Created new cloudflare json file at '" + cfJsonFile.string() + "'!",
+		"Created new server '" + ServerCore::GetServerName() + "' Cloudflare json file at '" + cfJsonFile.string() + "'!",
 		"CLOUDFLARE",
 		LogType::LOG_SUCCESS);
 
@@ -826,7 +814,7 @@ bool RouteTunnel()
 	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 	{
 		Log::Print(
-			"Starting to route Cloudflare tunnel '" + validTunnelName + "'.",
+			"Starting to route server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "'.",
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
@@ -854,7 +842,7 @@ bool RouteTunnel()
 	}
 
 	Log::Print(
-		"Routed Cloudflare tunnel '" + validTunnelName + "'!",
+		"Routed server '" + ServerCore::GetServerName() + "' Cloudflare tunnel '" + validTunnelName + "'!",
 		"CLOUDFLARE",
 		LogType::LOG_SUCCESS);
 
@@ -865,6 +853,14 @@ bool CreateConfigFile(string& outCommand)
 {
 	path certPath = validCFFolderPath / "cert.pem";
 	path configPath = validCFFolderPath / "config.yml";
+
+	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+	{
+		Log::Print(
+			"Starting to create server '" + ServerCore::GetServerName() + "' config file '" + configPath.string() + "'.",
+			"CLOUDFLARE",
+			LogType::LOG_INFO);
+	}
 
 	string domainName = ServerCore::GetDomainName();
 	string port = to_string(ServerCore::GetPort());
@@ -899,7 +895,7 @@ bool CreateConfigFile(string& outCommand)
 		if (!in.is_open())
 		{
 			Log::Print(
-				"Failed to check contents of Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' to verify if it is up to date!",
+				"Failed to check contents of server '" + ServerCore::GetServerName() + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' to verify if it is up to date!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -923,7 +919,7 @@ bool CreateConfigFile(string& outCommand)
 			if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 			{
 				Log::Print(
-					"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' does not exist and will be made.",
+					"Server '" + ServerCore::GetServerName() + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' does not exist and will be made.",
 					"CLOUDFLARE",
 					LogType::LOG_INFO);
 			}
@@ -933,7 +929,7 @@ bool CreateConfigFile(string& outCommand)
 			if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 			{
 				Log::Print(
-					"Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' is out of date and will be rewritten.",
+					"Server '" + ServerCore::GetServerName() + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' is out of date and will be rewritten.",
 					"CLOUDFLARE",
 					LogType::LOG_INFO);
 			}
@@ -944,7 +940,7 @@ bool CreateConfigFile(string& outCommand)
 		if (!file.is_open())
 		{
 			Log::Print(
-				"Failed to create Cloudflare config file to '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
+				"Failed to create server '" + ServerCore::GetServerName() + "' Cloudflare config file to '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -957,7 +953,7 @@ bool CreateConfigFile(string& outCommand)
 		if (!file.good())
 		{
 			Log::Print(
-				"Failed to write into newly created Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
+				"Failed to write into newly created server '" + ServerCore::GetServerName() + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
 				"CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
@@ -970,7 +966,7 @@ bool CreateConfigFile(string& outCommand)
 	else
 	{
 		Log::Print(
-			"Cloudflare config file already exists at '" + configPath.string() + "', skipping creation and using existing one.",
+			"Server '" + ServerCore::GetServerName() + "' Cloudflare config file already exists at '" + configPath.string() + "', skipping creation and using existing one.",
 			"CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
@@ -999,7 +995,7 @@ bool CreateCloudflareProcess(
 		if (isVerboseLoggingEnabled.load(memory_order_relaxed))
 		{
 			Log::Print(
-				"Starting to create process with command '" + string(command) + "' for tunnel '" + validTunnelName + "'",
+				"Starting to create server '" + ServerCore::GetServerName() + "' process with command '" + string(command) + "' for tunnel '" + validTunnelName + "'",
 				"CLOUDFLARE",
 				LogType::LOG_INFO);
 		}

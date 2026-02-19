@@ -3,12 +3,13 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include <atomic>
 #ifdef _WIN32
 #include <winsock2.h>
-#pragma comment(lib, "ws2_32.lib")
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #endif
 
@@ -16,6 +17,7 @@
 #include <thread>
 #include <chrono>
 #include <memory>
+#include <cerrno>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/log_utils.hpp"
@@ -24,6 +26,7 @@
 
 #include "server/ks_connect.hpp"
 #include "server/ks_server.hpp"
+#include "server/ks_cloudflare.hpp"
 #include "server/ks_response.hpp"
 #include "core/ks_core.hpp"
 
@@ -33,6 +36,7 @@ using KalaHeaders::KalaCore::ToVar;
 using KalaHeaders::KalaThread::lockwait_m;
 using KalaHeaders::KalaThread::unlock_m;
 using KalaHeaders::KalaThread::joinable_thread;
+using KalaHeaders::KalaThread::abool;
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -41,6 +45,7 @@ using KalaHeaders::KalaString::HasAnyWhiteSpace;
 using KalaHeaders::KalaString::SplitString;
 
 using KalaServer::Server::Connection;
+using KalaServer::Server::ResponseData;
 using KalaServer::Core::KalaServerCore;
 
 using std::memory_order_acquire;
@@ -50,6 +55,7 @@ using std::to_string;
 using std::this_thread::sleep_for;
 using std::chrono::seconds;
 using std::chrono::milliseconds;
+using std::unique_ptr;
 using std::make_unique;
 
 #ifdef _WIN32
@@ -69,7 +75,9 @@ using std::wstring;
 static wstring ToWide(const string& input);
 #endif
 
-static void ConnectStart(Connection* c);
+static unique_ptr<Connection> dummyConnection{};
+
+static void HandleConnectionCallback(ResponseData& data);
 
 namespace KalaServer::Server
 {
@@ -90,64 +98,100 @@ namespace KalaServer::Server
 	static vector<unique_ptr<Connection>> connectSockets{};
 	static mutex m_connectSockets{};
 
-	Connection::~Connection()
+	bool Connect::CreateListenerSocket()
 	{
-		isRunning.store(false, memory_order_release);
-
-		ksocket cs = 
-#ifdef _WIN32
-		ToVar<SOCKET>(connectionSocket.load(memory_order_acquire));
-#else
-		ToVar<int>(connectionSocket.load(memory_order_acquire));
-#endif
-
-		if (cs != UNASSIGNED_SOCKET_VALUE)
-		{
-#ifdef _WIN32
-			shutdown(cs, SD_BOTH);
-			closesocket(cs);
-#else
-			shutdown(cs, SHUT_RDWR);
-			close(cs);
-#endif	
-		}
-
-		if (connectionThread.joinable()) listenerSocket->connectionThread.join();
-	}
-
-	void Connect::HandleListenerCallback(Connection& c)
-	{
-
-	}
-
-	void Connect::CreateListenerSocket(function<void(Connection&)> onConnect)
-	{
-		if (!ServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
-				"LISTENER_SOCKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
+		if (!dummyConnection) dummyConnection = make_unique<Connection>();
 
 		if (!ServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the server is not ready!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the server is not running or not ready!",
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
+		}
+
+		if (TIME_OUT_PERIOD_M == 0)
+		{
+			Log::Print(
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the TIME_OUT_PERIOD_M value was set to 0!",
+				"LISTENER_SOCKET",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (ROLLING_WINDOW_TIMER_S == 0)
+		{
+			Log::Print(
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the ROLLING_WINDOW_TIMER_S value was set to 0!",
+				"LISTENER_SOCKET",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (MIN_PACKET_SPACING_MS == 0)
+		{
+			Log::Print(
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the MIN_PACKET_SPACING_MS value was set to 0!",
+				"LISTENER_SOCKET",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (ACCEPT_WAIT_TIME_MS == 0)
+		{
+			Log::Print(
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the ACCEPT_WAIT_TIME_MS value was set to 0!",
+				"LISTENER_SOCKET",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (MAX_TOTAL_PAYLOAD_SIZE_BYTES == 0)
+		{
+			Log::Print(
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the MAX_TOTAL_PAYLOAD_SIZE_BYTES value was set to 0!",
+				"LISTENER_SOCKET",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (UNASSIGNED_SOCKET_VALUE < 8192)
+		{
+			Log::Print(
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the UNASSIGNED_SOCKET_VALUE value was set below 8192!",
+				"LISTENER_SOCKET",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (MAX_ACTIVE_CONNECTIONS == 0)
+		{
+			Log::Print(
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the MAX_ACTIVE_CONNECTIONS value was set to 0!",
+				"LISTENER_SOCKET",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
 		}
 
 		Log::Print(
 			"Creating a new listener socket for server '" + ServerCore::GetServerName() + "'!",
 			"LISTENER_SOCKET",
 			LogType::LOG_INFO);
+
+		//
+		// CHECK FOR EXISTING SOCKET
+		//
 
 		lockwait_m(m_listenerSocket);
 		if (listenerSocket)
@@ -169,27 +213,17 @@ namespace KalaServer::Server
 
 				unlock_m(m_listenerSocket);
 
-				return;
+				return false;
 			}
 		}
 		unlock_m(m_listenerSocket);
 
+		//
+		// CREATE, BIND AND LISTEN
+		//
+
 #ifdef _WIN32
-		WSADATA wsaData{};
 		int iResult{};
-
-		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-		{
-			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because WSAStartup failed!",
-				"LISTENER_SOCKET",
-				LogType::LOG_ERROR,
-				2);
-
-			WSACleanup();
-
-			return;
-		}
 
 		SOCKET newSocket = socket(
 			AF_INET,
@@ -199,14 +233,12 @@ namespace KalaServer::Server
 		if (newSocket == INVALID_SOCKET)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket creation failed!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
 
-			WSACleanup();
-
-			return;
+			return false;
 		}
 
 		sockaddr_in serverAddress{};
@@ -220,41 +252,41 @@ namespace KalaServer::Server
 			sizeof(serverAddress)) == SOCKET_ERROR)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket bind failed!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
 
+			shutdown(newSocket, SD_BOTH);
 			closesocket(newSocket);
-			WSACleanup();
 
-			return;
+			return false;
 		}
 
 		if (listen(newSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket listen failed!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
 
+			shutdown(newSocket, SD_BOTH);
 			closesocket(newSocket);
-			WSACleanup();
 
-			return;
+			return false;
 		}
 #else
 		int newSocket = socket(AF_INET, SOCK_STREAM, 0);
 		if (newSocket < 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket creation failed!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(errno),
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
 
-			return;
+			return false;
 		}
 
 		sockaddr_in serverAddress{};
@@ -268,27 +300,36 @@ namespace KalaServer::Server
 			sizeof(serverAddress)) < 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket bind failed!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(errno),
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
 
+			shutdown(newSocket, SHUT_RDWR);
 			close(newSocket);
-			return;
+
+			return false;
 		}
 
 		if (listen(newSocket, SOMAXCONN) < 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket listen failed!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(errno),
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
 
+			shutdown(newSocket, SHUT_RDWR);
 			close(newSocket);
-			return;
+
+			return false;
 		}
 #endif
+
+		//
+		// STORE LISTENER SOCKET
+		//
+
 		unique_ptr<Connection> newListenerSocket = make_unique<Connection>();
 		Connection* localListener = newListenerSocket.get();
 
@@ -300,12 +341,16 @@ namespace KalaServer::Server
 
 		unlock_m(m_listenerSocket);
 
+		//
+		// START CONNECT SOCKET ACCEPT PROCESS
+		//
+
 		Log::Print(
 			"Created a new listener socket for server '" + ServerCore::GetServerName() + "', starting the accept loop!",
 			"LISTENER_SOCKET",
 			LogType::LOG_SUCCESS);
 
-		localListener->connectionThread = joinable_thread([localListener, onConnect]
+		localListener->connectionThread = joinable_thread([localListener]
 			{
 				while (true)
 				{
@@ -319,111 +364,487 @@ namespace KalaServer::Server
 						return;
 					}
 
-					if (!Cloudflare::IsTunnelHealthy())
+					if (!ServerCore::IsHealthy())
 					{
-						bool isOnline =
-							Cloudflare::IsTunnelAlive()
-							&& ServerCore::HasInternet();
+						Log::Print(
+							"Server is not healthy, waiting until trying again.",
+							"ACCEPT_LOOP",
+							LogType::LOG_INFO);
 
-						//wait a moment instead of spamming full check every frame
-						if (!isOnline) sleep_for(seconds(SERVER_HEALTH_SLEEP_SECONDS));
+						sleep_for(seconds(SERVER_HEALTH_SLEEP_S));
 
 						continue;
 					}
-						
+
+					vector<unique_ptr<Connection>> finishedConnections{};
+
+					lockwait_m(m_connectSockets);
+					for (auto it = connectSockets.begin(); it != connectSockets.end();)
+					{
+						if (!(*it)->isRunning.load(memory_order_acquire))
+						{
+							finishedConnections.push_back(std::move(*it));
+							it = connectSockets.erase(it);
+						}
+						else ++it;
+					}
+					unlock_m(m_connectSockets);
+
+					for (auto& conn : finishedConnections)
+					{
 #ifdef _WIN32
-					ksocket ls = ToVar<SOCKET>(localListener->connectionSocket.load(memory_order_acquire));
+						SOCKET cs = ToVar<SOCKET>(conn->connectionSocket.load(memory_order_acquire));
+						if (cs != UNASSIGNED_SOCKET_VALUE)
+						{
+							shutdown(cs, SD_BOTH);
+							closesocket(cs);
+						}
+#else
+						int cs = ToVar<int>(conn->connectionSocket.load(memory_order_acquire));
+						if (cs != UNASSIGNED_SOCKET_VALUE)
+						{
+							shutdown(cs, SHUT_RDWR);
+							close(cs);
+						}
+#endif
 
-					SOCKET client = accept(
-						ls,
+						if (conn->connectionThread.joinable()) conn->connectionThread.join();
+					}
+
+					//
+					// VERIFY CONNECTING SOCKET
+					//
+
+#ifdef _WIN32
+					ksocket lsock = ToVar<SOCKET>(localListener->connectionSocket.load(memory_order_acquire));
+
+					ksocket client = accept(
+						lsock,
 						nullptr,
 						nullptr);
 
+					Log::Print(
+						"Connection received, verifying socket.",
+						"ACCEPT_LOOP",
+						LogType::LOG_INFO);
+
 					if (client == invalid_socket)
 					{
-						int err = WSAGetLastError();
-
 						Log::Print(
-							"Connection failed! Reason: " + to_string(err),
+							"Failed to accept new connection! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
 							"ACCEPT_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
 						continue;
 					}
-#else
-					ksocket ls = ToVar<int>(localListener->connectionSocket.load(memory_order_acquire));
 
-					int client = accept(
-						ls,
-						nullptr,
-						nullptr);
+					DWORD timeout = ACCEPT_WAIT_TIME_MS;
+					int result_rcv_time = setsockopt(
+						client,
+						SOL_SOCKET,
+						SO_RCVTIMEO,
+						(char*)&timeout,
+						sizeof(timeout));
 
-					if (client == invalid_socket)
+					if (result_rcv_time == SOCKET_ERROR)
 					{
-						int err = errno;
-
 						Log::Print(
-							"Connection failed! Reason: " + to_string(err),
+							"Failed to accept new connection because SO_RCVTIMEO could not be set!",
 							"ACCEPT_LOOP",
 							LogType::LOG_ERROR,
 							2);
+
+						shutdown(client, SD_BOTH);
+						closesocket(client);
+
+						continue;
+					}
+
+					int result_snd_time = setsockopt(
+						client,
+						SOL_SOCKET,
+						SO_SNDTIMEO,
+						(char*)&timeout,
+						sizeof(timeout));
+
+					if (result_snd_time == SOCKET_ERROR)
+					{
+						Log::Print(
+							"Failed to accept new connection because SO_SNDTIMEO could not be set!",
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						shutdown(client, SD_BOTH);
+						closesocket(client);
+
+						continue;
+					}
+
+					BOOL no_delay = TRUE;
+
+					int result_no_delay = setsockopt(
+						client,
+						IPPROTO_TCP,
+						TCP_NODELAY,
+						(char*)&no_delay,
+						sizeof(no_delay));
+
+					if (result_no_delay == SOCKET_ERROR)
+					{
+						Log::Print(
+							"Failed to accept new connection because TCP_NODELAY could not be set!",
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						shutdown(client, SD_BOTH);
+						closesocket(client);
+
+						continue;
+					}
+#else 
+					ksocket lsock = ToVar<int>(localListener->connectionSocket.load(memory_order_acquire));
+
+					ksocket client = accept(
+						lsock,
+						nullptr,
+						nullptr);
+
+					Log::Print(
+						"Connection received, verifying socket.",
+						"ACCEPT_LOOP",
+						LogType::LOG_INFO);
+
+					if (client == invalid_socket)
+					{
+						Log::Print(
+							"Failed to accept new connection! Reason: " + KalaServerCore::ErrorToString(errno),
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						continue;
+					}
+
+					struct timeval timeout{};
+					timeout.tv_sec = ACCEPT_WAIT_TIME_MS / 1000;
+					timeout.tv_usec = (ACCEPT_WAIT_TIME_MS % 1000) * 1000;
+
+					int result_rcv_time = setsockopt(
+						client,
+						SOL_SOCKET,
+						SO_RCVTIMEO,
+						&timeout,
+						sizeof(timeout));
+
+					if (result_rcv_time < 0)
+					{
+						Log::Print(
+							"Failed to accept new connection because SO_RCVTIMEO could not be set!",
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						shutdown(client, SHUT_RDWR);
+						close(client);
+
+						continue;
+					}
+
+					int result_snd_time = setsockopt(
+						client,
+						SOL_SOCKET,
+						SO_SNDTIMEO,
+						&timeout,
+						sizeof(timeout));
+
+					if (result_snd_time < 0)
+					{
+						Log::Print(
+							"Failed to accept new connection because SO_SNDTIMEO could not be set!",
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						shutdown(client, SHUT_RDWR);
+						close(client);
+
+						continue;
+					}
+
+					int no_delay = 1;
+
+					int result_no_delay = setsockopt(
+						client,
+						IPPROTO_TCP,
+						TCP_NODELAY,
+						&no_delay,
+						sizeof(no_delay));
+
+					if (result_no_delay < 0)
+					{
+						Log::Print(
+							"Failed to accept new connection because TCP_NODELAY could not be set!",
+							"ACCEPT_LOOP",
+							LogType::LOG_ERROR,
+							2);
+
+						shutdown(client, SHUT_RDWR);
+						close(client);
 
 						continue;
 					}
 #endif
 
-					if (!onConnect)
+					lockwait_m(m_connectSockets);
+
+					if (connectSockets.size() >= MAX_ACTIVE_CONNECTIONS)
 					{
+						string reason = "Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' was reached, cannot accept new connections!";
+
 						Log::Print(
-							"Connection received but no connection callback was assigned!",
+							reason,
 							"ACCEPT_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
-						continue;
-					}
-
-					Log::Print(
-						"Connection received.",
-						"ACCEPT_LOOP",
-						LogType::LOG_INFO);
-
-					unique_ptr<Connection> c = make_unique<Connection>();
-					Connection* raw = c.get();
-
-					raw->connectionSocket.store(FromVar(client), memory_order_release);
-
-					lockwait_m(m_connectSockets);
-					if (connectSockets.size() >= MAX_ACTIVE_CONNECTIONS)
-					{
 						unlock_m(m_connectSockets);
 
-						Log::Print(
-							"Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' reached, kicking new connection.",
-							"ACCEPT_LOOP",
-							LogType::LOG_WARNING);
-						
+						string_view responseBodyTitle = Response::ResponseTypeToString(ResponseType::R_503);
+
 						Response::SendResponse({
 							.responseType = ResponseType::R_503,
 							.contentType = ContentType::CT_HTML,
 							.responseBody = 
-								"<html><body><h1>Service unavailable</h1>\n"
-								"<p>Server limit reached! Try again later.</p></body></html>",
-							.connection = raw
+								"<html><body><h1>" + string(responseBodyTitle) + "</h1>\n"
+								"<p>" + reason + "</p></body></html>",
+							.connectionSocket = FromVar(client)
 						});
+
+#ifdef _WIN32
+						shutdown(client, SD_BOTH);
+						closesocket(client);
+#else
+						shutdown(client, SHUT_RDWR);
+						close(client);
+#endif
 
 						continue;
 					}
+
+					unique_ptr<Connection> c = make_unique<Connection>();
+					c->isRunning.store(true, memory_order_release);
+					c->connectionSocket.store(FromVar(client), memory_order_release);
+				
+					Connection* raw = c.get();
 					connectSockets.push_back(std::move(c));
+
 					unlock_m(m_connectSockets);
 
-					raw->connectionThread = joinable_thread([onConnect, raw]
+					raw->connectionThread = joinable_thread([raw]
 						{
-							onConnect(*raw);
+							auto close_socket_on_error = [raw](
+								string_view error_reason, 
+								ResponseType type,
+								Connection* conn) -> void
+								{
+									string reason = "Connection failed! Reason: " + string(error_reason) + "!";
+
+									Log::Print(
+										reason,
+										"ACCEPT_LOOP",
+										LogType::LOG_ERROR,
+										2);
+
+									string_view responseBodyTitle = Response::ResponseTypeToString(type);
+
+									Response::SendResponse({
+										.responseType = type,
+										.contentType = ContentType::CT_HTML,
+										.responseBody = 
+											"<html><body><h1>" + string(responseBodyTitle) + "</h1>\n"
+											"<p>" + reason + "</p></body></html>",
+										.connection = conn
+									});
+
+									raw->isRunning.store(false, memory_order_release);
+								};
+
+							string readBuffer{};
+
+							while (raw->isRunning.load(memory_order_acquire))
+							{
+#ifdef _WIN32
+								ksocket csock = ToVar<SOCKET>(raw->connectionSocket.load(memory_order_acquire));
+
+								char buffer[2048]{};
+								int bytesReceived = recv(
+									csock, 
+									buffer, 
+									sizeof(buffer), 
+									0);
+
+								if (bytesReceived == SOCKET_ERROR)
+								{
+									DWORD err = WSAGetLastError();
+
+									//interrupted, try again
+									if (err == WSAEINTR) continue;
+
+									else if (err == WSAETIMEDOUT
+											|| err == WSAEWOULDBLOCK)
+									{
+										Log::Print(
+											"BytesReceived recv read timed out!",
+											"ACCEPT_LOOP",
+											LogType::LOG_ERROR,
+											2);
+
+										raw->isRunning.store(false, memory_order_release);
+
+										continue;
+									}
+									
+									Log::Print(
+										"BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(err),
+										"ACCEPT_LOOP",
+										LogType::LOG_ERROR,
+										2);
+
+									raw->isRunning.store(false, memory_order_release);
+
+									continue;
+								}
+
+								if (bytesReceived == 0)
+								{
+									Log::Print(
+										"Connection was closed during bytesReceived recv read.",
+										"ACCEPT_LOOP",
+										LogType::LOG_INFO);
+
+									raw->isRunning.store(false, memory_order_release);
+
+									continue;
+								}
+#else
+								ksocket csock = ToVar<int>(raw->connectionSocket.load(memory_order_acquire));
+
+								char buffer[2048]{};
+								int bytesReceived = recv(
+									csock, 
+									buffer, 
+									sizeof(buffer), 
+									0);
+
+								if (bytesReceived < 0)
+								{
+									//interrupted, try again
+									if (errno == EINTR) continue;
+
+									else if (errno == EAGAIN
+											 || errno == EWOULDBLOCK)
+									{
+										Log::Print(
+											"BytesReceived recv read timed out!",
+											"ACCEPT_LOOP",
+											LogType::LOG_ERROR,
+											2);
+
+										raw->isRunning.store(false, memory_order_release);
+
+										continue;
+									}
+									
+									Log::Print(
+										"BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(errno),
+										"ACCEPT_LOOP",
+										LogType::LOG_ERROR,
+										2);
+
+									raw->isRunning.store(false, memory_order_release);
+
+									continue;
+								}
+
+								if (bytesReceived == 0)
+								{
+									Log::Print(
+										"Connection was closed during bytesReceived recv read.",
+										"ACCEPT_LOOP",
+										LogType::LOG_INFO);
+
+									raw->isRunning.store(false, memory_order_release);
+
+									continue;
+								}
+#endif
+
+								readBuffer.append(buffer, bytesReceived);
+
+								if (readBuffer.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
+								{
+									close_socket_on_error(
+										"Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload",
+										ResponseType::R_413,
+										raw);
+
+									break;
+								}
+
+								while (true)
+								{
+									auto headerEnd = readBuffer.find("\r\n\r\n");
+									if (headerEnd == string::npos) break;
+
+									string request = readBuffer.substr(0, headerEnd + 4);
+									readBuffer.erase(0, headerEnd + 4);
+
+									if (request.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
+									{
+										close_socket_on_error(
+											"Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload",
+											ResponseType::R_413,
+											raw);
+
+										break;
+									}
+
+									//
+									// CONNECTING SOCKET LOOKS SAFE AND WILL BE ADDED
+									//
+
+									string reason = "linux webserver lul";
+
+									Log::Print(
+										reason,
+										"ACCEPT_LOOP",
+										LogType::LOG_INFO);
+
+									string_view responseBodyTitle = Response::ResponseTypeToString(ResponseType::R_404);
+
+									Response::SendResponse({
+										.responseType = ResponseType::R_418,
+										.contentType = ContentType::CT_HTML,
+										.responseBody = 
+											"<html><body>\n"
+												"<h1>" + reason + "</h1>\n"
+													"<p><a href=\"https://github.com/Lost-Empire-Entertainment/KalaKit-website\">"
+														"Check out the KalaKit website source code</a></p>\n"
+													"<p><a href=\"https://github.com/KalaKit/KalaServer\">"
+														"Check out the KalaKit server source code</a></p>\n"
+											"</body></html>",
+										.connection = raw
+									});
+								}
+							}
 						});
 				}
 			});
+
+		return true;
 	}
 
 	bool Connect::IsListenerRunning()
@@ -434,35 +855,6 @@ namespace KalaServer::Server
 		unlock_m(m_listenerSocket);
 
 		return isRunning;
-	}
-
-	void Connect::CreateConnectSocket(
-		const string& targetIP,
-		function<void()> onConnectFail)
-	{
-		//TODO: use callback
-
-		if (!ServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Failed to create connect socket with target IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
-				"CREATE_CONNECT_SOCKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-		if (!ServerCore::IsReady())
-		{
-			Log::Print(
-				"Failed to create connect socket with target IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the server is not ready!",
-				"CREATE_CONNECT_SOCKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
 	}
 
 	Connection* Connect::GetListenerSocket() { return listenerSocket.get(); }
@@ -480,78 +872,12 @@ namespace KalaServer::Server
 	}
 	mutex& Connect::GetConnectMutex() { return m_connectSockets; }
 
-	void Connect::SendPacket(
-		uintptr_t targetSocket,
-		bool getResponse,
-		function<void(vector<u8>)> onSucceed,
-		function<void()> onFail)
+	void Connect::DisconnectConnectedUser(uintptr_t targetSocket)
 	{
-		//TODO: use callbacks
-
-		if (!ServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Failed to send packet from server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
-				"SEND_PACKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
 		if (!ServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to send packet from server '" + ServerCore::GetServerName() + "' because the server is not ready!",
-				"SEND_PACKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-	}
-
-	void Connect::SendPacketLocal(
-		const string& targetIP,
-		bool getResponse,
-		function<void(vector<u8>)> onSucceed,
-		function<void()> onFail)
-	{
-		//TODO: use callbacks
-
-		if (!ServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Failed to send local packet from server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
-				"SEND_LOCAL_PACKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-		if (!ServerCore::IsReady())
-		{
-			Log::Print(
-				"Failed to send local packet from server '" + ServerCore::GetServerName() + "' because the server is not ready!",
-				"SEND_LOCAL_PACKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-	}
-
-	void Connect::DisconnectConnectedUser(
-		uintptr_t targetSocket,
-		string_view reason)
-	{
-		//TODO: send reason
-
-		if (!ServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Failed to disconnect target via socket for server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
+				"Failed to disconnect target via socket for server '" + ServerCore::GetServerName() + "' because the server is not running or not ready!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -559,23 +885,14 @@ namespace KalaServer::Server
 			return;
 		}
 
-		if (!ServerCore::IsReady())
-		{
-			Log::Print(
-				"Failed to disconnect target via socket for server '" + ServerCore::GetServerName() + "' because the server is not ready!",
-				"DISCONNECT_TARGET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-		if (!targetSocket
+		ksocket target = 
 #ifdef _WIN32
-			|| scast<SOCKET>(targetSocket) == invalid_socket)
+			ToVar<SOCKET>(targetSocket);
 #else
-			|| targetSocket == invalid_socket)
+			ToVar<int>(targetSocket);
 #endif
+
+		if (target == invalid_socket)
 		{
 			Log::Print(
 				"Failed to disconnect target via socket for server '" + ServerCore::GetServerName() + "' because the socket is unassigned or invalid!",
@@ -586,45 +903,32 @@ namespace KalaServer::Server
 			return;
 		}
 
-		lockwait_m(m_connectSockets);
+		unique_ptr<Connection> targetUser{};
 
+		lockwait_m(m_connectSockets);
 		for (auto it = connectSockets.begin(); it != connectSockets.end(); ++it)
 		{
-			Connection* raw = it->get();
+			ksocket sock =
+#ifdef _WIN32
+				ToVar<SOCKET>((*it)->connectionSocket.load(memory_order_acquire));
+#else
+				ToVar<int>((*it)->connectionSocket.load(memory_order_acquire));
+#endif
 
-			if (raw
-				&& raw->connectionSocket.load(memory_order_acquire) == targetSocket)
+			if (sock == target)
 			{
+				targetUser = std::move(*it);
 				connectSockets.erase(it);
-
-				Log::Print(
-					"Disconnected target via socket for server '" + ServerCore::GetServerName() + "'!",
-					"DISCONNECT_TARGET",
-					LogType::LOG_SUCCESS);
 
 				break;
 			}
 		}
-
 		unlock_m(m_connectSockets);
 
-		Log::Print(
-			"Failed to disconnect target via socket for server '" + ServerCore::GetServerName() + "' because the target socket was not found!",
-			"DISCONNECT_TARGET",
-			LogType::LOG_ERROR,
-			2);
-	}
-
-	void Connect::DisconnectConnectedUser(
-		const string& targetIP,
-		string_view reason)
-	{
-		//TODO: send reason
-
-		if (!ServerCore::IsInitialized())
+		if (targetUser == nullptr)
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
+				"Failed to disconnect target via socket for server '" + ServerCore::GetServerName() + "' because the target socket was not found!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -632,10 +936,38 @@ namespace KalaServer::Server
 			return;
 		}
 
+		targetUser->isRunning.store(false, memory_order_release);
+
+#ifdef _WIN32
+		ksocket cs = ToVar<SOCKET>(targetUser->connectionSocket.load(memory_order_acquire));
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SD_BOTH);
+			closesocket(cs);
+		}
+#else
+		ksocket cs = ToVar<int>(targetUser->connectionSocket.load(memory_order_acquire));
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SHUT_RDWR);
+			close(cs);
+		}
+#endif
+
+		if (targetUser->connectionThread.joinable()) targetUser->connectionThread.join();
+
+		Log::Print(
+			"Disconnected target via socket for server '" + ServerCore::GetServerName() + "'!",
+			"DISCONNECT_TARGET",
+			LogType::LOG_SUCCESS);
+	}
+
+	void Connect::DisconnectConnectedUser(const string& targetIP)
+	{
 		if (!ServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the server is not ready!",
+				"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the server is not running or not ready!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -655,81 +987,77 @@ namespace KalaServer::Server
 			return;
 		}
 
+		unique_ptr<Connection> targetUser{};
+
 		lockwait_m(m_connectSockets);
 		for (auto it = connectSockets.begin(); it != connectSockets.end(); ++it)
 		{
-			Connection* c = it->get();
-
 			string connectionIP{};
-			lockwait_m(c->m_connectionIP);
-			connectionIP = c->connectionIP;
-			unlock_m(c->m_connectionIP);
+			lockwait_m((*it)->m_connectionIP);
+			connectionIP = (*it)->connectionIP;
+			unlock_m((*it)->m_connectionIP);
 
 			if (connectionIP == targetIP)
 			{
-				c->isRunning.store(false, memory_order_release);
-
-				ksocket cs =
-#ifdef _WIN32
-				ToVar<SOCKET>(c->connectionSocket.load(memory_order_acquire));
-#else
-				ToVar<int>(c->connectionSocket.load(memory_order_acquire));
-#endif
-				
-				//we don't return error here if there is no socket because the target may only have a local socket via SendPacketLocal
-				if (cs == UNASSIGNED_SOCKET_VALUE)
-				{
-					Log::Print(
-						"Couldn't close socket for target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the socket is unassigned or invalid!",
-						"DISCONNECT_TARGET",
-						LogType::LOG_WARNING);
-				}
-				else
-				{
-#ifdef _WIN32
-					shutdown(cs, SD_BOTH);
-					closesocket(cs);
-#else
-					shutdown(cs, SHUT_RDWR);
-					close(cs);
-#endif	
-					c->connectionSocket.store(UNASSIGNED_SOCKET_VALUE, memory_order_release);
-				}
-
-				if (c->connectionThread.joinable()) c->connectionThread.join();
-				else
-				{
-					KalaServerCore::ForceClose(
-						"Disconnect target error",
-						"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because its thread failed to join!");
-				}
-
+				targetUser = std::move(*it);
 				connectSockets.erase(it);
 
-				unlock_m(m_connectSockets);
-
-				Log::Print(
-					"Disconnected target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "'!",
-					"DISCONNECT_TARGET",
-					LogType::LOG_SUCCESS);
-
-				return;
+				break;
 			}
 		}
 		unlock_m(m_connectSockets);
 
+		if (targetUser == nullptr)
+		{
+			Log::Print(
+				"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the target IP was not found!",
+				"DISCONNECT_TARGET",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		targetUser->isRunning.store(false, memory_order_release);
+
+#ifdef _WIN32
+		ksocket cs = ToVar<SOCKET>(targetUser->connectionSocket.load(memory_order_acquire));
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SD_BOTH);
+			closesocket(cs);
+		}
+#else
+		ksocket cs = ToVar<int>(targetUser->connectionSocket.load(memory_order_acquire));
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SHUT_RDWR);
+			close(cs);
+		}
+#endif
+
+		if (targetUser->connectionThread.joinable()) targetUser->connectionThread.join();
+
 		Log::Print(
-			"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the target IP was not found!",
+			"Disconnected target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "'!",
 			"DISCONNECT_TARGET",
-			LogType::LOG_ERROR,
-			2);
+			LogType::LOG_SUCCESS);
 	}
 
-	void Connect::DisconnectListener(string_view reason)
+	void Connect::DisconnectListener()
 	{
-		//TODO: send reason
-		
-		if (listenerSocket == nullptr)
+		if (!ServerCore::IsReady())
+		{
+			Log::Print(
+				"Failed to disconnect listener for server '" + ServerCore::GetServerName() + "' because the server is not running or not ready!",
+				"LISTENER_DISCONNECT",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		if (!listenerSocket)
 		{
 			Log::Print(
 				"Failed to disconnect listener for server '" + ServerCore::GetServerName() + "' because the server has no listener socket!",
@@ -741,9 +1069,9 @@ namespace KalaServer::Server
 
 		ksocket ls = 
 #ifdef _WIN32
-		ToVar<SOCKET>(listenerSocket->connectionSocket.load(memory_order_acquire));
+			ToVar<SOCKET>(listenerSocket->connectionSocket.load(memory_order_acquire));
 #else
-		ToVar<int>(listenerSocket->connectionSocket.load(memory_order_acquire));
+			ToVar<int>(listenerSocket->connectionSocket.load(memory_order_acquire));
 #endif
 
 		if (ls == UNASSIGNED_SOCKET_VALUE)
@@ -756,122 +1084,64 @@ namespace KalaServer::Server
 			return;
 		}
 
-		if (!ServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Failed to disconnect listener for server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
-				"LISTENER_DISCONNECT",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-		if (!ServerCore::IsReady())
-		{
-			Log::Print(
-				"Failed to disconnect listener for server '" + ServerCore::GetServerName() + "' because the server is not ready!",
-				"LISTENER_DISCONNECT",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
+		unique_ptr<Connection> lconnect{};
 
 		lockwait_m(m_listenerSocket);
-		if (listenerSocket) listenerSocket = nullptr;
+		if (listenerSocket) lconnect = std::move(listenerSocket);
 		unlock_m(m_listenerSocket);
 
-		lockwait_m(m_connectSockets);
-		for (const auto& c : connectSockets)
+		lconnect->isRunning.store(false, memory_order_release);
+
+#ifdef _WIN32
+		ksocket thisls = ToVar<SOCKET>(lconnect->connectionSocket.load(memory_order_acquire));
+		if (thisls != invalid_socket)
 		{
-			DisconnectConnectedUser(c->connectionSocket.load(memory_order_acquire), reason);
+			shutdown(thisls, SD_BOTH);
+			closesocket(thisls);
 		}
+#else
+		ksocket thisls = ToVar<int>(lconnect->connectionSocket.load(memory_order_acquire));
+		if (thisls != invalid_socket)
+		{
+			shutdown(thisls, SHUT_RDWR);
+			close(thisls);
+		}
+#endif
+
+		if (lconnect->connectionThread.joinable()) lconnect->connectionThread.join();
+
+		vector<unique_ptr<Connection>> cconnects{};
+
+		lockwait_m(m_connectSockets);
+		cconnects = std::move(connectSockets);
 		unlock_m(m_connectSockets);
 
-		CancelAllPackets(reason);
+		for (auto& conn : cconnects)
+		{
+			conn->isRunning.store(false, memory_order_release);
+
+#ifdef _WIN32
+			ksocket cs = ToVar<SOCKET>(conn->connectionSocket.load(memory_order_acquire));
+			if (cs != invalid_socket)
+			{
+				shutdown(cs, SD_BOTH);
+				closesocket(cs);
+			}
+#else
+			ksocket cs = ToVar<int>(conn->connectionSocket.load(memory_order_acquire));
+			if (cs != invalid_socket)
+			{
+				shutdown(cs, SHUT_RDWR);
+				close(cs);
+			}
+#endif
+
+			if (conn->connectionThread.joinable()) conn->connectionThread.join();
+		}
 
 		Log::Print(
 			"Disconnected listener socket for server '" + ServerCore::GetServerName() + "'!",
 			"LISTENER_DISCONNECT",
-			LogType::LOG_SUCCESS);
-	}
-
-	void Connect::CancelAllPackets(string_view reason)
-	{
-		//TODO: send reason
-
-		if (!ServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Failed to cancel all packets for server '" + ServerCore::GetServerName() + "' because the server has not been initialized!",
-				"SERVER_PACKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-		if (!ServerCore::IsReady())
-		{
-			Log::Print(
-				"Failed to cancel all packets for server '" + ServerCore::GetServerName() + "' because the server is not ready!",
-				"SERVER_PACKET",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
-		lockwait_m(m_connectSockets);
-
-		if (connectSockets.empty())
-		{
-			Log::Print(
-				"Couldn't cancel all packets for server '" + ServerCore::GetServerName() + "' because there are no active packets.",
-				"SERVER_PACKET",
-				LogType::LOG_WARNING);
-
-			unlock_m(m_connectSockets);
-
-			return;
-		}
-		
-		for (const auto& s : connectSockets)
-		{
-			ksocket cs = 
-#ifdef _WIN32
-			ToVar<SOCKET>(s->connectionSocket.load(memory_order_acquire));
-#else
-			ToVar<int>(s->connectionSocket.load(memory_order_acquire));
-#endif
-
-			if (cs != UNASSIGNED_SOCKET_VALUE)
-			{
-#ifdef _WIN32
-				shutdown(cs, SD_BOTH);
-				closesocket(cs);
-#else
-				shutdown(cs, SHUT_RDWR);
-				close(cs);
-#endif	
-				s->connectionSocket.store(UNASSIGNED_SOCKET_VALUE, memory_order_release);
-			}
-
-			if (s->connectionThread.joinable()) s->connectionThread.join();
-			else
-			{
-				KalaServerCore::ForceClose(
-					"Disconnect listener error",
-					"Failed to disconnect listener for server '" + ServerCore::GetServerName() + "' because a connection thread failed to join!");
-			}
-		}
-
-		unlock_m(m_connectSockets);
-
-		Log::Print(
-			"Closed all packets for server '" + ServerCore::GetServerName() + "'!",
-			"SERVER_PACKET",
 			LogType::LOG_SUCCESS);
 	}
 
@@ -1165,7 +1435,7 @@ namespace KalaServer::Server
 		auto it = remove_if(
 			users.begin(),
 			users.end(),
-			[&](const User& u) { return u.userIP == userIP; });
+			[&userIP](const User& u) { return u.userIP == userIP; });
 
 		if (it == users.end())
 		{
@@ -1319,7 +1589,7 @@ namespace KalaServer::Server
 		auto it = remove_if(
 			routes.begin(),
 			routes.end(),
-			[&](const Route& u) { return u.route == route; });
+			[&route](const Route& u) { return u.route == route; });
 
 		if (it == routes.end())
 		{
@@ -1402,7 +1672,7 @@ namespace KalaServer::Server
 	}
 }
 
-void ConnectStart(Connection* c)
+void HandleConnectionCallback(ResponseData& data)
 {
 
 }

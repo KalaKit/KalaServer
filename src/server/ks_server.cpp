@@ -3,8 +3,16 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include <curl/curl.h>
-#include <curl/easy.h>
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#include <winsock2.h>
+#else
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/capability.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#endif
 
 #include <string>
 
@@ -23,29 +31,18 @@ using KalaServer::Core::KalaServerCore;
 using std::to_string;
 using std::string;
 
-static void InitializeCurl()
-{
-	static bool curlInitialized{};
-
-	if (curlInitialized) return;
-
-	bool success = curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
-
-	if (success) curlInitialized = true;
-	else
-	{
-		KalaServerCore::ForceClose(
-			"Curl error",
-			"Failed to initialize Curl!");
-	}
-}
-
 namespace KalaServer::Server
 {
 	static bool isInitialized{};
 	static bool isReady{};
 
-	static u32 ID{};
+	static bool cloudflareRequired{};
+	static bool isHealthy{};
+
+#ifdef _WIN32
+	static bool startedWSA{};
+	WSADATA wsaData{};
+#endif
 
 	static u16 port{};
 	static string serverName{};
@@ -56,33 +53,22 @@ namespace KalaServer::Server
 		u16 newPort,
 		string_view newServerName,
 		string_view newDomainName,
-		const path& newServerRoot)
+		const path& newServerRoot,
+		bool requireCloudflare)
 	{
 		Log::Print(
 			"Starting to initialize server '" + string(newServerName) 
 			+ "' at port '" + to_string(newPort) 
 			+ "' with domain '" + string(newDomainName)
-			+ "' and server root '" + newServerRoot.string(),
-			"CLOUDFLARE",
+			+ "' and server root '" + newServerRoot.string() + "'",
+			"SERVER",
 			LogType::LOG_INFO);
-
-		if (newPort < MIN_PORT_RANGE
-			|| newPort > MAX_PORT_RANGE)
-		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because its port '" + to_string(newPort) + "' is out of range!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
-		}
 
 		if (newServerName.empty()
 			|| newServerName.length() > 50)
 		{
 			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because its name is empty or too long!",
+				"Failed to initialize server because its name is empty or too long!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
@@ -112,12 +98,67 @@ namespace KalaServer::Server
 			return false;
 		}
 
+		if (MIN_PORT_RANGE == 0)
+		{
+			Log::Print(
+				"Failed to initialize server '" + string(newServerName) + "' because the MIN_PORT_RANGE value was set to 0!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+		if (MIN_PORT_RANGE > MAX_PORT_RANGE)
+		{
+			Log::Print(
+				"Failed to initialize server '" + string(newServerName) + "' because the MIN_PORT_RANGE value was set higher than the MAX_PORT_RANGE value!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		if (newPort < MIN_PORT_RANGE
+			|| newPort > MAX_PORT_RANGE)
+		{
+			Log::Print(
+				"Failed to initialize server '" + string(newServerName) + "' because its port '" + to_string(newPort) + "' is out of range!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+#ifdef _WIN32
+		if (!startedWSA)
+		{
+			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+			{
+				Log::Print(
+					"Failed to check internet state for server '" + ServerCore::GetServerName() + "' because WSAStartup failed!",
+					"INTERNET_ACCESS",
+					LogType::LOG_ERROR,
+					2);
+
+				WSACleanup();
+
+				return false;
+			}
+			startedWSA = true;
+		}
+#endif
+
 		port = newPort;
 		serverName = newServerName;
 		domainName = newDomainName;
 		serverRoot = newServerRoot;
 
+		cloudflareRequired = requireCloudflare;
+
 		isInitialized = true;
+		if (!cloudflareRequired) isReady = true;
 
 		Log::Print(
 			"Created new server '" + serverName + "'!",
@@ -131,12 +172,16 @@ namespace KalaServer::Server
 
 	bool ServerCore::IsReady() { return isReady; }
 
+	bool ServerCore::IsCloudflareRequired() { return cloudflareRequired; }
+
 	bool ServerCore::HasInternet()
 	{
-		if (!ServerCore::IsInitialized())
+#ifdef _WIN32
+		SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (sock == INVALID_SOCKET)
 		{
 			Log::Print(
-				"Cannot check for internet access because the server has not been initialized!",
+				"Failed to check internet state for server '" + ServerCore::GetServerName() + "' because socket creation failed!",
 				"INTERNET_ACCESS",
 				LogType::LOG_ERROR,
 				2);
@@ -144,10 +189,25 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		if (!ServerCore::IsReady())
+		DWORD timeout = 1000;
+		setsockopt(
+			sock, 
+			SOL_SOCKET, 
+			SO_SNDTIMEO, 
+			(const char*)&timeout, 
+			sizeof(timeout));
+		setsockopt(
+			sock, 
+			SOL_SOCKET, 
+			SO_RCVTIMEO, 
+			(const char*)&timeout, 
+			sizeof(timeout));
+#else
+		int sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (sock < 0)
 		{
 			Log::Print(
-				"Cannot check for internet access because the server is not ready!",
+				"Failed to check internet state for server '" + ServerCore::GetServerName() + "' because socket creation failed!",
 				"INTERNET_ACCESS",
 				LogType::LOG_ERROR,
 				2);
@@ -155,59 +215,55 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		const string testPage = "https://www.google.com";
+		struct timeval timeout{};
+		timeout.tv_sec = 1;
+		timeout.tv_usec = 0;
+		setsockopt(
+			sock, 
+			SOL_SOCKET, 
+			SO_SNDTIMEO, 
+			&timeout, 
+			sizeof(timeout));
+		setsockopt(
+			sock, 
+			SOL_SOCKET, 
+			SO_RCVTIMEO, 
+			&timeout, 
+			sizeof(timeout));
+#endif
 
-		InitializeCurl();
-
-		CURL* curl = curl_easy_init();
-		if (!curl)
+		sockaddr_in addr{};
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(53);
+		if (inet_pton(AF_INET, "1.1.1.1", &addr.sin_addr) != 1)
 		{
-			KalaServerCore::ForceClose(
-				"Curl error",
-				"curl_easy failed!");
-		}
-
-		curl_easy_setopt(curl, CURLOPT_URL, testPage.c_str());
-
-		//ignore response body
-		curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
-
-		//reasonable timeouts
-		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
-
-		//follow redirects (google will redirect)
-		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-		//ignore errors
-		curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-
-		CURLcode res = curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
-
-		bool hasInternet = res == CURLE_OK;
-
-		if (!hasInternet)
-		{
-			Log::Print(
-				"Server does not have internet access!",
-				"INTERNET_ACCESS",
-				LogType::LOG_WARNING);
+#ifdef _WIN32
+		closesocket(sock);
+#else
+		close(sock);
+#endif
 
 			return false;
 		}
-		else
-		{
-			Log::Print(
-				"Server has internet access!",
-				"INTERNET_ACCESS",
-				LogType::LOG_SUCCESS);
 
-			return true;
-		}
+#ifdef _WIN32
+		bool ok = (connect(sock, (sockaddr*)&addr, sizeof(addr)) != SOCKET_ERROR);
+		closesocket(sock);
+#else
+		bool ok = (connect(sock, (sockaddr*)&addr, sizeof(addr)) == 0);
+		close(sock);
+#endif
+
+		return ok;
 	}
 
-	u32 ServerCore::GetID() { return ID; }
+	bool ServerCore::IsHealthy()
+	{
+		return cloudflareRequired
+			? Cloudflare::IsTunnelAlive()
+			&& Cloudflare::IsTunnelHealthy()
+			: true;
+	}
 
 	u16 ServerCore::GetPort() { return port; }
 	const string& ServerCore::GetServerName() { return serverName; }
@@ -216,10 +272,10 @@ namespace KalaServer::Server
 
 	void ServerCore::Shutdown()
 	{
-		if (!ServerCore::IsInitialized())
+		if (!ServerCore::IsReady())
 		{
 			Log::Print(
-				"Cannot shut down the server because it has not been initialized!",
+				"Cannot shut down the server because it is not running or not ready!",
 				"SERVER_SHUTDOWN",
 				LogType::LOG_ERROR,
 				2);
@@ -228,11 +284,15 @@ namespace KalaServer::Server
 		}
 
 		Connect::DisconnectListener();
-		Connect::CancelAllPackets();
+		
+#ifdef _WIN32
+		if (startedWSA)
+		{
+			WSACleanup();
+			startedWSA = false;
+		}
+#endif
 	}
 
-	void ServerCore::SetServerReadyState(bool state)
-	{
-		isReady = state;
-	}
+	void ServerCore::SetServerReadyState(bool state) { isReady = state; }
 }

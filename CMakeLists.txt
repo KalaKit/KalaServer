@@ -75,17 +75,23 @@ target_include_directories(KalaServer PRIVATE
 	"${EXT_SHARED_DIR}"
 )
 
-find_package(CURL REQUIRED)
-target_link_libraries(KalaServer PRIVATE CURL::libcurl)
+if (WIN32)
+	# Preprocessor Defines
+	target_compile_definitions(KalaServer PRIVATE
+		LIB_EXPORT          # dll import/export
+		WIN32_LEAN_AND_MEAN # cleaner windows.h
+		NOMINMAX            # skips min/max windows macros in favor of the std variants
+		UNICODE             # selects wide api variants over ansi for UTF16 windows functions
+		_UNICODE            # uses wide text types in the C runtime layer
+	)
+endif()
 
-# Preprocessor Defines
-target_compile_definitions(KalaServer PRIVATE 
-	LIB_EXPORT          # dll import/export
-	WIN32_LEAN_AND_MEAN # cleaner windows.h
-	NOMINMAX            # skips min/max windows macros in favor of the std variants
-	UNICODE             # selects wide api variants over ansi for UTF16 windows functions
-	_UNICODE            # uses wide text types in the C runtime layer
-)
+# Link libraries
+if (WIN32)
+	target_link_libraries(KalaServer PRIVATE ws2_32)
+else()
+	target_link_libraries(KalaServer PRIVATE cap)
+endif()
 
 # Expose version string
 add_compile_definitions(
