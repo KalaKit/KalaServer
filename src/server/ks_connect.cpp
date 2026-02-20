@@ -3,7 +3,6 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include <atomic>
 #ifdef _WIN32
 #include <winsock2.h>
 #else
@@ -143,10 +142,10 @@ namespace KalaServer::Server
 
 			return false;
 		}
-		if (ACCEPT_WAIT_TIME_MS == 0)
+		if (ACCEPT_WAIT_TIME_S == 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the ACCEPT_WAIT_TIME_MS value was set to 0!",
+				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because the ACCEPT_WAIT_TIME_S value was set to 0!",
 				"LISTENER_SOCKET",
 				LogType::LOG_ERROR,
 				2);
@@ -225,12 +224,12 @@ namespace KalaServer::Server
 #ifdef _WIN32
 		int iResult{};
 
-		SOCKET newSocket = socket(
+		SOCKET listener = socket(
 			AF_INET,
 			SOCK_STREAM,
 			IPPROTO_TCP);
 
-		if (newSocket == INVALID_SOCKET)
+		if (listener == INVALID_SOCKET)
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
@@ -246,8 +245,30 @@ namespace KalaServer::Server
 		serverAddress.sin_addr.s_addr = INADDR_ANY;
 		serverAddress.sin_port = htons(ServerCore::GetPort());
 
+		int opt = 1;
+
+		int result_reuse_addr = setsockopt(
+			listener,
+			SOL_SOCKET,
+			SO_REUSEADDR,
+			(const char*)&opt,
+			sizeof(opt));
+
+		if (result_reuse_addr == SOCKET_ERROR)
+		{
+			Log::Print(
+				"Failed to create new listener socket because SO_REUSEADDR could not be set!",
+				"ACCEPT_LOOP",
+				LogType::LOG_ERROR,
+				2);
+
+			closesocket(listener);
+
+			return false;
+		}
+
 		if (bind(
-			newSocket,
+			listener,
 			(sockaddr*)&serverAddress,
 			sizeof(serverAddress)) == SOCKET_ERROR)
 		{
@@ -257,13 +278,12 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			shutdown(newSocket, SD_BOTH);
-			closesocket(newSocket);
+			closesocket(listener);
 
 			return false;
 		}
 
-		if (listen(newSocket, SOMAXCONN) == SOCKET_ERROR)
+		if (listen(listener, SOMAXCONN) == SOCKET_ERROR)
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
@@ -271,14 +291,13 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			shutdown(newSocket, SD_BOTH);
-			closesocket(newSocket);
+			closesocket(listener);
 
 			return false;
 		}
 #else
-		int newSocket = socket(AF_INET, SOCK_STREAM, 0);
-		if (newSocket < 0)
+		int listener = socket(AF_INET, SOCK_STREAM, 0);
+		if (listener < 0)
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(errno),
@@ -294,8 +313,30 @@ namespace KalaServer::Server
 		serverAddress.sin_addr.s_addr = INADDR_ANY;
 		serverAddress.sin_port = htons(ServerCore::GetPort());
 
+		int opt = 1;
+
+		int result_reuse_addr = setsockopt(
+			listener,
+			SOL_SOCKET,
+			SO_REUSEADDR,
+			&opt,
+			sizeof(opt));
+
+		if (result_reuse_addr < 0)
+		{
+			Log::Print(
+				"Failed to create new listener socket because SO_REUSEADDR could not be set!",
+				"ACCEPT_LOOP",
+				LogType::LOG_ERROR,
+				2);
+
+			close(listener);
+
+			return false;
+		}
+
 		if (bind(
-			newSocket,
+			listener,
 			(sockaddr*)&serverAddress,
 			sizeof(serverAddress)) < 0)
 		{
@@ -305,13 +346,12 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			shutdown(newSocket, SHUT_RDWR);
-			close(newSocket);
+			close(listener);
 
 			return false;
 		}
 
-		if (listen(newSocket, SOMAXCONN) < 0)
+		if (listen(listener, SOMAXCONN) < 0)
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + ServerCore::GetServerName() + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(errno),
@@ -319,8 +359,7 @@ namespace KalaServer::Server
 				LogType::LOG_ERROR,
 				2);
 
-			shutdown(newSocket, SHUT_RDWR);
-			close(newSocket);
+			close(listener);
 
 			return false;
 		}
@@ -336,7 +375,7 @@ namespace KalaServer::Server
 		lockwait_m(m_listenerSocket);
 		listenerSocket = std::move(newListenerSocket);
 
-		listenerSocket->connectionSocket.store(FromVar(newSocket), memory_order_release);
+		listenerSocket->connectionSocket.store(FromVar(listener), memory_order_release);
 		listenerSocket->isRunning.store(true, memory_order_release);
 
 		unlock_m(m_listenerSocket);
@@ -439,7 +478,7 @@ namespace KalaServer::Server
 						continue;
 					}
 
-					DWORD timeout = ACCEPT_WAIT_TIME_MS;
+					DWORD timeout = ACCEPT_WAIT_TIME_S * 1000;
 					int result_rcv_time = setsockopt(
 						client,
 						SOL_SOCKET,
@@ -529,8 +568,8 @@ namespace KalaServer::Server
 					}
 
 					struct timeval timeout{};
-					timeout.tv_sec = ACCEPT_WAIT_TIME_MS / 1000;
-					timeout.tv_usec = (ACCEPT_WAIT_TIME_MS % 1000) * 1000;
+					timeout.tv_sec = ACCEPT_WAIT_TIME_S;
+					timeout.tv_usec = 0;
 
 					int result_rcv_time = setsockopt(
 						client,
@@ -697,10 +736,9 @@ namespace KalaServer::Server
 											|| err == WSAEWOULDBLOCK)
 									{
 										Log::Print(
-											"BytesReceived recv read timed out!",
+											"BytesReceived recv read timed out.",
 											"ACCEPT_LOOP",
-											LogType::LOG_ERROR,
-											2);
+											LogType::LOG_INFO);
 
 										raw->isRunning.store(false, memory_order_release);
 
@@ -748,10 +786,9 @@ namespace KalaServer::Server
 											 || errno == EWOULDBLOCK)
 									{
 										Log::Print(
-											"BytesReceived recv read timed out!",
+											"BytesReceived recv read timed out.",
 											"ACCEPT_LOOP",
-											LogType::LOG_ERROR,
-											2);
+											LogType::LOG_INFO);
 
 										raw->isRunning.store(false, memory_order_release);
 

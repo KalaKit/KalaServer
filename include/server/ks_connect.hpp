@@ -39,8 +39,8 @@ namespace KalaServer::Server
 	//is allowed to have between each connection attempt
 	constexpr u8 MIN_PACKET_SPACING_MS = 200u;
 
-	//Wait for this amount of milliseconds before deeming the connection as too slow or delayed.
-	constexpr u16 ACCEPT_WAIT_TIME_MS = 5000u;
+	//Wait for this amount of seconds before deeming the connection as inactive.
+	constexpr u16 ACCEPT_WAIT_TIME_S = 60u;
 
 	//Client must not exceed this max payload capacity in bytes at accept loop
 	constexpr u16 MAX_TOTAL_PAYLOAD_SIZE_BYTES = 8192u;
