@@ -7,6 +7,7 @@
 
 #include <string>
 #include <filesystem>
+#include <vector>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
@@ -17,6 +18,7 @@ namespace KalaServer::Server
 	using std::string;
 	using std::string_view;
 	using std::filesystem::path;
+	using std::vector;
 
 	using KalaHeaders::KalaThread::abool;
 
@@ -33,18 +35,18 @@ namespace KalaServer::Server
 	friend class Cloudflare;
 	public:
 		//Initialize a new server on this process.
-		//Port is where your server connects to Cloudflare.
 		//Server name helps distinguish this server from other servers.
-		//Domain name is th domain name with extension inserted to url path in browser.
 		//Server root is the true origin where the server will expose
-		//routes fromrelative to where the process was ran from.
-		//Set requireCloudflare to false if you dont want to use it,
-		//otherwise it must be enabled before connections are accepted.
+		//routes from relative to where the process was run.
+		//Port is the local TCP port this server binds to and listens on.
+		//Domains are the allowed hostnames this server will accept connections for.
+		//Set requireCloudflare to false if you dont want to use Cloudflare tunnel,
+		//otherwise it must be enabled before any connections are accepted.
 		static bool Initialize(
-			u16 port,
 			string_view serverName,
-			string_view domainName,
 			const path& serverRoot,
+			vector<string> serverDomains,
+			u16 port,
 			bool requireCloudflare);
 
 		//Returns true if this server instance has been initialized successfully
@@ -64,10 +66,10 @@ namespace KalaServer::Server
 		//or if cloudflare tunnel is not healthy if cloudflare is required
 		static bool IsHealthy();
 
-		static u16 GetPort();
 		static const string& GetServerName();
-		static const string& GetDomainName();
 		static const path& GetServerRoot();
+		static const vector<string>& GetDomains();
+		static u16 GetPort();
 
 		//Close all sockets and clear all server resources
 		static void Shutdown();

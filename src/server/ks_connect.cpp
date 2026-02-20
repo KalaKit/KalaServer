@@ -5,8 +5,10 @@
 
 #ifdef _WIN32
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <unistd.h>
@@ -17,11 +19,11 @@
 #include <chrono>
 #include <memory>
 #include <cerrno>
+#include <unordered_map>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/log_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
-#include "KalaHeaders/string_utils.hpp"
 
 #include "server/ks_connect.hpp"
 #include "server/ks_server.hpp"
@@ -40,22 +42,23 @@ using KalaHeaders::KalaThread::abool;
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
-using KalaHeaders::KalaString::HasAnyWhiteSpace;
-using KalaHeaders::KalaString::SplitString;
-
 using KalaServer::Server::Connection;
+using KalaServer::Server::ResponseType;
+using KalaServer::Server::ContentType;
 using KalaServer::Server::ResponseData;
 using KalaServer::Core::KalaServerCore;
 
 using std::memory_order_acquire;
 using std::memory_order_release;
 using std::string;
+using std::string_view;
 using std::to_string;
 using std::this_thread::sleep_for;
 using std::chrono::seconds;
 using std::chrono::milliseconds;
 using std::unique_ptr;
 using std::make_unique;
+using std::unordered_map;
 
 #ifdef _WIN32
 using ksocket = SOCKET;
@@ -74,7 +77,18 @@ using std::wstring;
 static wstring ToWide(const string& input);
 #endif
 
-static unique_ptr<Connection> dummyConnection{};
+constexpr string_view response_ban
+	= "<html><body>Get banned nerd</body></html>";
+constexpr string_view response_not_found 
+	= "<html><body>The page you're trying to access does not exist.</body></html>";
+constexpr string_view response_success 
+	= "<html><body>\n"
+		"<h1>linux webserver lul</h1>\n"
+			"<p><a href=\"https://github.com/Lost-Empire-Entertainment/KalaKit-website\">"
+				"Check out the KalaKit website source code</a></p>\n"
+			"<p><a href=\"https://github.com/KalaKit/KalaServer\">"
+				"Check out the KalaKit server source code</a></p>\n"
+	"</body></html>";
 
 static void HandleConnectionCallback(ResponseData& data);
 
@@ -86,9 +100,7 @@ namespace KalaServer::Server
 	static vector<Route> routes{};
 	static mutex m_routes{};
 
-	static vector<string> whitelistedIPs{};
 	static vector<string> blacklistedIPs{};
-	static vector<string> whitelistedExtensions{};
 	static vector<string> blacklistedKeywords{};
 
 	static unique_ptr<Connection> listenerSocket{};
@@ -99,8 +111,6 @@ namespace KalaServer::Server
 
 	bool Connect::CreateListenerSocket()
 	{
-		if (!dummyConnection) dummyConnection = make_unique<Connection>();
-
 		if (!ServerCore::IsReady())
 		{
 			Log::Print(
@@ -457,10 +467,13 @@ namespace KalaServer::Server
 #ifdef _WIN32
 					ksocket lsock = ToVar<SOCKET>(localListener->connectionSocket.load(memory_order_acquire));
 
+					sockaddr_storage clientAddress{};
+					int addressLength = sizeof(clientAddress);
+
 					ksocket client = accept(
 						lsock,
-						nullptr,
-						nullptr);
+						rcast<sockaddr*>(&clientAddress),
+						&addressLength);
 
 					Log::Print(
 						"Connection received, verifying socket.",
@@ -546,10 +559,13 @@ namespace KalaServer::Server
 #else 
 					ksocket lsock = ToVar<int>(localListener->connectionSocket.load(memory_order_acquire));
 
+					sockaddr_storage clientAddress{};
+					socklen_t addressLength = sizeof(clientAddress);
+
 					ksocket client = accept(
 						lsock,
-						nullptr,
-						nullptr);
+						rcast<sockaddr*>(&clientAddress),
+						&addressLength);
 
 					Log::Print(
 						"Connection received, verifying socket.",
@@ -637,6 +653,80 @@ namespace KalaServer::Server
 					}
 #endif
 
+					//
+					// GET USER IP (get ip via http headers if using proxy or tunnel)
+					//
+
+					char ipStr[INET6_ADDRSTRLEN]{};
+
+					if (clientAddress.ss_family == AF_INET)
+					{
+						auto* addr = rcast<sockaddr_in*>(&clientAddress);
+						if (!inet_ntop(AF_INET, &addr->sin_addr, ipStr, sizeof(ipStr)))
+						{
+							ipStr[0] = '\0';
+
+							Log::Print(
+								"Failed to get ipv4 from client socket!",
+								"ACCEPT_LOOP",
+								LogType::LOG_ERROR,
+								2);
+						}
+					}
+					else if (clientAddress.ss_family == AF_INET6)
+					{
+						auto* addr = rcast<sockaddr_in6*>(&clientAddress);
+						if (!inet_ntop(AF_INET6, &addr->sin6_addr, ipStr, sizeof(ipStr)))
+						{
+							ipStr[0] = '\0';
+
+							Log::Print(
+								"Failed to get ipv6 from client socket!",
+								"ACCEPT_LOOP",
+								LogType::LOG_ERROR,
+								2);
+						}
+					}
+					else snprintf(ipStr, sizeof(ipStr), "UNKNOWN");
+
+					//
+					// CHECK IF IP IS NOT BANNED
+					//
+
+					lockwait_m(m_users);
+
+					bool foundBannedUser{};
+					for (const auto& u : users)
+					{
+						if (ipStr == u.userIP)
+						{
+							Log::Print(
+								"Found banned user '" + string(ipStr) + "' and closing socket.",
+								"ACCEPT_LOOP",
+								LogType::LOG_INFO);
+
+#ifdef _WIN32
+							shutdown(client, SD_BOTH);
+							closesocket(client);
+#else
+							shutdown(client, SHUT_RDWR);
+							close(client);
+#endif
+
+							foundBannedUser = true;
+
+							break;
+						}
+					}
+
+					unlock_m(m_users);
+
+					if (foundBannedUser) continue;
+
+					//
+					// CHECK USER COUNT, REJECT IF MAX
+					//
+
 					lockwait_m(m_connectSockets);
 
 					if (connectSockets.size() >= MAX_ACTIVE_CONNECTIONS)
@@ -644,7 +734,7 @@ namespace KalaServer::Server
 						string reason = "Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' was reached, cannot accept new connections!";
 
 						Log::Print(
-							reason,
+							"[ " + string(ipStr) + " ] " + reason,
 							"ACCEPT_LOOP",
 							LogType::LOG_ERROR,
 							2);
@@ -672,15 +762,28 @@ namespace KalaServer::Server
 
 						continue;
 					}
+					unlock_m(m_connectSockets);
+
+					//
+					// STORE AND PARSE SOCKET DATA
+					//
+
+					lockwait_m(m_connectSockets);
 
 					unique_ptr<Connection> c = make_unique<Connection>();
 					c->isRunning.store(true, memory_order_release);
 					c->connectionSocket.store(FromVar(client), memory_order_release);
+
+					c->connectionIP = ipStr;
 				
 					Connection* raw = c.get();
 					connectSockets.push_back(std::move(c));
 
 					unlock_m(m_connectSockets);
+
+					//
+					// RECEIVE INCOMING DATA
+					//
 
 					raw->connectionThread = joinable_thread([raw]
 						{
@@ -692,7 +795,7 @@ namespace KalaServer::Server
 									string reason = "Connection failed! Reason: " + string(error_reason) + "!";
 
 									Log::Print(
-										reason,
+										"[ " + raw->connectionIP + " ] " + reason,
 										"ACCEPT_LOOP",
 										LogType::LOG_ERROR,
 										2);
@@ -733,10 +836,22 @@ namespace KalaServer::Server
 									if (err == WSAEINTR) continue;
 
 									else if (err == WSAETIMEDOUT
-											|| err == WSAEWOULDBLOCK)
+											 || err == WSAEWOULDBLOCK)
 									{
 										Log::Print(
-											"BytesReceived recv read timed out.",
+											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
+											"ACCEPT_LOOP",
+											LogType::LOG_INFO);
+
+										raw->isRunning.store(false, memory_order_release);
+
+										continue;
+									}
+									else if (err == WSAECONNRESET
+											 || err == WSAECONNABORTED)
+									{
+										Log::Print(
+											"[ " + raw->connectionIP + " ] Connection was closed abruptly by client during bytesReceived recv read.",
 											"ACCEPT_LOOP",
 											LogType::LOG_INFO);
 
@@ -746,7 +861,7 @@ namespace KalaServer::Server
 									}
 									
 									Log::Print(
-										"BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(err),
+										"[ " + raw->connectionIP + " ] BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(err),
 										"ACCEPT_LOOP",
 										LogType::LOG_ERROR,
 										2);
@@ -759,7 +874,7 @@ namespace KalaServer::Server
 								if (bytesReceived == 0)
 								{
 									Log::Print(
-										"Connection was closed during bytesReceived recv read.",
+										"[ " + raw->connectionIP + " ] Connection was closed during bytesReceived recv read.",
 										"ACCEPT_LOOP",
 										LogType::LOG_INFO);
 
@@ -786,7 +901,19 @@ namespace KalaServer::Server
 											 || errno == EWOULDBLOCK)
 									{
 										Log::Print(
-											"BytesReceived recv read timed out.",
+											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
+											"ACCEPT_LOOP",
+											LogType::LOG_INFO);
+
+										raw->isRunning.store(false, memory_order_release);
+
+										continue;
+									}
+									else if (errno == ECONNRESET
+											 || errno == ECONNABORTED)
+									{
+										Log::Print(
+											"[ " + raw->connectionIP + " ] Connection was closed abruptly by client during bytesReceived recv read.",
 											"ACCEPT_LOOP",
 											LogType::LOG_INFO);
 
@@ -796,7 +923,7 @@ namespace KalaServer::Server
 									}
 									
 									Log::Print(
-										"BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(errno),
+										"[ " + raw->connectionIP + " ] BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(errno),
 										"ACCEPT_LOOP",
 										LogType::LOG_ERROR,
 										2);
@@ -809,7 +936,7 @@ namespace KalaServer::Server
 								if (bytesReceived == 0)
 								{
 									Log::Print(
-										"Connection was closed during bytesReceived recv read.",
+										"[ " + raw->connectionIP + " ] Connection was closed by client during bytesReceived recv read.",
 										"ACCEPT_LOOP",
 										LogType::LOG_INFO);
 
@@ -831,15 +958,52 @@ namespace KalaServer::Server
 									break;
 								}
 
+								/*
+								* for extra debugging if needed
+								Log::Print(
+										"\n---- EARLY BUFFER START ----\n\n"
+										+ readBuffer +
+										"---- EARLY BUFFER END ----\n");
+								*/
+
 								while (true)
 								{
 									auto headerEnd = readBuffer.find("\r\n\r\n");
+
+									//incomplete headers
 									if (headerEnd == string::npos) break;
 
-									string request = readBuffer.substr(0, headerEnd + 4);
-									readBuffer.erase(0, headerEnd + 4);
+									size_t headerSize = headerEnd + 4;
 
-									if (request.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
+									//extract header block
+									string headerblock = readBuffer.substr(0, headerSize);
+
+									//parse content length
+
+									size_t contentLength{};
+									auto clPos = headerblock.find("Content-Length:");
+									if (clPos != string::npos)
+									{
+										size_t valueStart = clPos + 15;
+										size_t valueEnd = headerblock.find("\r\n", valueStart);
+										string value = headerblock.substr(valueStart, valueEnd - valueStart);
+
+										contentLength = scast<size_t>(stoul(value));
+									}
+
+									size_t totalRequired = headerSize + contentLength;
+
+									//wait until full body is present (if any)
+									if (readBuffer.size() < totalRequired) break;
+
+									string fullRequest = readBuffer.substr(0, totalRequired);
+
+									string newLine = 
+										!fullRequest.empty() && fullRequest.back() != '\n'
+										? "\n"
+										: "";
+
+									if (fullRequest.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
 									{
 										close_socket_on_error(
 											"Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload",
@@ -849,30 +1013,47 @@ namespace KalaServer::Server
 										break;
 									}
 
-									//
-									// CONNECTING SOCKET LOOKS SAFE AND WILL BE ADDED
-									//
-
-									string reason = "linux webserver lul";
+									//remove processed request from buffer
+									readBuffer.erase(0, totalRequired);
 
 									Log::Print(
-										reason,
+										"\n---- BUFFER START [ " + raw->connectionIP + " ] ----\n\n"
+										+ fullRequest + newLine +
+										"---- BUFFER END ----\n");
+
+									//
+									// STORE HEADER AND BODY CONTENT
+									//
+
+									//
+									// VERIFY HOST
+									//
+										
+									//
+									// PARSE ROUTE BY IP AND ROLE
+									//
+
+									lockwait_m(m_routes);
+									lockwait_m(m_users);
+
+									
+
+									unlock_m(m_users);
+									unlock_m(m_routes);
+
+									//
+									// ALLOW CONNECTION
+									//
+
+									Log::Print(
+										"[ " + raw->connectionIP + " ] Connection verified, sending response.",
 										"ACCEPT_LOOP",
 										LogType::LOG_INFO);
 
-									string_view responseBodyTitle = Response::ResponseTypeToString(ResponseType::R_404);
-
 									Response::SendResponse({
-										.responseType = ResponseType::R_418,
+										.responseType = ResponseType::R_200,
 										.contentType = ContentType::CT_HTML,
-										.responseBody = 
-											"<html><body>\n"
-												"<h1>" + reason + "</h1>\n"
-													"<p><a href=\"https://github.com/Lost-Empire-Entertainment/KalaKit-website\">"
-														"Check out the KalaKit website source code</a></p>\n"
-													"<p><a href=\"https://github.com/KalaKit/KalaServer\">"
-														"Check out the KalaKit server source code</a></p>\n"
-											"</body></html>",
+										.responseBody = string(response_success),
 										.connection = raw
 									});
 								}
@@ -894,18 +1075,22 @@ namespace KalaServer::Server
 		return isRunning;
 	}
 
-	Connection* Connect::GetListenerSocket() { return listenerSocket.get(); }
+	const Connection& Connect::GetListenerSocket() { return *listenerSocket.get(); }
 	mutex& Connect::GetListenerMutex() { return m_listenerSocket; }
 
-	vector<Connection*> Connect::GetConnectSockets()
+	const vector<const Connection*>& Connect::GetConnectSockets()
 	{ 
-		vector<Connection*> connections{};
+		static vector<const Connection*> connectSocketView{};
+
+		connectSocketView.clear();
+		connectSocketView.reserve(connectSockets.size());
+
 		for (const auto& c : connectSockets)
 		{
-			connections.push_back(c.get());
+			connectSocketView.push_back(c.get());
 		}
 
-		return connections;
+		return connectSocketView;
 	}
 	mutex& Connect::GetConnectMutex() { return m_connectSockets; }
 
@@ -1012,11 +1197,10 @@ namespace KalaServer::Server
 			return;
 		}
 
-		IPResult result = IsValidIP(targetIP);
-		if (result != IPResult::IP_IS_VALID)
+		if (!IsValidIP(targetIP))
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "'! Reason: " + IPResultToString(result),
+				"Failed to disconnect target via IP '" + targetIP + "' for server '" + ServerCore::GetServerName() + "' because the IP structure is invalid!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -1029,10 +1213,7 @@ namespace KalaServer::Server
 		lockwait_m(m_connectSockets);
 		for (auto it = connectSockets.begin(); it != connectSockets.end(); ++it)
 		{
-			string connectionIP{};
-			lockwait_m((*it)->m_connectionIP);
-			connectionIP = (*it)->connectionIP;
-			unlock_m((*it)->m_connectionIP);
+			string connectionIP = (*it)->connectionIP;
 
 			if (connectionIP == targetIP)
 			{
@@ -1182,92 +1363,15 @@ namespace KalaServer::Server
 			LogType::LOG_SUCCESS);
 	}
 
-	IPResult Connect::IsValidIP(const string& targetIP)
+	bool Connect::IsValidIP(const string& targetIP)
 	{
-		if (HasAnyWhiteSpace(targetIP)) return IPResult::IP_STRUCTURE_IS_INVALID;
+		struct in_addr addr4{};
+		if (inet_pton(AF_INET, targetIP.c_str(), &addr4) == 1) return true;
 
-		if (targetIP.length() < 9) return IPResult::IP_TOO_SHORT;
-		if (targetIP.length() > 15) return IPResult::IP_TOO_LONG;
+		struct in6_addr addr6{};
+		if (inet_pton(AF_INET6, targetIP.c_str(), &addr6) == 1) return true;
 
-		u8 dotCount{};
-		for (const auto& c : targetIP)
-		{
-			if (c == '.') dotCount++;
-			if (dotCount > 3) return IPResult::IP_STRUCTURE_IS_INVALID;
-		}
-
-		if (dotCount < 3) return IPResult::IP_STRUCTURE_IS_INVALID;
-
-		vector<string> split = SplitString(targetIP, ".");
-
-		try
-		{
-			int v1 = stoi(split[0]);
-			if (v1 != 10
-				&& v1 != 172
-				&& v1 != 192)
-			{
-				return IPResult::IP_OUT_OF_RANGE;
-			}
-
-			int v2 = stoi(split[1]);
-
-			if (v1 == 10
-				&& (v2 < 0
-					|| v2 > 255))
-			{
-				return IPResult::IP_OUT_OF_RANGE;
-			}
-			if (v1 == 172
-				&& (v2 < 16
-					|| v2 > 31))
-			{
-				return IPResult::IP_OUT_OF_RANGE;
-			}
-			if (v1 == 192
-				&& v2 != 168)
-			{
-				return IPResult::IP_OUT_OF_RANGE;
-			}
-
-			if (v2 < 0
-				|| v2 > 255)
-			{
-				return IPResult::IP_OUT_OF_RANGE;
-			}
-
-			int v3 = stoi(split[2]);
-			if (v3 < 0
-				|| v3 > 255)
-			{
-				return IPResult::IP_OUT_OF_RANGE;
-			}
-
-			int v4 = stoi(split[3]);
-			if (v4 < 0
-				|| v4 > 255)
-			{
-				return IPResult::IP_OUT_OF_RANGE;
-			}
-		}
-		catch (...)
-		{
-			return IPResult::IP_STRUCTURE_IS_INVALID;
-		}
-
-		return IPResult::IP_IS_VALID;
-	}
-
-	string Connect::IPResultToString(IPResult result)
-	{
-		switch (result)
-		{
-		default:                                return "Unknown error!";
-		case IPResult::IP_TOO_SHORT:            return "IP address was too short!";
-		case IPResult::IP_TOO_LONG:             return "IP address was too long!";
-		case IPResult::IP_OUT_OF_RANGE:         return "IP address was out of range!";
-		case IPResult::IP_STRUCTURE_IS_INVALID: return "IP address structure was invalid!";
-		}
+		return false;
 	}
 
 	string Connect::RoleToString(Role role)
@@ -1279,7 +1383,6 @@ namespace KalaServer::Server
 
 		case Role::ROLE_BANNED:       return "BANNED";
 		case Role::ROLE_GUEST:        return "GUEST";
-		case Role::ROLE_WHITELISTED:  return "WHITELISTED";
 		case Role::ROLE_BLACKLISTED:  return "BLACKLISTED";
 		case Role::ROLE_USER:         return "USER";
 		case Role::ROLE_ADMIN:        return "ADMIN";
@@ -1289,7 +1392,6 @@ namespace KalaServer::Server
 	{
 		if (role == "BANNED")           return Role::ROLE_BANNED;
 		else if (role == "GUEST")       return Role::ROLE_GUEST;
-		else if (role == "WHITELISTED") return Role::ROLE_WHITELISTED;
 		else if (role == "BLACKLISTED") return Role::ROLE_BLACKLISTED;
 		else if (role == "USER")        return Role::ROLE_USER;
 		else if (role == "ADMIN")       return Role::ROLE_ADMIN;
@@ -1299,11 +1401,10 @@ namespace KalaServer::Server
 
 	Role Connect::GetUserRole(const string& userIP)
 	{
-		IPResult result = IsValidIP(userIP);
-		if (result != IPResult::IP_IS_VALID)
+		if (!IsValidIP(userIP))
 		{
 			Log::Print(
-				"Failed to get role for user with IP '" + userIP + "'! Reason: " + IPResultToString(result),
+				"Failed to get role for user with IP '" + userIP + "' because its structure is invalid!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
@@ -1335,11 +1436,10 @@ namespace KalaServer::Server
 	}
 	void Connect::SetUserRole(const string& userIP, Role newRole)
 	{
-		IPResult result = IsValidIP(userIP);
-		if (result != IPResult::IP_IS_VALID)
+		if (!IsValidIP(userIP))
 		{
 			Log::Print(
-				"Failed to set role for user with IP '" + userIP + "'! Reason: " + IPResultToString(result),
+				"Failed to set role for user with IP '" + userIP + "' because its structure is invalid!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
@@ -1402,11 +1502,10 @@ namespace KalaServer::Server
 
 	void Connect::AddUser(const User& newUser)
 	{
-		IPResult result = IsValidIP(newUser.userIP);
-		if (result != IPResult::IP_IS_VALID)
+		if (!IsValidIP(newUser.userIP))
 		{
 			Log::Print(
-				"Failed to add new user with IP '" + newUser.userIP + "'! Reason: " + IPResultToString(result),
+				"Failed to add new user with IP '" + newUser.userIP + "' because its structure is invalid!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
@@ -1455,11 +1554,10 @@ namespace KalaServer::Server
 	}
 	void Connect::RemoveUser(const string& userIP)
 	{
-		IPResult result = IsValidIP(userIP);
-		if (result != IPResult::IP_IS_VALID)
+		if (!IsValidIP(userIP))
 		{
 			Log::Print(
-				"Failed to remove existing user with IP '" + userIP + "'! Reason: " + IPResultToString(result),
+				"Failed to remove existing user with IP '" + userIP + "' because its structure is invalid!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
@@ -1524,8 +1622,7 @@ namespace KalaServer::Server
 	void Connect::SetRouteRole(const string& route, Role newRole)
 	{
 		if (newRole == Role::ROLE_NONE
-			|| newRole == Role::ROLE_BANNED
-			|| newRole == Role::ROLE_WHITELISTED)
+			|| newRole == Role::ROLE_BANNED)
 		{
 			Log::Print(
 				"Role '" + RoleToString(newRole) + "' cannot be given to routes!",
@@ -1580,8 +1677,7 @@ namespace KalaServer::Server
 	void Connect::AddRoute(const Route& newRoute)
 	{
 		if (newRoute.role == Role::ROLE_NONE
-			|| newRoute.role == Role::ROLE_BANNED
-			|| newRoute.role == Role::ROLE_WHITELISTED)
+			|| newRoute.role == Role::ROLE_BANNED)
 		{
 			Log::Print(
 				"Role '" + RoleToString(newRoute.role) + "' cannot be given to new route '" + newRoute.route + "'!",

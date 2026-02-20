@@ -823,22 +823,25 @@ bool RouteTunnel()
 	// ROOT DOMAIN
 	//
 
-	if (!CreateCloudflareProcess(
-		"tunnel route dns " + validTunnelName + " " + ServerCore::GetDomainName(), 
-		"route tunnel '" + validTunnelName + "'"))
+	for (const auto& d : ServerCore::GetDomains())
 	{
-		return false;
-	}
+		if (!CreateCloudflareProcess(
+			"tunnel route dns " + validTunnelName + " " + d, 
+			"route tunnel '" + validTunnelName + "'"))
+		{
+			return false;
+		}
 
-	//
-	// SUBDOMAIN
-	//
+		//
+		// SUBDOMAIN
+		//
 
-	if (!CreateCloudflareProcess(
-		"tunnel route dns " + validTunnelName + " www." + ServerCore::GetDomainName(), 
-		"route tunnel '" + validTunnelName + "'"))
-	{
-		return false;
+		if (!CreateCloudflareProcess(
+			"tunnel route dns " + validTunnelName + " www." + d, 
+			"route tunnel '" + validTunnelName + "'"))
+		{
+			return false;
+		}
 	}
 
 	Log::Print(
@@ -862,29 +865,32 @@ bool CreateConfigFile(string& outCommand)
 			LogType::LOG_INFO);
 	}
 
-	string domainName = ServerCore::GetDomainName();
 	string port = to_string(ServerCore::GetPort());
 
 	string output = 
 		"tunnel: " + cfTunnelID + "\n"
 		+ "credentials-file: " + cfJsonFile.string() + "\n"
 		+ "\n"
-		+ "ingress:\n"
-		+ "  - hostname: " + domainName + "\n"
-		+ "    service: http://localhost:" + port + "\n"
-		+ "    originRequest:\n"
-		+ "      httpHostHeader: " + domainName + "\n"
-		+ "      ipHeaders:\n"
-		+ "        - CF-Connecting-IP\n"
-		+ "\n"
-		+ "  - hostname: www." + domainName + "\n"
-		+ "    service: http://localhost:" + port + "\n"
-		+ "    originRequest:\n"
-		+ "      httpHostHeader: www." + domainName + "\n"
-		+ "      ipHeaders:\n"
-		+ "        - CF-Connecting-IP\n"
-		+ "\n"
-		+ "  - service: http_status:404\n";
+		+ "ingress:\n";
+
+	for (const auto& d : ServerCore::GetDomains())
+	{
+		output += "  - hostname: " + d + "\n"
+			+ "    service: http://localhost:" + port + "\n"
+			+ "    originRequest:\n"
+			+ "      httpHostHeader: " + d + "\n"
+			+ "      ipHeaders:\n"
+			+ "        - CF-Connecting-IP\n"
+			+ "\n"
+			+ "  - hostname: www." + d + "\n"
+			+ "    service: http://localhost:" + port + "\n"
+			+ "    originRequest:\n"
+			+ "      httpHostHeader: www." + d + "\n"
+			+ "      ipHeaders:\n"
+			+ "        - CF-Connecting-IP\n";
+	}
+
+	output += "\n  - service: http_status:404\n";
 
 	bool needsRewrite = true;
 

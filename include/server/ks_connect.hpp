@@ -8,6 +8,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <unordered_map>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
@@ -18,6 +19,7 @@ namespace KalaServer::Server
     using std::string_view;
     using std::unique_ptr;
     using std::vector;
+	using std::unordered_map;
 
     using u8 = uint8_t;
 	using u16 = uint16_t;
@@ -72,31 +74,38 @@ namespace KalaServer::Server
 	{
 		//Default empty-state and return type for invalid getters,
 		//users and routes cannot be given this role
-		ROLE_NONE        = 0,
+		ROLE_NONE        = 0u,
 
 		//Users with this role have been manually banned or autobanned by the server,
 		//routes cannot be given this role
-		ROLE_BANNED      = 1,
+		ROLE_BANNED      = 1u,
 
 		//Users with this role have default server access,
 		//guests, whitelisted, users and admins can access routes with this role
-		ROLE_GUEST       = 2,
-
-		//Users with this role are same as guests but will never get autobanned,
-		//routes cannot be given this role
-		ROLE_WHITELISTED = 3,
+		ROLE_GUEST       = 2u,
 
 		//Role dedicated to honeypot routes to catch annoying bots, users cannot be given this role,
 		//guests will get autobanned if they access this route
-		ROLE_BLACKLISTED = 4,
+		ROLE_BLACKLISTED = 3u,
 
 		//Users with this role can access routes with user privileges,
 		//users and admins can access routes with this role
-		ROLE_USER        = 5,
+		ROLE_USER        = 4u,
 
 		//Users with this role bypass all privileges,
 		//only admins can access routes with this role
-		ROLE_ADMIN       = 6
+		ROLE_ADMIN       = 5u
+	};
+
+	//The data received from an accepted socket ready to be parsed
+	struct LIB_API RequestData
+	{
+		string method{};
+		string route{};
+		string httpVersion{};
+		string host{};
+		unordered_map<string, string> headers{};
+		string body{};
 	};
 
 	//Any inbound or outbound socket and its data regardless of origin or destination,
@@ -107,14 +116,13 @@ namespace KalaServer::Server
 		abool isRunning{};
 
 		string connectionIP{};
-		mutex m_connectionIP{};
-
 		string connectionRoute{};
-		mutex m_connectionRoute{};
 
 		auptr connectionSocket = UNASSIGNED_SOCKET_VALUE;
 
 		thread connectionThread{};
+
+		RequestData requestData{};
 	};
 
 	struct LIB_API User
@@ -139,10 +147,10 @@ namespace KalaServer::Server
 
         static bool IsListenerRunning();
 
-		static Connection* GetListenerSocket();
+		static const Connection& GetListenerSocket();
 		static mutex& GetListenerMutex();
 
-		static vector<Connection*> GetConnectSockets();
+		static const vector<const Connection*>& GetConnectSockets();
 		static mutex& GetConnectMutex();
 
 		//Disconnect the target user via connect socket
@@ -154,9 +162,7 @@ namespace KalaServer::Server
 		//Closes the server listener socket and all inbound sockets and all outbound packets
 		static void DisconnectListener();
 
-		static IPResult IsValidIP(const string& targetIP);
-
-		static string IPResultToString(IPResult result);
+		static bool IsValidIP(const string& targetIP);
 
 		static string RoleToString(Role role);
 		static Role StringToRole(const string& role);

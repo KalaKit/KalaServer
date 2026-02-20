@@ -429,9 +429,9 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
     if (send_all())
     {
         Log::Print(
-            "Sent server '" + ServerCore::GetServerName() + "' response '" + responseLogContent + "'.",
+            "[ " + data.connection->connectionIP + " ] Sent response:\n" + responseLogContent + ".",
             "SEND_RESPONSE",
-            LogType::LOG_INFO);
+            LogType::LOG_SUCCESS);
     }
 
     if (!socketAlreadyClosed

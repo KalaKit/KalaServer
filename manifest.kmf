@@ -8,22 +8,22 @@
 
 //copy readme
 origin: readme.md
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@readme.md, ..@..@_domains@engine-website@server@_external_shared@KalaServer@readme.md
+target: ..@..@_websites@server@_external_shared@KalaServer@readme.md
 action: forcecopy
 
 //copy license
 origin: LICENSE.md
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@LICENSE.md, ..@..@_domains@engine-website@server@_external_shared@KalaServer@LICENSE.md
+target: ..@..@_websites@server@_external_shared@KalaServer@LICENSE.md
 action: forcecopy
 
 //copy include files
 origin: include
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@include, ..@..@_domains@engine-website@server@_external_shared@KalaServer@include
+target: ..@..@_websites@server@_external_shared@KalaServer@include
 action: forcecopy
 
 //copy docs
 origin: docs
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@docs, ..@..@_domains@engine-website@server@_external_shared@KalaServer@docs
+target: ..@..@_websites@server@_external_shared@KalaServer@docs
 action: forcecopy
 
 //
@@ -32,32 +32,32 @@ action: forcecopy
 
 //copy debug dll
 origin: build@windows-debug@libKalaServer1d.dll
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@debug@libKalaServer1d.dll, ..@..@_domains@engine-website@server@_external_shared@KalaServer@debug@libKalaServer1d.dll
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@libKalaServer1d.dll
 action: forcecopy
 
 //copy debug lib
 origin: build@windows-debug@libKalaServer1d.dll.a
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@debug@libKalaServer1d.dll.a, ..@..@_domains@engine-website@server@_external_shared@KalaServer@debug@libKalaServer1d.dll.a
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@libKalaServer1d.dll.a
 action: forcecopy
 
 //copy debug so
 origin: build@linux-debug@libKalaServer1d.so
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@debug@libKalaServer1d.so, ..@..@_domains@engine-website@server@_external_shared@KalaServer@debug@libKalaServer1d.so
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@libKalaServer1d.so
 action: forcecopy
 
 //copy release dll
 origin: build@windows-release@libKalaServer1.dll
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@release@libKalaServer1.dll, ..@..@_domains@engine-website@server@_external_shared@KalaServer@release@libKalaServer1.dll
+target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.dll
 action: forcecopy
 
 //copy release lib
 origin: build@windows-release@libKalaServer1.dll.a
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@release@libKalaServer1.dll.a, ..@..@_domains@engine-website@server@_external_shared@KalaServer@release@libKalaServer1.dll.a
+target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.dll.a
 action: forcecopy
 
 //copy release so
 origin: build@linux-release@libKalaServer1.so
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaServer@release@libKalaServer1.so, ..@..@_domains@engine-website@server@_external_shared@KalaServer@release@libKalaServer1.so
+target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.so
 action: forcecopy
 
 //
@@ -66,10 +66,10 @@ action: forcecopy
 
 //KalaHeaders
 origin: _external_shared@KalaHeaders
-target: ..@..@_domains@kalakit-website@server@_external_shared@KalaHeaders, ..@..@_domains@engine-website@server@_external_shared@KalaHeaders
+target: ..@..@_websites@server@_external_shared@KalaHeaders
 action: copy
 
 //Cloudflared
 origin: _external_shared@Cloudflared
-target: ..@..@_domains@kalakit-website@server@_external_shared@Cloudflared, ..@..@_domains@engine-website@server@_external_shared@Cloudflared
+target: ..@..@_websites@server@_external_shared@Cloudflared
 action: copy

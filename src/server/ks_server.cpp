@@ -17,6 +17,7 @@
 #include <string>
 
 #include "KalaHeaders/log_utils.hpp"
+#include "KalaHeaders/string_utils.hpp"
 
 #include "server/ks_server.hpp"
 #include "server/ks_cloudflare.hpp"
@@ -25,6 +26,8 @@
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
+
+using KalaHeaders::KalaString::SplitString;
 
 using KalaServer::Core::KalaServerCore;
 
@@ -44,23 +47,20 @@ namespace KalaServer::Server
 	WSADATA wsaData{};
 #endif
 
-	static u16 port{};
 	static string serverName{};
-	static string domainName{};
 	static path serverRoot{};
+	static vector<string> serverDomains{};
+	static u16 serverPort{};
 
 	bool ServerCore::Initialize(
-		u16 newPort,
 		string_view newServerName,
-		string_view newDomainName,
 		const path& newServerRoot,
+		vector<string> newServerDomains,
+		u16 newPort,
 		bool requireCloudflare)
 	{
 		Log::Print(
-			"Starting to initialize server '" + string(newServerName) 
-			+ "' at port '" + to_string(newPort) 
-			+ "' with domain '" + string(newDomainName)
-			+ "' and server root '" + newServerRoot.string() + "'",
+			"Starting to initialize server '" + string(newServerName),
 			"SERVER",
 			LogType::LOG_INFO);
 
@@ -69,17 +69,6 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to initialize server because its name is empty or too long!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
-		}
-		if (newDomainName.empty()
-			|| newDomainName.length() > 50)
-		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because its domain name '" + string(newDomainName) + "' is empty or too long!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
@@ -96,6 +85,55 @@ namespace KalaServer::Server
 				2);
 
 			return false;
+		}
+
+		if (newServerDomains.empty())
+		{
+			Log::Print(
+				"Failed to initialize server '" + string(newServerName) + "' because it has no assigned domains!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		for (const auto& d : newServerDomains)
+		{
+			if (d.empty())
+			{
+				Log::Print(
+					"Server '" + string(newServerName) + "' did not initialize all domains because one of its assigned domains is empty!",
+					"SERVER",
+					LogType::LOG_ERROR,
+					2);
+
+				continue;
+			}
+			if (d.find('.') == string::npos)
+			{
+				Log::Print(
+					"Server '" + string(newServerName) + "' did not initialize all domains because domain '" + d + "' has no extension splitters!",
+					"SERVER",
+					LogType::LOG_ERROR,
+					2);
+
+				continue;
+			}
+
+			vector<string> split = SplitString(d, ".");
+			if (split.size() != 2)
+			{
+				Log::Print(
+					"Server '" + string(newServerName) + "' did not initialize all domains because domain '" + d + "' has a malformed structure!",
+					"SERVER",
+					LogType::LOG_ERROR,
+					2);
+
+				continue;
+			}
+
+			serverDomains.push_back(d);
 		}
 
 		if (MIN_PORT_RANGE == 0)
@@ -150,18 +188,31 @@ namespace KalaServer::Server
 		}
 #endif
 
-		port = newPort;
 		serverName = newServerName;
-		domainName = newDomainName;
 		serverRoot = newServerRoot;
+		serverPort = newPort;
 
 		cloudflareRequired = requireCloudflare;
 
 		isInitialized = true;
 		if (!cloudflareRequired) isReady = true;
 
+		string output = 
+			"Created new server '" + serverName + "' "
+			"with root '" + serverRoot.string() + "', "
+			"domains '";
+
+		for (const auto& d : serverDomains)
+		{
+			output += d + ", ";
+		}
+
+		output.erase(output.size() - 2);
+
+		output += "' and port '" + to_string(serverPort) + "'!";
+
 		Log::Print(
-			"Created new server '" + serverName + "'!",
+			output,
 			"SERVER",
 			LogType::LOG_SUCCESS);
 
@@ -265,10 +316,10 @@ namespace KalaServer::Server
 			: true;
 	}
 
-	u16 ServerCore::GetPort() { return port; }
 	const string& ServerCore::GetServerName() { return serverName; }
-	const string& ServerCore::GetDomainName() { return domainName; }
 	const path& ServerCore::GetServerRoot() { return serverRoot; }
+	const vector<string>& ServerCore::GetDomains() { return serverDomains; };
+	u16 ServerCore::GetPort() { return serverPort; }
 
 	void ServerCore::Shutdown()
 	{
