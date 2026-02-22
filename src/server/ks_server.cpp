@@ -22,14 +22,14 @@
 #include "server/ks_server.hpp"
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_connect.hpp"
-#include "core/ks_core.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
 using KalaHeaders::KalaString::SplitString;
 
-using KalaServer::Core::KalaServerCore;
+using KalaHeaders::KalaThread::lockwait_m;
+using KalaHeaders::KalaThread::unlock_m;
 
 using std::to_string;
 using std::string;
@@ -52,6 +52,15 @@ namespace KalaServer::Server
 	static vector<string> serverDomains{};
 	static string serverIP{};
 	static u16 serverPort{};
+
+	static vector<BannedIP> bannedIPs{};
+	static mutex m_bannedIPs{};
+
+	static vector<string> routes{};
+	static mutex m_routes{};
+
+	static vector<string> blacklistedKeywords{};
+	static mutex m_blacklistedKeywords{};
 
 	bool ServerCore::Initialize(
 		string_view newServerName,
@@ -171,7 +180,7 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		if (!Connect::IsValidIP(newServerIP))
+		if (!IsValidIP(newServerIP))
 		{
 			Log::Print(
 				"Failed to initialize server '" + string(newServerName) + "' because its IP '" + string(newServerIP) + "' is not a valid IP address!",
@@ -335,6 +344,161 @@ namespace KalaServer::Server
 	const vector<string>& ServerCore::GetServerDomains() { return serverDomains; };
 	string_view ServerCore::GetServerIP() { return serverIP; }
 	u16 ServerCore::GetServerPort() { return serverPort; }
+
+	bool ServerCore::IsValidIP(string_view targetIP)
+	{
+		struct in_addr addr4{};
+		if (inet_pton(AF_INET, string(targetIP).c_str(), &addr4) == 1) return true;
+
+		struct in6_addr addr6{};
+		if (inet_pton(AF_INET6, string(targetIP).c_str(), &addr6) == 1) return true;
+
+		return false;
+	}
+
+	bool ServerCore::IsBannedIP(string_view targetIP)
+	{
+		return false;
+	}
+	void ServerCore::BanIP(string_view targetIP)
+	{
+
+	}
+	void ServerCore::UnbanIP(string_view targetIP)
+	{
+		
+	}
+
+	vector<BannedIP>& ServerCore::GetBannedIPs() { return bannedIPs; }
+	mutex& ServerCore::GetBannedIPsMutex() { return m_bannedIPs; }
+
+	void ServerCore::AddRoute(string_view newValue)
+	{
+		lockwait_m(m_routes);
+
+		for (const auto& r : routes)
+		{
+			if (r == newValue)
+			{
+				Log::Print(
+					"Failed to add new route '" + string(newValue) + "' because it has already been added!",
+					"SERVER",
+					LogType::LOG_ERROR,
+					2);
+
+				unlock_m(m_routes);
+
+				return;
+			}
+		}
+
+		routes.push_back(string(newValue));
+
+		unlock_m(m_routes);
+
+		Log::Print(
+			"Added new route '" + string(newValue) + "'!",
+			"SERVER",
+			LogType::LOG_SUCCESS);
+	}
+	void ServerCore::RemoveRoute(string_view newValue)
+	{
+		lockwait_m(m_routes);
+
+		auto it = remove_if(
+			routes.begin(),
+			routes.end(),
+			[&newValue](const string& u) { return u == newValue; });
+
+		if (it == routes.end())
+		{
+			Log::Print(
+				"Failed to remove existing route '" + string(newValue) + "' because it has not been added!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			unlock_m(m_routes);
+
+			return;
+		}
+
+		routes.erase((it), routes.end());
+
+		unlock_m(m_routes);
+
+		Log::Print(
+			"Removed existing route '" + string(newValue) + "'.",
+			"SERVER",
+			LogType::LOG_SUCCESS);
+	}
+
+	vector<string>& ServerCore::GetRoutes() { return routes; }
+	mutex& ServerCore::GetRoutesMutex() { return m_routes; }
+
+	void ServerCore::AddBlacklistedKeyword(string_view newValue)
+	{
+		lockwait_m(m_blacklistedKeywords);
+
+		for (const auto& r : blacklistedKeywords)
+		{
+			if (r == newValue)
+			{
+				Log::Print(
+					"Failed to add new blacklisted keyword '" + string(newValue) + "' because it has already been added!",
+					"SERVER",
+					LogType::LOG_ERROR,
+					2);
+
+				unlock_m(m_blacklistedKeywords);
+
+				return;
+			}
+		}
+
+		blacklistedKeywords.push_back(string(newValue));
+
+		unlock_m(m_blacklistedKeywords);
+
+		Log::Print(
+			"Added new blacklisted keyword '" + string(newValue) + "'!",
+			"SERVER",
+			LogType::LOG_SUCCESS);
+	}
+	void ServerCore::RemoveBlacklistedKeyword(string_view newValue)
+	{
+		lockwait_m(m_blacklistedKeywords);
+
+		auto it = remove_if(
+			blacklistedKeywords.begin(),
+			blacklistedKeywords.end(),
+			[&newValue](const string& u) { return u == newValue; });
+
+		if (it == blacklistedKeywords.end())
+		{
+			Log::Print(
+				"Failed to remove existing blacklisted keyword '" + string(newValue) + "' because it has not been added!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			unlock_m(m_blacklistedKeywords);
+
+			return;
+		}
+
+		blacklistedKeywords.erase((it), blacklistedKeywords.end());
+
+		unlock_m(m_blacklistedKeywords);
+
+		Log::Print(
+			"Removed existing blacklisted keyword '" + string(newValue) + "'.",
+			"SERVER",
+			LogType::LOG_SUCCESS);
+	}
+
+	vector<string>& ServerCore::GetBlacklistedKeywords() { return blacklistedKeywords; }
+	mutex& ServerCore::GetBKMutex() { return m_blacklistedKeywords; }
 
 	void ServerCore::Shutdown()
 	{

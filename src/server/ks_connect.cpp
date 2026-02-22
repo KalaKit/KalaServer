@@ -119,15 +119,6 @@ constexpr string_view response_success =
 
 namespace KalaServer::Server
 {
-	static vector<BannedIP> bannedIPs{};
-	static mutex m_bannedIPs{};
-
-	static vector<string> routes{};
-	static mutex m_routes{};
-
-	static vector<string> blacklistedKeywords{};
-	static mutex m_blacklistedKeywords{};
-
 	static unique_ptr<Connection> listenerSocket{};
 	static mutex m_listenerSocket{};
 
@@ -140,7 +131,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server because the server is not running or not ready!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -151,7 +142,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the TIME_OUT_PERIOD_M value was set to 0!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -161,7 +152,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the ROLLING_WINDOW_TIMER_S value was set to 0!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -171,7 +162,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the MIN_PACKET_SPACING_MS value was set to 0!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -181,7 +172,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the ACCEPT_WAIT_TIME_S value was set to 0!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -191,7 +182,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the MAX_TOTAL_PAYLOAD_SIZE_BYTES value was set to 0!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -201,7 +192,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the UNASSIGNED_SOCKET_VALUE value was set below 8192!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -211,7 +202,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the MAX_ACTIVE_CONNECTIONS value was set to 0!",
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -220,7 +211,7 @@ namespace KalaServer::Server
 
 		Log::Print(
 			"Creating a new listener socket for server '" + string(ServerCore::GetServerName()) + "'!",
-			"LISTENER_SOCKET",
+			"LISTENER_INIT",
 			LogType::LOG_INFO);
 
 		//
@@ -241,7 +232,7 @@ namespace KalaServer::Server
 			{
 				Log::Print(
 					"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the server already has a listener socket!",
-					"LISTENER_SOCKET",
+					"LISTENER_INIT",
 					LogType::LOG_ERROR,
 					2);
 
@@ -268,7 +259,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -292,8 +283,8 @@ namespace KalaServer::Server
 		if (result_reuse_addr == SOCKET_ERROR)
 		{
 			Log::Print(
-				"Failed to create new listener socket because SO_REUSEADDR could not be set!",
-				"ACCEPT_LOOP",
+				"Failed to create new listener socket because SO_REUSEADDR couldn't be set!",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -309,7 +300,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -322,7 +313,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -336,7 +327,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(errno),
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -360,8 +351,8 @@ namespace KalaServer::Server
 		if (result_reuse_addr < 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket because SO_REUSEADDR could not be set!",
-				"ACCEPT_LOOP",
+				"Failed to create new listener socket because SO_REUSEADDR couldn't be set!",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -377,7 +368,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(errno),
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -390,7 +381,7 @@ namespace KalaServer::Server
 		{
 			Log::Print(
 				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(errno),
-				"LISTENER_SOCKET",
+				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
 
@@ -425,12 +416,12 @@ namespace KalaServer::Server
 		}
 
 		//
-		// START CONNECT SOCKET ACCEPT PROCESS
+		// START LISTENER SOCKET THREAD
 		//
 
 		Log::Print(
-			"Created a new listener socket for server '" + string(ServerCore::GetServerName()) + "', starting the accept loop!",
-			"LISTENER_SOCKET",
+			"Created a new listener socket for server '" + string(ServerCore::GetServerName()) + "', starting the listener loop!",
+			"LISTENER_INIT",
 			LogType::LOG_SUCCESS);
 
 		localListener->connectionThread = joinable_thread([localListener]
@@ -441,7 +432,7 @@ namespace KalaServer::Server
 					{
 						Log::Print(
 							"Listener socket for server '" + string(ServerCore::GetServerName()) + "' has been shut down.",
-							"ACCEPT_LOOP",
+							"LISTENER_LOOP",
 							LogType::LOG_INFO);
 
 						return;
@@ -451,13 +442,17 @@ namespace KalaServer::Server
 					{
 						Log::Print(
 							"Server is not healthy, waiting until trying again.",
-							"ACCEPT_LOOP",
+							"LISTENER_LOOP",
 							LogType::LOG_INFO);
 
 						sleep_for(seconds(SERVER_HEALTH_SLEEP_S));
 
 						continue;
 					}
+
+					//
+					// REMOVE DISABLED SOCKETS
+					//
 
 					vector<unique_ptr<Connection>> finishedConnections{};
 
@@ -475,23 +470,23 @@ namespace KalaServer::Server
 
 					for (auto& conn : finishedConnections)
 					{
+						if (conn->connectionThread.joinable()) conn->connectionThread.join();
+
 #ifdef _WIN32
-						SOCKET cs = ToVar<SOCKET>(conn->connectionSocket.load(memory_order_acquire));
+						SOCKET cs = ToVar<SOCKET>(conn->connectionSocket.exchange(UNASSIGNED_SOCKET_VALUE));
 						if (cs != UNASSIGNED_SOCKET_VALUE)
 						{
 							shutdown(cs, SD_BOTH);
 							closesocket(cs);
 						}
 #else
-						int cs = ToVar<int>(conn->connectionSocket.load(memory_order_acquire));
+						int cs = ToVar<int>(conn->connectionSocket.exchange(UNASSIGNED_SOCKET_VALUE));
 						if (cs != UNASSIGNED_SOCKET_VALUE)
 						{
 							shutdown(cs, SHUT_RDWR);
 							close(cs);
 						}
 #endif
-
-						if (conn->connectionThread.joinable()) conn->connectionThread.join();
 					}
 
 					//
@@ -509,16 +504,40 @@ namespace KalaServer::Server
 						rcast<sockaddr*>(&clientAddress),
 						&addressLength);
 
-					Log::Print(
-						"Connection received, verifying socket.",
-						"ACCEPT_LOOP",
-						LogType::LOG_INFO);
-
 					if (client == invalid_socket)
-					{
+					{	
+						DWORD err = WSAGetLastError();
+
+						//interrupted, try again
+						if (err == WSAEINTR
+							|| err == WSAEWOULDBLOCK)
+						{
+							continue;
+						}
+
+						else if (err == WSAETIMEDOUT)
+						{
+							Log::Print(
+								"Accept timed out.",
+								"LISTENER_LOOP",
+								LogType::LOG_INFO);
+
+							continue;
+						}
+						else if (err == WSAECONNRESET
+								 || err == WSAECONNABORTED)
+						{
+							Log::Print(
+								"Connection was closed abruptly by client during accept.",
+								"LISTENER_LOOP",
+								LogType::LOG_INFO);
+
+							continue;
+						}
+
 						Log::Print(
-							"Failed to accept new connection! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
-							"ACCEPT_LOOP",
+							"Failed to accept new connection! Reason: " + KalaServerCore::ErrorToString(err),
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -536,8 +555,8 @@ namespace KalaServer::Server
 					if (result_rcv_time == SOCKET_ERROR)
 					{
 						Log::Print(
-							"Failed to accept new connection because SO_RCVTIMEO could not be set!",
-							"ACCEPT_LOOP",
+							"Failed to accept new connection because SO_RCVTIMEO couldn't be set!",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -557,8 +576,8 @@ namespace KalaServer::Server
 					if (result_snd_time == SOCKET_ERROR)
 					{
 						Log::Print(
-							"Failed to accept new connection because SO_SNDTIMEO could not be set!",
-							"ACCEPT_LOOP",
+							"Failed to accept new connection because SO_SNDTIMEO couldn't be set!",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -580,8 +599,8 @@ namespace KalaServer::Server
 					if (result_no_delay == SOCKET_ERROR)
 					{
 						Log::Print(
-							"Failed to accept new connection because TCP_NODELAY could not be set!",
-							"ACCEPT_LOOP",
+							"Failed to accept new connection because TCP_NODELAY couldn't be set!",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -601,16 +620,39 @@ namespace KalaServer::Server
 						rcast<sockaddr*>(&clientAddress),
 						&addressLength);
 
-					Log::Print(
-						"Connection received, verifying socket.",
-						"ACCEPT_LOOP",
-						LogType::LOG_INFO);
-
-					if (client == invalid_socket)
+					if (client < 0)
 					{
+						//interrupted, try again
+						if (errno == EINTR
+							|| errno == EAGAIN
+							|| errno == EWOULDBLOCK)
+						{
+							continue;
+						}
+
+						else if (errno == ETIMEDOUT)
+						{
+							Log::Print(
+								"Accept timed out.",
+								"LISTENER_LOOP",
+								LogType::LOG_INFO);
+
+							continue;
+						}
+						else if (errno == ECONNRESET
+								 || errno == ECONNABORTED)
+						{
+							Log::Print(
+								"Connection was closed abruptly by client during accept.",
+								"LISTENER_LOOP",
+								LogType::LOG_INFO);
+
+							continue;
+						}
+
 						Log::Print(
 							"Failed to accept new connection! Reason: " + KalaServerCore::ErrorToString(errno),
-							"ACCEPT_LOOP",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -631,8 +673,8 @@ namespace KalaServer::Server
 					if (result_rcv_time < 0)
 					{
 						Log::Print(
-							"Failed to accept new connection because SO_RCVTIMEO could not be set!",
-							"ACCEPT_LOOP",
+							"Failed to accept new connection because SO_RCVTIMEO couldn't be set!",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -652,8 +694,8 @@ namespace KalaServer::Server
 					if (result_snd_time < 0)
 					{
 						Log::Print(
-							"Failed to accept new connection because SO_SNDTIMEO could not be set!",
-							"ACCEPT_LOOP",
+							"Failed to accept new connection because SO_SNDTIMEO couldn't be set!",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -675,8 +717,8 @@ namespace KalaServer::Server
 					if (result_no_delay < 0)
 					{
 						Log::Print(
-							"Failed to accept new connection because TCP_NODELAY could not be set!",
-							"ACCEPT_LOOP",
+							"Failed to accept new connection because TCP_NODELAY couldn't be set!",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -701,8 +743,8 @@ namespace KalaServer::Server
 							ipStr[0] = '\0';
 
 							Log::Print(
-								"Failed to get ipv4 from client socket!",
-								"ACCEPT_LOOP",
+								"Failed accept new connection because ipv4 couldn't be found from it!",
+								"LISTENER_LOOP",
 								LogType::LOG_ERROR,
 								2);
 						}
@@ -715,13 +757,18 @@ namespace KalaServer::Server
 							ipStr[0] = '\0';
 
 							Log::Print(
-								"Failed to get ipv6 from client socket!",
-								"ACCEPT_LOOP",
+								"Failed accept new connection because ipv6 couldn't be found from it!",
+								"LISTENER_LOOP",
 								LogType::LOG_ERROR,
 								2);
 						}
 					}
 					else snprintf(ipStr, sizeof(ipStr), "UNKNOWN");
+
+					Log::Print(
+						"[ " + string(ipStr) + " ] Connection received, verifying socket.",
+						"LISTENER_LOOP",
+						LogType::LOG_INFO);
 
 					//
 					// CHECK USER COUNT, REJECT IF MAX
@@ -735,7 +782,7 @@ namespace KalaServer::Server
 
 						Log::Print(
 							"[ " + string(ipStr) + " ] " + reason,
-							"ACCEPT_LOOP",
+							"LISTENER_LOOP",
 							LogType::LOG_ERROR,
 							2);
 
@@ -758,16 +805,17 @@ namespace KalaServer::Server
 					// CHECK IF IP IS NOT BANNED
 					//
 
+					mutex& m_bannedIPs = ServerCore::GetBannedIPsMutex();
 					lockwait_m(m_bannedIPs);
 
 					bool foundBannedUser{};
-					for (const auto& u : bannedIPs)
+					for (const auto& u : ServerCore::GetBannedIPs())
 					{
 						if (ipStr == u.targetIP)
 						{
 							Log::Print(
 								"[ " + string(ipStr) + " ] Banned user tried to reconnect to server.",
-								"ACCEPT_LOOP",
+								"LISTENER_LOOP",
 								LogType::LOG_INFO);
 
 							unlock_m(m_bannedIPs);
@@ -791,7 +839,7 @@ namespace KalaServer::Server
 					unlock_m(m_bannedIPs);
 
 					//
-					// STORE AND PARSE SOCKET DATA
+					// STORE CLIENT SOCKET
 					//
 
 					lockwait_m(m_connectSockets);
@@ -808,7 +856,7 @@ namespace KalaServer::Server
 					unlock_m(m_connectSockets);
 
 					//
-					// RECEIVE INCOMING DATA
+					// START CLIENT SOCKET
 					//
 
 					raw->connectionThread = joinable_thread([raw]
@@ -832,14 +880,17 @@ namespace KalaServer::Server
 									DWORD err = WSAGetLastError();
 
 									//interrupted, try again
-									if (err == WSAEINTR) continue;
+									if (err == WSAEINTR
+										|| err == WSAEWOULDBLOCK)
+									{
+										continue;
+									}
 
-									else if (err == WSAETIMEDOUT
-											 || err == WSAEWOULDBLOCK)
+									else if (err == WSAETIMEDOUT)
 									{
 										Log::Print(
 											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
-											"ACCEPT_LOOP",
+											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
 										raw->isRunning.store(false, memory_order_release);
@@ -851,7 +902,7 @@ namespace KalaServer::Server
 									{
 										Log::Print(
 											"[ " + raw->connectionIP + " ] Connection was closed abruptly by client during bytesReceived recv read.",
-											"ACCEPT_LOOP",
+											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
 										raw->isRunning.store(false, memory_order_release);
@@ -861,7 +912,7 @@ namespace KalaServer::Server
 									
 									Log::Print(
 										"[ " + raw->connectionIP + " ] BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(err),
-										"ACCEPT_LOOP",
+										"CONNECTION_LOOP",
 										LogType::LOG_ERROR,
 										2);
 
@@ -874,7 +925,7 @@ namespace KalaServer::Server
 								{
 									Log::Print(
 										"[ " + raw->connectionIP + " ] Connection was closed during bytesReceived recv read.",
-										"ACCEPT_LOOP",
+										"CONNECTION_LOOP",
 										LogType::LOG_INFO);
 
 									raw->isRunning.store(false, memory_order_release);
@@ -894,14 +945,18 @@ namespace KalaServer::Server
 								if (bytesReceived < 0)
 								{
 									//interrupted, try again
-									if (errno == EINTR) continue;
+									if (errno == EINTR
+										|| errno == EAGAIN
+										|| errno == EWOULDBLOCK)
+									{
+										continue;
+									}
 
-									else if (errno == EAGAIN
-											 || errno == EWOULDBLOCK)
+									else if (errno == ETIMEDOUT)
 									{
 										Log::Print(
 											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
-											"ACCEPT_LOOP",
+											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
 										raw->isRunning.store(false, memory_order_release);
@@ -913,7 +968,7 @@ namespace KalaServer::Server
 									{
 										Log::Print(
 											"[ " + raw->connectionIP + " ] Connection was closed abruptly by client during bytesReceived recv read.",
-											"ACCEPT_LOOP",
+											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
 										raw->isRunning.store(false, memory_order_release);
@@ -923,7 +978,7 @@ namespace KalaServer::Server
 									
 									Log::Print(
 										"[ " + raw->connectionIP + " ] BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(errno),
-										"ACCEPT_LOOP",
+										"CONNECTION_LOOP",
 										LogType::LOG_ERROR,
 										2);
 
@@ -936,7 +991,7 @@ namespace KalaServer::Server
 								{
 									Log::Print(
 										"[ " + raw->connectionIP + " ] Connection was closed by client during bytesReceived recv read.",
-										"ACCEPT_LOOP",
+										"CONNECTION_LOOP",
 										LogType::LOG_INFO);
 
 									raw->isRunning.store(false, memory_order_release);
@@ -944,7 +999,7 @@ namespace KalaServer::Server
 									continue;
 								}
 #endif
-
+								
 								readBuffer.append(buffer, bytesReceived);
 
 								if (readBuffer.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
@@ -959,6 +1014,8 @@ namespace KalaServer::Server
 
 									break;
 								}
+
+								Log::Print("[ " + raw->connectionIP + " ] Client sent '" + to_string(bytesReceived) + "' bytes with request.");
 
 								while (true)
 								{
@@ -1243,11 +1300,18 @@ namespace KalaServer::Server
 
 									if (!req.route.starts_with('/')) req.route.insert(req.route.begin(), '/');
 
+									mutex& m_routes = ServerCore::GetRoutesMutex();
+									mutex& m_blacklistedKeywords = ServerCore::GetBKMutex();
+
 									lockwait_m(m_routes);
 									lockwait_m(m_blacklistedKeywords);
 
+									vector<string>& blacklistedKeywords = ServerCore::GetBlacklistedKeywords();
+									vector<BannedIP>& bannedIPs = ServerCore::GetBannedIPs();
+									vector<string>& routes = ServerCore::GetRoutes();
+
 									string blacklistedKeyword{};
-									for (const auto& b : blacklistedKeywords)
+									for (const auto& b : ServerCore::GetBlacklistedKeywords())
 									{
 										if (req.route.find(b) != string::npos)
 										{
@@ -1261,7 +1325,7 @@ namespace KalaServer::Server
 
 										Log::Print(
 											"[ " + raw->connectionIP + " ] User was banned for trying to access route via blacklisted keyword '" + blacklistedKeyword + "'",
-											"ACCEPT_LOOP",
+											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
 										unlock_m(m_blacklistedKeywords);
@@ -1314,11 +1378,10 @@ namespace KalaServer::Server
 									//
 
 									string parsedHeaders = 
-										"    IP: " + raw->connectionIP + "\n"
-										"    Method: " + req.method + "\n"
-										"    Route: " + req.route + "\n"
+										"    method: " + req.method + "\n"
+										"    route: " + req.route + "\n"
 										"    HTTP version: " + req.httpVersion + "\n"
-										"    Host: " + req.host + "\n";
+										"    host: " + req.host;
 
 									for (const auto& [k, v] : req.headers)
 									{
@@ -1327,16 +1390,31 @@ namespace KalaServer::Server
 
 									Log::Print(parsedHeaders);
 
+									vector<OptionalSendType> optSendTypes{};
+									for (const auto& [k, v] : req.headers)
+									{
+										if (k == "connection")
+										{
+											string lowerValue = ToLowerString(v);
+											if (lowerValue.find("close") != string::npos)
+											{
+												optSendTypes.push_back(OptionalSendType::S_FORCE_CLOSE);
+												break;
+											}
+										}
+									}
+
 									raw->requestData = std::move(req);
 
 									Log::Print(
 										"[ " + raw->connectionIP + " ] Connection verified, sending response.",
-										"ACCEPT_LOOP",
+										"CONNECTION_LOOP",
 										LogType::LOG_INFO);
 
 									Response::SendResponse({
 										.responseType = ResponseType::R_200,
 										.contentType = ContentType::CT_HTML,
+										.optionalSendTypes = optSendTypes,
 										.responseBody = string(response_success),
 										.connection = raw
 									});
@@ -1481,7 +1559,7 @@ namespace KalaServer::Server
 			return;
 		}
 
-		if (!IsValidIP(targetIP))
+		if (!ServerCore::IsValidIP(targetIP))
 		{
 			Log::Print(
 				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(ServerCore::GetServerName()) + "' because the IP structure is invalid!",
@@ -1644,152 +1722,6 @@ namespace KalaServer::Server
 		Log::Print(
 			"Disconnected listener socket for server '" + string(ServerCore::GetServerName()) + "'!",
 			"LISTENER_DISCONNECT",
-			LogType::LOG_SUCCESS);
-	}
-
-	bool Connect::IsValidIP(string_view targetIP)
-	{
-		struct in_addr addr4{};
-		if (inet_pton(AF_INET, string(targetIP).c_str(), &addr4) == 1) return true;
-
-		struct in6_addr addr6{};
-		if (inet_pton(AF_INET6, string(targetIP).c_str(), &addr6) == 1) return true;
-
-		return false;
-	}
-
-	bool Connect::IsBannedIP(string_view targetIP)
-	{
-		return false;
-	}
-	void Connect::BanIP(string_view targetIP)
-	{
-
-	}
-	void Connect::UnbanIP(string_view targetIP)
-	{
-		
-	}
-
-	void Connect::AddRoute(string_view newValue)
-	{
-		lockwait_m(m_routes);
-
-		for (const auto& r : routes)
-		{
-			if (r == newValue)
-			{
-				Log::Print(
-					"Failed to add new route '" + string(newValue) + "' because it has already been added!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				unlock_m(m_routes);
-
-				return;
-			}
-		}
-
-		routes.push_back(string(newValue));
-
-		unlock_m(m_routes);
-
-		Log::Print(
-			"Added new route '" + string(newValue) + "'!",
-			"SERVER",
-			LogType::LOG_SUCCESS);
-	}
-	void Connect::RemoveRoute(string_view newValue)
-	{
-		lockwait_m(m_routes);
-
-		auto it = remove_if(
-			routes.begin(),
-			routes.end(),
-			[&newValue](const string& u) { return u == newValue; });
-
-		if (it == routes.end())
-		{
-			Log::Print(
-				"Failed to remove existing route '" + string(newValue) + "' because it has not been added!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			unlock_m(m_routes);
-
-			return;
-		}
-
-		routes.erase((it), routes.end());
-
-		unlock_m(m_routes);
-
-		Log::Print(
-			"Removed existing route '" + string(newValue) + "'.",
-			"SERVER",
-			LogType::LOG_SUCCESS);
-	}
-
-	void Connect::AddBlacklistedKeyword(string_view newValue)
-	{
-		lockwait_m(m_blacklistedKeywords);
-
-		for (const auto& r : blacklistedKeywords)
-		{
-			if (r == newValue)
-			{
-				Log::Print(
-					"Failed to add new blacklisted keyword '" + string(newValue) + "' because it has already been added!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				unlock_m(m_blacklistedKeywords);
-
-				return;
-			}
-		}
-
-		blacklistedKeywords.push_back(string(newValue));
-
-		unlock_m(m_blacklistedKeywords);
-
-		Log::Print(
-			"Added new blacklisted keyword '" + string(newValue) + "'!",
-			"SERVER",
-			LogType::LOG_SUCCESS);
-	}
-	void Connect::RemoveBlacklistedKeyword(string_view newValue)
-	{
-		lockwait_m(m_blacklistedKeywords);
-
-		auto it = remove_if(
-			blacklistedKeywords.begin(),
-			blacklistedKeywords.end(),
-			[&newValue](const string& u) { return u == newValue; });
-
-		if (it == blacklistedKeywords.end())
-		{
-			Log::Print(
-				"Failed to remove existing blacklisted keyword '" + string(newValue) + "' because it has not been added!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			unlock_m(m_blacklistedKeywords);
-
-			return;
-		}
-
-		blacklistedKeywords.erase((it), blacklistedKeywords.end());
-
-		unlock_m(m_blacklistedKeywords);
-
-		Log::Print(
-			"Removed existing blacklisted keyword '" + string(newValue) + "'.",
-			"SERVER",
 			LogType::LOG_SUCCESS);
 	}
 }

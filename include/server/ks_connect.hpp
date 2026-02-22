@@ -9,7 +9,6 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
-#include <chrono>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
@@ -21,7 +20,6 @@ namespace KalaServer::Server
     using std::unique_ptr;
     using std::vector;
 	using std::unordered_map;
-	using std::chrono::steady_clock;
 
     using u8 = uint8_t;
 	using u16 = uint16_t;
@@ -58,14 +56,6 @@ namespace KalaServer::Server
 	//Sleep this many seconds on the listener thread before retrying from start
 	//if internet checks failed at the top of the listener thread
 	constexpr u8 SERVER_HEALTH_SLEEP_S = 1;
-
-	struct BannedIP
-	{
-		string targetIP{};
-
-		//Leave unassigned to mark as permanent ban
-		steady_clock::time_point expiresAt{};
-	};
 
 	//The data received from an accepted socket ready to be parsed
 	struct LIB_API RequestData
@@ -119,20 +109,5 @@ namespace KalaServer::Server
 
 		//Closes the server listener socket and all inbound sockets and all outbound packets
 		static void DisconnectListener();
-
-		static bool IsValidIP(string_view targetIP);
-
-		static bool IsBannedIP(string_view targetIP);
-		static void BanIP(string_view targetIP);
-		static void UnbanIP(string_view targetIP);
-
-		static void AddRoute(string_view newValue);
-		static void RemoveRoute(string_view newValue);
-
-		static void AddBlacklistedKeyword(string_view newValue);
-		static void RemoveBlacklistedKeyword(string_view newValue);
-
-		static void ClearAllUsers();
-		static void ClearAllRoutes();
     };
 }

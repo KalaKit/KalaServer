@@ -13,6 +13,7 @@
 
 #include <unordered_map>
 #include <atomic>
+#include <cerrno>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/log_utils.hpp"
@@ -20,6 +21,7 @@
 #include "server/ks_response.hpp"
 #include "server/ks_connect.hpp"
 #include "server/ks_server.hpp"
+#include "core/ks_core.hpp"
 
 using KalaHeaders::KalaCore::ToVar;
 using KalaHeaders::KalaCore::FromVar;
@@ -35,6 +37,7 @@ using KalaServer::Server::ContentType;
 using KalaServer::Server::OptionalSendType;
 using KalaServer::Server::Response;
 using KalaServer::Server::ServerCore;
+using KalaServer::Core::KalaServerCore;
 
 using std::unordered_map;
 using std::string;
@@ -152,13 +155,14 @@ namespace KalaServer::Server
 			return;
 		}
 
-        auto close_socket = [&data]()
+        uintptr_t sock = data.connection
+            ? data.connection->connectionSocket.load(memory_order_acquire)
+            : data.connectionSocket.load(memory_order_acquire);
+
+        auto close_socket = [&data, &sock]()
             {
 #ifdef _WIN32
-                SOCKET csock = data.connection 
-                    ? ToVar<SOCKET>(data.connection->connectionSocket.load(memory_order_acquire))
-                    : ToVar<SOCKET>(data.connectionSocket.load(memory_order_acquire));
-
+                SOCKET csock = ToVar<SOCKET>(sock);
                 if (csock == UNASSIGNED_SOCKET_VALUE)
                 {
                     Log::Print(
@@ -173,10 +177,7 @@ namespace KalaServer::Server
                 shutdown(csock, SD_BOTH);
                 closesocket(csock);
 #else
-                int csock = data.connection 
-                    ? ToVar<int>(data.connection->connectionSocket.load(memory_order_acquire))
-                    : ToVar<int>(data.connectionSocket.load(memory_order_acquire));
-
+                int csock = ToVar<int>(sock);
                 if (csock == UNASSIGNED_SOCKET_VALUE)
                 {
                     Log::Print(
@@ -191,17 +192,15 @@ namespace KalaServer::Server
                 shutdown(csock, SHUT_RDWR);
                 close(csock);
 #endif
+
+                if (data.connection) data.connection->isRunning.store(false, std::memory_order_release);
             };
 
-        bool noTargetSocket =
-            (data.connection
-                ? data.connection->connectionSocket.load(memory_order_acquire) == UNASSIGNED_SOCKET_VALUE
-                : data.connectionSocket.load(memory_order_acquire) == UNASSIGNED_SOCKET_VALUE);
         bool invalidResponseType = data.responseType == ResponseType::R_INVALID;
         bool invalidContentType = data.contentType == ContentType::CT_INVALID;
         bool emptyBody = data.responseBody.empty();
 
-        if (noTargetSocket)
+        if (sock == UNASSIGNED_SOCKET_VALUE)
         {
             Log::Print(
                 "Failed to send response because no Connection struct or connectionSocket has been assigned!",
@@ -248,9 +247,7 @@ namespace KalaServer::Server
                 .contentType = data.contentType,
                 .optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
                 .responseBody = response_missing,
-                .connectionSocket = data.connection
-                    ? data.connection->connectionSocket.load(memory_order_acquire)
-                    : data.connectionSocket.load(memory_order_acquire)
+                .connectionSocket = sock
             };
 
             Send(newData);
@@ -332,6 +329,14 @@ namespace KalaServer::Server
 
 void Send(const ResponseData& data)
 {
+    string connectionIP = data.connection
+            ? "[ " + data.connection->connectionIP + " ] "
+            : "";
+
+    uintptr_t sock = data.connection
+        ? data.connection->connectionSocket.load(memory_order_acquire)
+        : data.connectionSocket.load(memory_order_acquire);
+
     const string_view statusLine = Response::ResponseTypeToString(data.responseType);
     const string_view contentType = Response::ContentTypeToMimeType(data.contentType);
     static constexpr string_view ending = "\r\n";
@@ -374,14 +379,17 @@ void Send(const ResponseData& data)
 
     fullResponse += data.responseBody;
 
-    auto send_all = [&data, &fullResponse, &responseLogContent]() -> bool
+    auto send_all = [
+        &data, 
+        &fullResponse, 
+        &responseLogContent, 
+        &connectionIP,
+        &sock]() -> bool
         {
             int totalSent{};
             int length = fullResponse.size();
 #ifdef _WIN32
-            SOCKET csock = data.connection 
-                ? ToVar<SOCKET>(data.connection->connectionSocket.load(memory_order_acquire))
-                : ToVar<SOCKET>(data.connectionSocket.load(memory_order_acquire));
+            SOCKET csock = ToVar<SOCKET>(sock);
 
             while (totalSent < length)
             {
@@ -393,10 +401,36 @@ void Send(const ResponseData& data)
 
                 if (sent == SOCKET_ERROR)
                 {
-                    string err = to_string(WSAGetLastError());
+                    int err = WSAGetLastError();
+
+                    //interrupted, try again
+					if (err == WSAEINTR
+						|| err == WSAEWOULDBLOCK)
+					{
+						continue;
+					}
+                    if (err == WSAETIMEDOUT)
+					{
+						Log::Print(
+							connectionIP + "Send timed out.",
+							"SEND_RESPONSE",
+							LogType::LOG_INFO);
+
+						return false;
+					}
+					if (err == WSAECONNRESET
+						|| err == WSAECONNABORTED)
+					{
+						Log::Print(
+							connectionIP + "Response was closed abruptly by client during send.",
+							"SEND_RESPONSE",
+							LogType::LOG_INFO);
+
+						return false;
+					}
 
                     Log::Print(
-                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "'! Reason: " + err,
+                        connectionIP + "Failed to finish sending response! Reason: " + KalaServerCore::ErrorToString(err),
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
@@ -407,10 +441,9 @@ void Send(const ResponseData& data)
                 if (sent == 0)
                 {
                     Log::Print(
-                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "' because the connection closed!",
+                        connectionIP + "Couldn't finish sending response because the connection closed.",
                         "SEND_RESPONSE",
-                        LogType::LOG_ERROR,
-                        2);
+                        LogType::LOG_INFO);
 
                     return false;
                 }
@@ -418,9 +451,7 @@ void Send(const ResponseData& data)
                 totalSent += sent;
             }
 #else
-            int csock = csock = data.connection 
-                ? ToVar<int>(data.connection->connectionSocket.load(memory_order_acquire))
-                : ToVar<int>(data.connectionSocket.load(memory_order_acquire));
+            int csock = ToVar<int>(sock);
 
             while (totalSent < length)
             {
@@ -433,12 +464,35 @@ void Send(const ResponseData& data)
                 if (sent < 0)
                 {
                     //interrupted by signal, retry
-                    if (errno == EINTR) continue;
+                    if (errno == EINTR
+                        || errno == EAGAIN
+                        || errno == EWOULDBLOCK)
+                    {
+                        continue;
+                    }
+                    if (errno == ETIMEDOUT)
+					{
+						Log::Print(
+							connectionIP + "Send timed out.",
+							"SEND_RESPONSE",
+							LogType::LOG_INFO);
 
-                    string err = string(strerror(errno)) + " (errno=" + to_string(errno) + ")";
+						return false;
+					}
+					if (errno == EPIPE
+                        || errno == ECONNRESET
+						|| errno == ECONNABORTED)
+					{
+						Log::Print(
+							connectionIP + "Response was closed abruptly by client during send.",
+							"SEND_RESPONSE",
+							LogType::LOG_INFO);
+
+						return false;
+					}
 
                     Log::Print(
-                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "'! Reason: " + err,
+                        connectionIP + "Failed to finish sending response! Reason: " + KalaServerCore::ErrorToString(errno),
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
@@ -449,10 +503,9 @@ void Send(const ResponseData& data)
                 if (sent == 0)
                 {
                     Log::Print(
-                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "' because the connection closed!",
+                        connectionIP + "Couldn't finish sending response because the connection closed.",
                         "SEND_RESPONSE",
-                        LogType::LOG_ERROR,
-                        2);
+                        LogType::LOG_INFO);
 
                     return false;
                 }
@@ -480,18 +533,14 @@ void Send(const ResponseData& data)
 
     if (containsCloseSendType)
     {
-#ifdef _WIN32
-        SOCKET csock = csock = data.connection 
-                ? ToVar<SOCKET>(data.connection->connectionSocket.load(memory_order_acquire))
-                : ToVar<SOCKET>(data.connectionSocket.load(memory_order_acquire));
-        closesocket(csock);
-#else
-        int csock = data.connection 
-                ? ToVar<int>(data.connection->connectionSocket.load(memory_order_acquire))
-                : ToVar<int>(data.connectionSocket.load(memory_order_acquire));
-        close(csock);
-#endif
-
         if (data.connection) data.connection->isRunning.store(false, std::memory_order_release);
+        else
+        {
+#ifdef _WIN32
+        closesocket(ToVar<SOCKET>(sock));
+#else
+        close(ToVar<int>(sock));
+#endif
+        }
     }
 }

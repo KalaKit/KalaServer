@@ -8,9 +8,11 @@
 #include <string>
 #include <filesystem>
 #include <vector>
+#include <chrono>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
+
 #include "server/ks_cloudflare.hpp"
 
 namespace KalaServer::Server
@@ -19,8 +21,10 @@ namespace KalaServer::Server
 	using std::string_view;
 	using std::filesystem::path;
 	using std::vector;
+	using std::chrono::steady_clock;
 
 	using KalaHeaders::KalaThread::abool;
+	using KalaHeaders::KalaThread::mutex;
 
 	using u16 = uint16_t;
 	using u32 = uint32_t;
@@ -29,6 +33,14 @@ namespace KalaServer::Server
 	constexpr u16 MIN_PORT_RANGE = 1u;
 	//Maximum port, cannot go past 16-bit unsigned integer TCP and UDP port fields
 	constexpr u16 MAX_PORT_RANGE = 65535u;
+
+	struct BannedIP
+	{
+		string targetIP{};
+
+		//Leave unassigned to mark as permanent ban
+		steady_clock::time_point expiresAt{};
+	};
 
 	class LIB_API ServerCore
 	{
@@ -73,6 +85,27 @@ namespace KalaServer::Server
 		static const vector<string>& GetServerDomains();
 		static string_view GetServerIP();
 		static u16 GetServerPort();
+
+		static bool IsValidIP(string_view targetIP);
+
+		static bool IsBannedIP(string_view targetIP);
+		static void BanIP(string_view targetIP);
+		static void UnbanIP(string_view targetIP);
+
+		static vector<BannedIP>& GetBannedIPs();
+		static mutex& GetBannedIPsMutex();
+
+		static void AddRoute(string_view newValue);
+		static void RemoveRoute(string_view newValue);
+
+		static vector<string>& GetRoutes();
+		static mutex& GetRoutesMutex();
+
+		static void AddBlacklistedKeyword(string_view newValue);
+		static void RemoveBlacklistedKeyword(string_view newValue);
+
+		static vector<string>& GetBlacklistedKeywords();
+		static mutex& GetBKMutex();
 
 		//Close all sockets and clear all server resources
 		static void Shutdown();
