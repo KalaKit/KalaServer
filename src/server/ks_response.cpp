@@ -42,9 +42,14 @@ using std::string_view;
 using std::to_string;
 using std::vector;
 using std::memory_order_acquire;
-using std::memory_order_release;
 
-static void Send(const ResponseData& data, bool socketAlreadyClosed);
+const string response_missing = 
+	"<html><body>\n"
+	"    <h1>HTTP/1.1 500 Internal Server Error</h1>\n"
+	"    <p>No response body was given for this request.</p>\n"
+	"</body></html>";
+
+static void Send(const ResponseData& data);
 
 namespace KalaServer::Server
 {
@@ -237,14 +242,23 @@ namespace KalaServer::Server
                 "SEND_RESPONSE",
                 LogType::LOG_WARNING);
 
-            Send(data, true);
+            ResponseData newData
+            {
+                .responseType = data.responseType,
+                .contentType = data.contentType,
+                .optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
+                .responseBody = response_missing,
+                .connectionSocket = data.connection
+                    ? data.connection->connectionSocket.load(memory_order_acquire)
+                    : data.connectionSocket.load(memory_order_acquire)
+            };
 
-            close_socket();
+            Send(newData);
 
             return;
         }
 
-        Send(data, false);
+        Send(data);
     }
 
     OptionalSendType Response::StringToSendType(string_view input)
@@ -316,7 +330,7 @@ namespace KalaServer::Server
     }
 }
 
-void Send(const ResponseData& data, bool socketAlreadyClosed)
+void Send(const ResponseData& data)
 {
     const string_view statusLine = Response::ResponseTypeToString(data.responseType);
     const string_view contentType = Response::ContentTypeToMimeType(data.contentType);
@@ -464,8 +478,7 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
         */
     }
 
-    if (!socketAlreadyClosed
-        && containsCloseSendType)
+    if (containsCloseSendType)
     {
 #ifdef _WIN32
         SOCKET csock = csock = data.connection 
@@ -478,5 +491,7 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
                 : ToVar<int>(data.connectionSocket.load(memory_order_acquire));
         close(csock);
 #endif
+
+        if (data.connection) data.connection->isRunning.store(false, std::memory_order_release);
     }
 }
