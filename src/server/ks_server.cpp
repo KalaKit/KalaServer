@@ -50,17 +50,19 @@ namespace KalaServer::Server
 	static string serverName{};
 	static path serverRoot{};
 	static vector<string> serverDomains{};
+	static string serverIP{};
 	static u16 serverPort{};
 
 	bool ServerCore::Initialize(
 		string_view newServerName,
 		const path& newServerRoot,
 		vector<string> newServerDomains,
-		u16 newPort,
+		string_view newServerIP,
+		u16 newServerPort,
 		bool requireCloudflare)
 	{
 		Log::Print(
-			"Starting to initialize server '" + string(newServerName),
+			"Starting to initialize server '" + string(newServerName) + "'.",
 			"SERVER",
 			LogType::LOG_INFO);
 
@@ -157,11 +159,22 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		if (newPort < MIN_PORT_RANGE
-			|| newPort > MAX_PORT_RANGE)
+		if (newServerPort < MIN_PORT_RANGE
+			|| newServerPort > MAX_PORT_RANGE)
 		{
 			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because its port '" + to_string(newPort) + "' is out of range!",
+				"Failed to initialize server '" + string(newServerName) + "' because its port '" + to_string(newServerPort) + "' is out of range!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		if (!Connect::IsValidIP(newServerIP))
+		{
+			Log::Print(
+				"Failed to initialize server '" + string(newServerName) + "' because its IP '" + string(newServerIP) + "' is not a valid IP address!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
@@ -175,7 +188,7 @@ namespace KalaServer::Server
 			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 			{
 				Log::Print(
-					"Failed to check internet state for server '" + ServerCore::GetServerName() + "' because WSAStartup failed!",
+					"Failed to check internet state for server '" + serverName + "' because WSAStartup failed!",
 					"INTERNET_ACCESS",
 					LogType::LOG_ERROR,
 					2);
@@ -190,7 +203,8 @@ namespace KalaServer::Server
 
 		serverName = newServerName;
 		serverRoot = newServerRoot;
-		serverPort = newPort;
+		serverIP = newServerIP;
+		serverPort = newServerPort;
 
 		cloudflareRequired = requireCloudflare;
 
@@ -200,16 +214,16 @@ namespace KalaServer::Server
 		string output = 
 			"Created new server '" + serverName + "' "
 			"with root '" + serverRoot.string() + "', "
-			"domains '";
+			"domains ";
 
 		for (const auto& d : serverDomains)
 		{
-			output += d + ", ";
+			output += "'" + d + "'" + ", ";
 		}
 
-		output.erase(output.size() - 2);
+		output += "IP '" + serverIP + "' ";
 
-		output += "' and port '" + to_string(serverPort) + "'!";
+		output += "and port '" + to_string(serverPort) + "'!";
 
 		Log::Print(
 			output,
@@ -232,7 +246,7 @@ namespace KalaServer::Server
 		if (sock == INVALID_SOCKET)
 		{
 			Log::Print(
-				"Failed to check internet state for server '" + ServerCore::GetServerName() + "' because socket creation failed!",
+				"Failed to check internet state for server '" + serverName + "' because socket creation failed!",
 				"INTERNET_ACCESS",
 				LogType::LOG_ERROR,
 				2);
@@ -258,7 +272,7 @@ namespace KalaServer::Server
 		if (sock < 0)
 		{
 			Log::Print(
-				"Failed to check internet state for server '" + ServerCore::GetServerName() + "' because socket creation failed!",
+				"Failed to check internet state for server '" + serverName + "' because socket creation failed!",
 				"INTERNET_ACCESS",
 				LogType::LOG_ERROR,
 				2);
@@ -316,10 +330,11 @@ namespace KalaServer::Server
 			: true;
 	}
 
-	const string& ServerCore::GetServerName() { return serverName; }
+	string_view ServerCore::GetServerName() { return serverName; }
 	const path& ServerCore::GetServerRoot() { return serverRoot; }
-	const vector<string>& ServerCore::GetDomains() { return serverDomains; };
-	u16 ServerCore::GetPort() { return serverPort; }
+	const vector<string>& ServerCore::GetServerDomains() { return serverDomains; };
+	string_view ServerCore::GetServerIP() { return serverIP; }
+	u16 ServerCore::GetServerPort() { return serverPort; }
 
 	void ServerCore::Shutdown()
 	{

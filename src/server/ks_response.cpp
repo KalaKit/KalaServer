@@ -74,7 +74,8 @@ namespace KalaServer::Server
       { ResponseType::R_418, "HTTP/1.1 418 I'm a teapot" },
 
       { ResponseType::R_500, "HTTP/1.1 500 Internal Server Error" },
-      { ResponseType::R_503, "HTTP/1.1 503 Service Unavailable" }
+      { ResponseType::R_503, "HTTP/1.1 503 Service Unavailable" },
+      { ResponseType::R_505, "HTTP/1.1 505 HTTP Version Not Supported" }
     };
 
     struct ContentTypeData
@@ -135,9 +136,25 @@ namespace KalaServer::Server
 
     void Response::SendResponse(const ResponseData& data)
     {
+        if (!ServerCore::IsReady())
+		{
+			Log::Print(
+				"Failed to send response because the server is not running or not ready!",
+				"SEND_RESPONSE",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
         auto close_socket = [&data]()
             {
-                if (data.connection->connectionSocket.load(memory_order_acquire) == UNASSIGNED_SOCKET_VALUE)
+#ifdef _WIN32
+                SOCKET csock = data.connection 
+                    ? ToVar<SOCKET>(data.connection->connectionSocket.load(memory_order_acquire))
+                    : ToVar<SOCKET>(data.connectionSocket.load(memory_order_acquire));
+
+                if (csock == UNASSIGNED_SOCKET_VALUE)
                 {
                     Log::Print(
                         "Cannot close socket because its unassigned!",
@@ -148,11 +165,6 @@ namespace KalaServer::Server
                     return;
                 }
 
-#ifdef _WIN32
-                SOCKET csock = data.connection 
-                    ? ToVar<SOCKET>(data.connection->connectionSocket.load(memory_order_acquire))
-                    : ToVar<SOCKET>(data.connectionSocket.load(memory_order_acquire));
-
                 shutdown(csock, SD_BOTH);
                 closesocket(csock);
 #else
@@ -160,14 +172,26 @@ namespace KalaServer::Server
                     ? ToVar<int>(data.connection->connectionSocket.load(memory_order_acquire))
                     : ToVar<int>(data.connectionSocket.load(memory_order_acquire));
 
+                if (csock == UNASSIGNED_SOCKET_VALUE)
+                {
+                    Log::Print(
+                        "Cannot close socket because its unassigned!",
+                        "SEND_RESPONSE",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    return;
+                }
+
                 shutdown(csock, SHUT_RDWR);
                 close(csock);
 #endif
             };
 
-        bool noTargetSocket = 
-            !data.connection 
-            && data.connectionSocket.load(memory_order_acquire) == UNASSIGNED_SOCKET_VALUE;
+        bool noTargetSocket =
+            (data.connection
+                ? data.connection->connectionSocket.load(memory_order_acquire) == UNASSIGNED_SOCKET_VALUE
+                : data.connectionSocket.load(memory_order_acquire) == UNASSIGNED_SOCKET_VALUE);
         bool invalidResponseType = data.responseType == ResponseType::R_INVALID;
         bool invalidContentType = data.contentType == ContentType::CT_INVALID;
         bool emptyBody = data.responseBody.empty();
@@ -358,7 +382,7 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
                     string err = to_string(WSAGetLastError());
 
                     Log::Print(
-                        "Failed to finish sending server '" + ServerCore::GetServerName() + "' response '" + responseLogContent + "'! Reason: " + err,
+                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "'! Reason: " + err,
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
@@ -369,7 +393,7 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
                 if (sent == 0)
                 {
                     Log::Print(
-                        "Failed to finish sending server '" + ServerCore::GetServerName() + "' response '" + responseLogContent + "' because the connection closed!",
+                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "' because the connection closed!",
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
@@ -400,7 +424,7 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
                     string err = string(strerror(errno)) + " (errno=" + to_string(errno) + ")";
 
                     Log::Print(
-                        "Failed to finish sending server '" + ServerCore::GetServerName() + "' response '" + responseLogContent + "'! Reason: " + err,
+                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "'! Reason: " + err,
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
@@ -411,7 +435,7 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
                 if (sent == 0)
                 {
                     Log::Print(
-                        "Failed to finish sending server '" + ServerCore::GetServerName() + "' response '" + responseLogContent + "' because the connection closed!",
+                        "Failed to finish sending server '" + string(ServerCore::GetServerName()) + "' response '" + responseLogContent + "' because the connection closed!",
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
@@ -428,20 +452,30 @@ void Send(const ResponseData& data, bool socketAlreadyClosed)
 
     if (send_all())
     {
+        /*
+        string connectionIP = data.connection
+            ? "[ " + data.connection->connectionIP + " ] "
+            : "";
+
         Log::Print(
-            "[ " + data.connection->connectionIP + " ] Sent response:\n" + responseLogContent + ".",
+            connectionIP + "Sent response:\n" + responseLogContent + ".",
             "SEND_RESPONSE",
             LogType::LOG_SUCCESS);
+        */
     }
 
     if (!socketAlreadyClosed
         && containsCloseSendType)
     {
 #ifdef _WIN32
-        SOCKET csock = ToVar<SOCKET>(data.connection->connectionSocket.load(memory_order_acquire));
+        SOCKET csock = csock = data.connection 
+                ? ToVar<SOCKET>(data.connection->connectionSocket.load(memory_order_acquire))
+                : ToVar<SOCKET>(data.connectionSocket.load(memory_order_acquire));
         closesocket(csock);
 #else
-        int csock = ToVar<int>(data.connection->connectionSocket.load(memory_order_acquire));
+        int csock = data.connection 
+                ? ToVar<int>(data.connection->connectionSocket.load(memory_order_acquire))
+                : ToVar<int>(data.connectionSocket.load(memory_order_acquire));
         close(csock);
 #endif
     }

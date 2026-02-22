@@ -73,7 +73,9 @@ namespace KalaServer::Server
         //Internal server error
         R_500 = 10u,
         //Service unavailable
-        R_503 = 11u
+        R_503 = 11u,
+        //HTTP version not supported
+        R_505 = 12u
     };
 
     enum class ContentType : u8

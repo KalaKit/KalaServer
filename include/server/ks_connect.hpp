@@ -9,6 +9,7 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <chrono>
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
@@ -20,6 +21,7 @@ namespace KalaServer::Server
     using std::unique_ptr;
     using std::vector;
 	using std::unordered_map;
+	using std::chrono::steady_clock;
 
     using u8 = uint8_t;
 	using u16 = uint16_t;
@@ -57,44 +59,12 @@ namespace KalaServer::Server
 	//if internet checks failed at the top of the listener thread
 	constexpr u8 SERVER_HEALTH_SLEEP_S = 1;
 
-	enum class IPResult : u8
+	struct BannedIP
 	{
-		IP_TOO_SHORT = 0,            //must be 9 characters or longer
-		IP_TOO_LONG = 1,             //must be 15 characters or less
+		string targetIP{};
 
-		IP_OUT_OF_RANGE = 2,         //ip adresses have a very limited allowed range
-		IP_STRUCTURE_IS_INVALID = 3, //you managed to mess up the ip structure somehow
-
-		IP_IS_VALID = 4
-	};
-
-	//Roles are assigned to users and routes,
-	//users with higher role can always access same and lower routes unless demoted
-	enum class Role : u8
-	{
-		//Default empty-state and return type for invalid getters,
-		//users and routes cannot be given this role
-		ROLE_NONE        = 0u,
-
-		//Users with this role have been manually banned or autobanned by the server,
-		//routes cannot be given this role
-		ROLE_BANNED      = 1u,
-
-		//Users with this role have default server access,
-		//guests, whitelisted, users and admins can access routes with this role
-		ROLE_GUEST       = 2u,
-
-		//Role dedicated to honeypot routes to catch annoying bots, users cannot be given this role,
-		//guests will get autobanned if they access this route
-		ROLE_BLACKLISTED = 3u,
-
-		//Users with this role can access routes with user privileges,
-		//users and admins can access routes with this role
-		ROLE_USER        = 4u,
-
-		//Users with this role bypass all privileges,
-		//only admins can access routes with this role
-		ROLE_ADMIN       = 5u
+		//Leave unassigned to mark as permanent ban
+		steady_clock::time_point expiresAt{};
 	};
 
 	//The data received from an accepted socket ready to be parsed
@@ -125,18 +95,6 @@ namespace KalaServer::Server
 		RequestData requestData{};
 	};
 
-	struct LIB_API User
-	{
-		string userIP{};
-		Role role{};
-	};
-
-	struct LIB_API Route
-	{
-		string route{}; //path relative to true server route root
-		Role role{};
-	};
-
     class LIB_API Connect 
     {
     public:
@@ -157,33 +115,22 @@ namespace KalaServer::Server
 		static void DisconnectConnectedUser(uintptr_t targetSocket);
 
 		//Disconnect the target user via IP
-		static void DisconnectConnectedUser(const string& targetIP);
+		static void DisconnectConnectedUser(string_view targetIP);
 
 		//Closes the server listener socket and all inbound sockets and all outbound packets
 		static void DisconnectListener();
 
-		static bool IsValidIP(const string& targetIP);
+		static bool IsValidIP(string_view targetIP);
 
-		static string RoleToString(Role role);
-		static Role StringToRole(const string& role);
+		static bool IsBannedIP(string_view targetIP);
+		static void BanIP(string_view targetIP);
+		static void UnbanIP(string_view targetIP);
 
-		static Role GetUserRole(const string& userIP);
-		static void SetUserRole(const string& userIP, Role newRole);
+		static void AddRoute(string_view newValue);
+		static void RemoveRoute(string_view newValue);
 
-		static void AddUser(const User& newUser);
-		static void RemoveUser(const string& userIP);
-
-		static Role GetRouteRole(const string& route);
-		static void SetRouteRole(const string& route, Role newRole);
-
-		static void AddRoute(const Route& newRoute);
-		static void RemoveRoute(const string& route);
-
-		static vector<string> GetAllUsersByRole(Role targetRole);
-		static vector<string> GetAllRoutesByRole(Role targetRole);
-
-		static vector<User> GetAllUsers();
-		static vector<Route> GetAllRoutes();
+		static void AddBlacklistedKeyword(string_view newValue);
+		static void RemoveBlacklistedKeyword(string_view newValue);
 
 		static void ClearAllUsers();
 		static void ClearAllRoutes();

@@ -38,15 +38,17 @@ namespace KalaServer::Server
 		//Server name helps distinguish this server from other servers.
 		//Server root is the true origin where the server will expose
 		//routes from relative to where the process was run.
-		//Port is the local TCP port this server binds to and listens on.
-		//Domains are the allowed hostnames this server will accept connections for.
+		//Server domains are the allowed hostnames this server will accept connections for.
+		//Server IP is the IP address users will connect to.
+		//Server port is the local TCP port this server binds to and listens on.
 		//Set requireCloudflare to false if you dont want to use Cloudflare tunnel,
 		//otherwise it must be enabled before any connections are accepted.
 		static bool Initialize(
 			string_view serverName,
 			const path& serverRoot,
 			vector<string> serverDomains,
-			u16 port,
+			string_view serverIP,
+			u16 serverPort,
 			bool requireCloudflare);
 
 		//Returns true if this server instance has been initialized successfully
@@ -66,10 +68,11 @@ namespace KalaServer::Server
 		//or if cloudflare tunnel is not healthy if cloudflare is required
 		static bool IsHealthy();
 
-		static const string& GetServerName();
+		static string_view GetServerName();
 		static const path& GetServerRoot();
-		static const vector<string>& GetDomains();
-		static u16 GetPort();
+		static const vector<string>& GetServerDomains();
+		static string_view GetServerIP();
+		static u16 GetServerPort();
 
 		//Close all sockets and clear all server resources
 		static void Shutdown();
