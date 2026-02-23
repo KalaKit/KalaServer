@@ -509,13 +509,8 @@ namespace KalaServer::Server
 						DWORD err = WSAGetLastError();
 
 						//interrupted, try again
-						if (err == WSAEINTR
-							|| err == WSAEWOULDBLOCK)
-						{
-							continue;
-						}
-
-						else if (err == WSAETIMEDOUT)
+						if (err == WSAEINTR) continue;
+						if (err == WSAETIMEDOUT)
 						{
 							Log::Print(
 								"Accept timed out.",
@@ -524,8 +519,8 @@ namespace KalaServer::Server
 
 							continue;
 						}
-						else if (err == WSAECONNRESET
-								 || err == WSAECONNABORTED)
+						if (err == WSAECONNRESET
+							|| err == WSAECONNABORTED)
 						{
 							Log::Print(
 								"Connection was closed abruptly by client during accept.",
@@ -623,14 +618,9 @@ namespace KalaServer::Server
 					if (client < 0)
 					{
 						//interrupted, try again
-						if (errno == EINTR
-							|| errno == EAGAIN
+						if (errno == EINTR) continue;
+						if (errno == EAGAIN
 							|| errno == EWOULDBLOCK)
-						{
-							continue;
-						}
-
-						else if (errno == ETIMEDOUT)
 						{
 							Log::Print(
 								"Accept timed out.",
@@ -639,8 +629,8 @@ namespace KalaServer::Server
 
 							continue;
 						}
-						else if (errno == ECONNRESET
-								 || errno == ECONNABORTED)
+						if (errno == ECONNRESET
+							|| errno == ECONNABORTED)
 						{
 							Log::Print(
 								"Connection was closed abruptly by client during accept.",
@@ -880,13 +870,8 @@ namespace KalaServer::Server
 									DWORD err = WSAGetLastError();
 
 									//interrupted, try again
-									if (err == WSAEINTR
-										|| err == WSAEWOULDBLOCK)
-									{
-										continue;
-									}
-
-									else if (err == WSAETIMEDOUT)
+									if (err == WSAEINTR) continue;
+									if (err == WSAETIMEDOUT)
 									{
 										Log::Print(
 											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
@@ -897,8 +882,8 @@ namespace KalaServer::Server
 
 										continue;
 									}
-									else if (err == WSAECONNRESET
-											 || err == WSAECONNABORTED)
+									if (err == WSAECONNRESET
+										|| err == WSAECONNABORTED)
 									{
 										Log::Print(
 											"[ " + raw->connectionIP + " ] Connection was closed abruptly by client during bytesReceived recv read.",
@@ -945,14 +930,9 @@ namespace KalaServer::Server
 								if (bytesReceived < 0)
 								{
 									//interrupted, try again
-									if (errno == EINTR
-										|| errno == EAGAIN
+									if (errno == EINTR) continue;
+									if (errno == EAGAIN
 										|| errno == EWOULDBLOCK)
-									{
-										continue;
-									}
-
-									else if (errno == ETIMEDOUT)
 									{
 										Log::Print(
 											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
@@ -963,7 +943,7 @@ namespace KalaServer::Server
 
 										continue;
 									}
-									else if (errno == ECONNRESET
+									if (errno == ECONNRESET
 											 || errno == ECONNABORTED)
 									{
 										Log::Print(

@@ -31,33 +31,28 @@ action: forcecopy
 //
 
 //copy debug dll
-origin: build@windows-debug@libKalaServer1d.dll
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@libKalaServer1d.dll
+origin: build@windows-debug@KalaServer1d.dll
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.dll
 action: forcecopy
 
 //copy debug lib
-origin: build@windows-debug@libKalaServer1d.dll.a
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@libKalaServer1d.dll.a
+origin: build@windows-debug@KalaServer1d.lib
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.lib
 action: forcecopy
 
-//copy debug so
-origin: build@linux-debug@libKalaServer1d.so
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@libKalaServer1d.so
+//copy debug pdb
+origin: build@linux-debug@KalaServer1d.pdb
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.pdb
 action: forcecopy
 
-//copy release dll
-origin: build@windows-release@libKalaServer1.dll
+//copy release lib
+origin: build@windows-release@KalaServer1.dll
 target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.dll
 action: forcecopy
 
 //copy release lib
-origin: build@windows-release@libKalaServer1.dll.a
-target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.dll.a
-action: forcecopy
-
-//copy release so
-origin: build@linux-release@libKalaServer1.so
-target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.so
+origin: build@linux-release@KalaServer1.lib
+target: ..@..@_websites@server@_external_shared@KalaServer@release@KalaServer1.lib
 action: forcecopy
 
 //

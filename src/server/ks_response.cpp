@@ -404,11 +404,7 @@ void Send(const ResponseData& data)
                     int err = WSAGetLastError();
 
                     //interrupted, try again
-					if (err == WSAEINTR
-						|| err == WSAEWOULDBLOCK)
-					{
-						continue;
-					}
+					if (err == WSAEINTR) continue;
                     if (err == WSAETIMEDOUT)
 					{
 						Log::Print(
@@ -418,7 +414,8 @@ void Send(const ResponseData& data)
 
 						return false;
 					}
-					if (err == WSAECONNRESET
+					if (err == WSAENOTCONN
+                        || err == WSAECONNRESET
 						|| err == WSAECONNABORTED)
 					{
 						Log::Print(
@@ -434,16 +431,6 @@ void Send(const ResponseData& data)
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
-
-                    return false;
-                }
-
-                if (sent == 0)
-                {
-                    Log::Print(
-                        connectionIP + "Couldn't finish sending response because the connection closed.",
-                        "SEND_RESPONSE",
-                        LogType::LOG_INFO);
 
                     return false;
                 }
@@ -464,13 +451,9 @@ void Send(const ResponseData& data)
                 if (sent < 0)
                 {
                     //interrupted by signal, retry
-                    if (errno == EINTR
-                        || errno == EAGAIN
+                    if (errno == EINTR) continue;
+                    if (errno == EAGAIN
                         || errno == EWOULDBLOCK)
-                    {
-                        continue;
-                    }
-                    if (errno == ETIMEDOUT)
 					{
 						Log::Print(
 							connectionIP + "Send timed out.",
@@ -480,6 +463,7 @@ void Send(const ResponseData& data)
 						return false;
 					}
 					if (errno == EPIPE
+                        || errno == ENOTCONN
                         || errno == ECONNRESET
 						|| errno == ECONNABORTED)
 					{
@@ -500,16 +484,6 @@ void Send(const ResponseData& data)
                     return false;
                 }
 
-                if (sent == 0)
-                {
-                    Log::Print(
-                        connectionIP + "Couldn't finish sending response because the connection closed.",
-                        "SEND_RESPONSE",
-                        LogType::LOG_INFO);
-
-                    return false;
-                }
-
                 totalSent += scast<int>(sent);
             }
 #endif
@@ -517,21 +491,8 @@ void Send(const ResponseData& data)
             return true;
         };
 
-    if (send_all())
-    {
-        /*
-        string connectionIP = data.connection
-            ? "[ " + data.connection->connectionIP + " ] "
-            : "";
-
-        Log::Print(
-            connectionIP + "Sent response:\n" + responseLogContent + ".",
-            "SEND_RESPONSE",
-            LogType::LOG_SUCCESS);
-        */
-    }
-
-    if (containsCloseSendType)
+    if (!send_all()
+        || containsCloseSendType)
     {
         if (data.connection) data.connection->isRunning.store(false, std::memory_order_release);
         else
