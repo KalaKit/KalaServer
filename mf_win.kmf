@@ -41,17 +41,17 @@ target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.li
 action: forcecopy
 
 //copy debug pdb
-origin: build@linux-debug@KalaServer1d.pdb
+origin: build@windows-debug@KalaServer1d.pdb
 target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.pdb
 action: forcecopy
 
 //copy release lib
 origin: build@windows-release@KalaServer1.dll
-target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.dll
+target: ..@..@_websites@server@_external_shared@KalaServer@release@KalaServer1.dll
 action: forcecopy
 
 //copy release lib
-origin: build@linux-release@KalaServer1.lib
+origin: build@windows-release@KalaServer1.lib
 target: ..@..@_websites@server@_external_shared@KalaServer@release@KalaServer1.lib
 action: forcecopy
 
