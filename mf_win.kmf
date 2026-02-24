@@ -7,8 +7,8 @@
 //
 
 //copy readme
-origin: readme.md
-target: ..@..@_websites@server@_external_shared@KalaServer@readme.md
+origin: README.md
+target: ..@..@_websites@server@_external_shared@KalaServer@README.md
 action: forcecopy
 
 //copy license
