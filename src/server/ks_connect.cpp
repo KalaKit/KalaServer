@@ -1096,7 +1096,7 @@ namespace KalaServer::Server
 
 									Log::Print(
 											"------------------------------\n"
-											"Parsing client request (" + to_string(bytesReceived) + " bytes):\n"
+											+ connectionIP + "Parsing client request (" + to_string(bytesReceived) + " bytes):\n"
 											+ fullRequestToLog
 											+ "\n------------------------------");
 
@@ -1144,7 +1144,6 @@ namespace KalaServer::Server
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
-													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 													.responseBody = 
 														ReturnErrorBody(sendMsg,
 														ResponseType::R_400),
@@ -1165,7 +1164,6 @@ namespace KalaServer::Server
 												Response::SendResponse({
 													.responseType = ResponseType::R_405,
 													.contentType = ContentType::CT_HTML,
-													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 													.responseBody = 
 														ReturnErrorBody(sendMsg,
 														ResponseType::R_405),
@@ -1187,7 +1185,6 @@ namespace KalaServer::Server
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
-													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 													.responseBody = 
 														ReturnErrorBody(sendMsg,
 														ResponseType::R_400),
@@ -1209,7 +1206,6 @@ namespace KalaServer::Server
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
-													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 													.responseBody = 
 														ReturnErrorBody(sendMsg,
 														ResponseType::R_400),
@@ -1230,7 +1226,6 @@ namespace KalaServer::Server
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
-													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 													.responseBody = 
 														ReturnErrorBody(sendMsg,
 														ResponseType::R_400),
@@ -1264,7 +1259,6 @@ namespace KalaServer::Server
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
-													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 													.responseBody = 
 														ReturnErrorBody(sendMsg,
 														ResponseType::R_400),
@@ -1294,7 +1288,6 @@ namespace KalaServer::Server
 													Response::SendResponse({
 														.responseType = ResponseType::R_400,
 														.contentType = ContentType::CT_HTML,
-														.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 														.responseBody = 
 														ReturnErrorBody(sendMsg,
 														ResponseType::R_400),
@@ -1328,7 +1321,6 @@ namespace KalaServer::Server
 														Response::SendResponse({
 															.responseType = ResponseType::R_400,
 															.contentType = ContentType::CT_HTML,
-															.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 															.responseBody = 
 																ReturnErrorBody(sendMsg,
 																ResponseType::R_400),
@@ -1359,7 +1351,6 @@ namespace KalaServer::Server
 										Response::SendResponse({
 											.responseType = ResponseType::R_400,
 											.contentType = ContentType::CT_HTML,
-											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 											.responseBody = 
 												ReturnErrorBody(sendMsg,
 												ResponseType::R_400),
@@ -1369,6 +1360,10 @@ namespace KalaServer::Server
 										break;
 									}
 
+									if (req.domainRoute.domain.starts_with("http://")) req.domainRoute.domain.erase(0, 7);
+									if (req.domainRoute.domain.starts_with("https://")) req.domainRoute.domain.erase(0, 8);
+									if (req.domainRoute.domain.starts_with("www.")) req.domainRoute.domain.erase(0, 4);
+
 									bool foundDomain{};
 									if (req.domainRoute.domain == serverIPDomain 
 										|| req.domainRoute.domain == serverIPPortDomain)
@@ -1377,6 +1372,9 @@ namespace KalaServer::Server
 									}
 									else
 									{
+										size_t dcolon = req.domainRoute.domain.find(':');
+										if (dcolon != string::npos) req.domainRoute.domain.erase(dcolon);
+
 										for (const auto& d : ServerCore::GetServerDomains())
 										{
 											if (req.domainRoute.domain == d)
@@ -1399,7 +1397,6 @@ namespace KalaServer::Server
 										Response::SendResponse({
 											.responseType = ResponseType::R_400,
 											.contentType = ContentType::CT_HTML,
-											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 											.responseBody = 
 												ReturnErrorBody(sendMsg,
 												ResponseType::R_400),
@@ -1492,7 +1489,6 @@ namespace KalaServer::Server
 										Response::SendResponse({
 											.responseType = ResponseType::R_404,
 											.contentType = ContentType::CT_HTML,
-											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
 											.responseBody = 
 												ReturnErrorBody(sendMsg,
 												ResponseType::R_404),
@@ -1508,21 +1504,6 @@ namespace KalaServer::Server
 									//
 									// ALLOW CONNECTION
 									//
-
-									/*
-									string parsedHeaders = 
-										"    method: " + req.method + "\n"
-										"    route: " + req.route + "\n"
-										"    HTTP version: " + req.httpVersion + "\n"
-										"    host: " + req.host;
-
-									for (const auto& [k, v] : req.headers)
-									{
-										parsedHeaders += "\n    " + k + ": " + v;
-									}
-
-									Log::Print(parsedHeaders);
-									*/
 
 									vector<OptionalSendType> optSendTypes{};
 									for (const auto& [k, v] : req.headers)

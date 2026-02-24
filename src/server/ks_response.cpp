@@ -517,7 +517,8 @@ void Send(const ResponseData& data)
 
     bool sendSuccess = send_all();
 
-    if (sendSuccess)
+    if (sendSuccess
+        && !connectionIP.empty())
     {
         Log::Print(
             connectionIP + "Sent '" + to_string(totalSent) + "' bytes of data as response.",

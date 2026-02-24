@@ -470,7 +470,7 @@ namespace KalaServer::Server
 	const vector<BannedIP>& ServerCore::GetBannedIPs() { return bannedIPs; }
 	mutex& ServerCore::GetBannedIPsMutex() { return m_bannedIPs; }
 
-	bool ServerCore::AddRoute(DomainRoute& newRoute)
+	bool ServerCore::AddRoute(const DomainRoute& newRoute)
 	{
 		bool foundDomain{};
 		for (const auto& d : serverDomains)
@@ -544,14 +544,17 @@ namespace KalaServer::Server
 			}
 		}
 
-		newRoute.routePath = cleanedPath;
-
-		routes.push_back(newRoute);
+		routes.push_back(
+			{ 
+				.domain = newRoute.domain, 
+				.route = newRoute.route, 
+				.routePath = cleanedPath 
+			});
 
 		unlock_m(m_routes);
 
 		Log::Print(
-			"Added new domain '" + newRoute.domain + "' with route '" + newRoute.route + "'!",
+			"Added new domain '" + newRoute.domain + "' with route '" + newRoute.route + "' and path '" + cleanedPath.string() + "'!",
 			"SERVER",
 			LogType::LOG_SUCCESS);
 

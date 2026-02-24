@@ -116,7 +116,7 @@ namespace KalaServer::Server
 
 		//Add new route, cannot add add duplicates if domain+route matches,
 		//cannot add routes if their path matches any existing route path of the same domain
-		static bool AddRoute(DomainRoute& newRoute);
+		static bool AddRoute(const DomainRoute& newRoute);
 		//Remove existing route
 		static bool RemoveRoute(const DomainRoute& existingRoute);
 
