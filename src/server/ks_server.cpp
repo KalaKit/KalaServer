@@ -517,7 +517,7 @@ namespace KalaServer::Server
 		if (!exists(cleanedPath))
 		{
 			Log::Print(
-				"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because its path '" + string(cleanedPath) + "' does not exist!",
+				"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because its path '" + cleanedPath.string() + "' does not exist!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);

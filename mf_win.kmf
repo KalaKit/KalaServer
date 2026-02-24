@@ -63,8 +63,3 @@ action: forcecopy
 origin: _external_shared@KalaHeaders
 target: ..@..@_websites@server@_external_shared@KalaHeaders
 action: copy
-
-//Cloudflared
-origin: _external_shared@Cloudflared
-target: ..@..@_websites@server@_external_shared@Cloudflared
-action: copy

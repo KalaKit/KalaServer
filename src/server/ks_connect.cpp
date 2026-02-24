@@ -916,7 +916,7 @@ namespace KalaServer::Server
 									Log::Print(
 										connectionIP + "BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(err),
 										"CONNECTION_LOOP",
-										LogType::LOG_WARNING2);
+										LogType::LOG_WARNING);
 
 									raw->isRunning.store(false, memory_order_release);
 
@@ -1106,6 +1106,7 @@ namespace KalaServer::Server
 
 									RequestData req{};
 
+									bool foundGetLineError{};
 									{
 										size_t headerEnd = fullRequest.find("\r\n\r\n");
 										string headerBlock = fullRequest.substr(0, headerEnd);
@@ -1265,6 +1266,7 @@ namespace KalaServer::Server
 													.connection = raw
 												});
 
+												foundGetLineError = true;
 												break;
 											}
 
@@ -1294,6 +1296,7 @@ namespace KalaServer::Server
 														.connection = raw
 													});
 
+													foundGetLineError = true;
 													break;
 												}
 
@@ -1327,6 +1330,7 @@ namespace KalaServer::Server
 															.connection = raw
 														});
 
+														foundGetLineError = true;
 														break;
 													}
 												}
@@ -1334,6 +1338,8 @@ namespace KalaServer::Server
 											}
 										}
 									}
+
+									if (foundGetLineError) break;
 
 									//
 									// VERIFY HOST

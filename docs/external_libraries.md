@@ -13,4 +13,3 @@ These libraries are used for various purposes, their licenses are included in th
 | Library                                                              | Use case                                             |
 |----------------------------------------------------------------------|------------------------------------------------------|
 | [openSSL](https://github.com/openssl/openssl)                        | TSL/SSL and encryption library.                      |
-| [cloudflared](https://github.com/cloudflare/cloudflared)             | Tunnel for inbound connections without needing port-forwarding |
