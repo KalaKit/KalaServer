@@ -2,6 +2,10 @@
 
 KalaServer is a lightweight C++ 20 library for Windows and Linux that allows you to make web, media or any other kind of a server with very few dependencies. The library is currently in early alpha development, so a lot of changes will come, but the core goals will stay the same.
 
+# Cloudflare tunnel
+
+This server supports Cloudflare tunnel but is not required to use it. If you wish to use Cloudflare tunnel then you must manually [download](https://github.com/cloudflare/cloudflared/releases) it and place it to C:\cloudflared or /home/cloudflared.
+
 ---
 
 ## Links
