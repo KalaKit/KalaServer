@@ -379,14 +379,16 @@ void Send(const ResponseData& data)
 
     fullResponse += data.responseBody;
 
+    int totalSent{};
+
     auto send_all = [
         &data, 
         &fullResponse, 
         &responseLogContent, 
         &connectionIP,
-        &sock]() -> bool
+        &sock,
+        &totalSent]() -> bool
         {
-            int totalSent{};
             int length = fullResponse.size();
 #ifdef _WIN32
             SOCKET csock = ToVar<SOCKET>(sock);
@@ -428,6 +430,17 @@ void Send(const ResponseData& data)
 
                     Log::Print(
                         connectionIP + "Failed to finish sending response! Reason: " + KalaServerCore::ErrorToString(err),
+                        "SEND_RESPONSE",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    return false;
+                }
+
+                if (sent == 0)
+                {
+                    Log::Print(
+                        connectionIP + "Failed to finish sending response because send returned 0 bytes!",
                         "SEND_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
@@ -484,6 +497,17 @@ void Send(const ResponseData& data)
                     return false;
                 }
 
+                if (sent == 0)
+                {
+                    Log::Print(
+                        connectionIP + "Failed to finish sending response because send returned 0 bytes!",
+                        "SEND_RESPONSE",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    return false;
+                }
+
                 totalSent += scast<int>(sent);
             }
 #endif
@@ -491,9 +515,27 @@ void Send(const ResponseData& data)
             return true;
         };
 
-    if (!send_all()
-        || containsCloseSendType)
+    bool sendSuccess = send_all();
+
+    if (sendSuccess)
     {
+        Log::Print(
+            connectionIP + "Sent '" + to_string(totalSent) + "' bytes of data as response.",
+            "SEND_RESPONSE",
+            LogType::LOG_INFO);
+    }
+
+    if (!sendSuccess
+        || containsCloseSendType)
+    {               
+        if (!connectionIP.empty())
+        {
+            Log::Print(
+                connectionIP + "Connection was closed at the end of sent response.",
+                "SEND_RESPONSE",
+                LogType::LOG_INFO);
+        }
+
         if (data.connection) data.connection->isRunning.store(false, std::memory_order_release);
         else
         {

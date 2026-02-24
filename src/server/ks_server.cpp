@@ -3,6 +3,7 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include "KalaHeaders/thread_utils.hpp"
 #ifdef _WIN32
 #include <ws2tcpip.h>
 #include <winsock2.h>
@@ -18,6 +19,7 @@
 
 #include "KalaHeaders/log_utils.hpp"
 #include "KalaHeaders/string_utils.hpp"
+#include "KalaHeaders/file_utils.hpp"
 
 #include "server/ks_server.hpp"
 #include "server/ks_cloudflare.hpp"
@@ -30,6 +32,9 @@ using KalaHeaders::KalaString::SplitString;
 
 using KalaHeaders::KalaThread::lockwait_m;
 using KalaHeaders::KalaThread::unlock_m;
+
+using KalaHeaders::KalaFile::WriteLinesToFile;
+using KalaHeaders::KalaFile::ReadLinesFromFile;
 
 using std::to_string;
 using std::string;
@@ -56,7 +61,7 @@ namespace KalaServer::Server
 	static vector<BannedIP> bannedIPs{};
 	static mutex m_bannedIPs{};
 
-	static vector<string> routes{};
+	static vector<DomainRoute> routes{};
 	static mutex m_routes{};
 
 	static vector<string> blacklistedKeywords{};
@@ -356,71 +361,222 @@ namespace KalaServer::Server
 		return false;
 	}
 
-	bool ServerCore::IsBannedIP(string_view targetIP)
+	bool ServerCore::BanIP(string_view targetIP)
 	{
-		return false;
-	}
-	void ServerCore::BanIP(string_view targetIP)
-	{
+		lockwait_m(m_bannedIPs);
+		for (const auto& b : bannedIPs)
+		{
+			if (b.targetIP == targetIP)
+			{
+				Log::Print(
+					"Failed to ban IP '" + string(targetIP) + "' because it is already banned!",
+					"SERVER",
+					LogType::LOG_ERROR,
+					2);
 
+				unlock_m(m_bannedIPs);
+				return false;
+			}
+		}
+
+		bannedIPs.push_back({.targetIP = string(targetIP)});
+		unlock_m(m_bannedIPs);
+
+		return true;
 	}
-	void ServerCore::UnbanIP(string_view targetIP)
+	bool ServerCore::UnbanIP(string_view targetIP)
 	{
-		
+		bool foundTarget{};
+
+		lockwait_m(m_bannedIPs);
+		for (auto it = bannedIPs.begin(); it != bannedIPs.end(); ++it)
+		{
+			if (it->targetIP == targetIP)
+			{
+				bannedIPs.erase(it);
+
+				unlock_m(m_bannedIPs);
+				return false;
+			}
+		}
+		unlock_m(m_bannedIPs);
+
+		Log::Print(
+			"Failed to unban IP '" + string(targetIP) + "' because it has not been banned!",
+			"SERVER",
+			LogType::LOG_ERROR,
+			2);
+
+		return true;
 	}
 
-	vector<BannedIP>& ServerCore::GetBannedIPs() { return bannedIPs; }
+	bool ServerCore::SaveBannedIPsToDisk(const path& targetPath)
+	{
+		lockwait_m(m_bannedIPs);
+		if (bannedIPs.empty())
+		{
+			Log::Print(
+				"There are no banned IPs to save to disk.",
+				"SERVER",
+				LogType::LOG_INFO);
+
+			unlock_m(m_bannedIPs);
+			return false;
+		}
+
+		vector<string> lines{};
+
+		//TODO: add setup
+
+		string errorMsg = WriteLinesToFile(targetPath, lines);
+
+		if (!errorMsg.empty())
+		{
+			Log::Print(
+				"Failed to save banned IPs to path '" + targetPath.string() + "'! Reason: " + errorMsg,
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			unlock_m(m_bannedIPs);
+			return false;
+		}
+
+		unlock_m(m_bannedIPs);
+		return true;
+	}
+	bool ServerCore::LoadBannedIPsFromDisk(const path& targetPath)
+	{
+		vector<string> lines{};
+
+		string errorMsg = ReadLinesFromFile(targetPath, lines);
+
+		if (!errorMsg.empty())
+		{
+			Log::Print(
+				"Failed to load banned IPs from path '" + targetPath.string() + "'! Reason: " + errorMsg,
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		//TODO: add setup
+
+		return true;
+	}
+
+	const vector<BannedIP>& ServerCore::GetBannedIPs() { return bannedIPs; }
 	mutex& ServerCore::GetBannedIPsMutex() { return m_bannedIPs; }
 
-	void ServerCore::AddRoute(string_view newValue)
+	bool ServerCore::AddRoute(DomainRoute& newRoute)
 	{
+		bool foundDomain{};
+		for (const auto& d : serverDomains)
+		{
+			if (d == newRoute.domain)
+			{
+				foundDomain = true;
+				break;
+			}
+		}
+
+		if (!foundDomain)
+		{
+			Log::Print(
+				"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because the domain does not exist!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
 		lockwait_m(m_routes);
 
 		for (const auto& r : routes)
 		{
-			if (r == newValue)
+			if (r.domain == newRoute.domain
+				&& r.route == newRoute.route)
 			{
 				Log::Print(
-					"Failed to add new route '" + string(newValue) + "' because it has already been added!",
+					"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because it has already been added!",
 					"SERVER",
 					LogType::LOG_ERROR,
 					2);
 
 				unlock_m(m_routes);
 
-				return;
+				return false;
 			}
 		}
 
-		routes.push_back(string(newValue));
+		path cleanedPath = weakly_canonical(newRoute.routePath);
 
-		unlock_m(m_routes);
-
-		Log::Print(
-			"Added new route '" + string(newValue) + "'!",
-			"SERVER",
-			LogType::LOG_SUCCESS);
-	}
-	void ServerCore::RemoveRoute(string_view newValue)
-	{
-		lockwait_m(m_routes);
-
-		auto it = remove_if(
-			routes.begin(),
-			routes.end(),
-			[&newValue](const string& u) { return u == newValue; });
-
-		if (it == routes.end())
+		if (!exists(cleanedPath))
 		{
 			Log::Print(
-				"Failed to remove existing route '" + string(newValue) + "' because it has not been added!",
+				"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because its path '" + string(cleanedPath) + "' does not exist!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
 
 			unlock_m(m_routes);
 
-			return;
+			return false;
+		}
+
+		bool foundExistingPath{};
+		for (const auto& r : routes)
+		{
+			if (r.routePath == cleanedPath)
+			{
+				Log::Print(
+					"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because it has already been added!",
+					"SERVER",
+					LogType::LOG_ERROR,
+					2);
+
+				unlock_m(m_routes);
+
+				return false;
+			}
+		}
+
+		newRoute.routePath = cleanedPath;
+
+		routes.push_back(newRoute);
+
+		unlock_m(m_routes);
+
+		Log::Print(
+			"Added new domain '" + newRoute.domain + "' with route '" + newRoute.route + "'!",
+			"SERVER",
+			LogType::LOG_SUCCESS);
+
+		return true;
+	}
+	bool ServerCore::RemoveRoute(const DomainRoute& existingRoute)
+	{
+		lockwait_m(m_routes);
+
+		auto it = remove_if(
+			routes.begin(),
+			routes.end(),
+			[&existingRoute](const DomainRoute& u) { return u == existingRoute; });
+
+		if (it == routes.end())
+		{
+			Log::Print(
+				"Failed to remove existing domain '" + existingRoute.domain + "' with route '" + existingRoute.route + "' because it has not been added!",
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			unlock_m(m_routes);
+
+			return false;
 		}
 
 		routes.erase((it), routes.end());
@@ -428,63 +584,124 @@ namespace KalaServer::Server
 		unlock_m(m_routes);
 
 		Log::Print(
-			"Removed existing route '" + string(newValue) + "'.",
+			"Removed existing domain '" + existingRoute.domain + "' with route '" + existingRoute.route + "'.",
 			"SERVER",
 			LogType::LOG_SUCCESS);
+
+		return true;
 	}
 
-	vector<string>& ServerCore::GetRoutes() { return routes; }
+	bool ServerCore::SaveRoutesToDisk(const path& targetPath)
+	{
+		lockwait_m(m_routes);
+		if (routes.empty())
+		{
+			Log::Print(
+				"There are no routes to save to disk.",
+				"SERVER",
+				LogType::LOG_INFO);
+
+			unlock_m(m_routes);
+			return false;
+		}
+
+		vector<string> lines{};
+
+		//TODO: add setup
+
+		string errorMsg = WriteLinesToFile(targetPath, lines);
+
+		if (!errorMsg.empty())
+		{
+			Log::Print(
+				"Failed to save routes to path '" + targetPath.string() + "'! Reason: " + errorMsg,
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			unlock_m(m_routes);
+			return false;
+		}
+
+		unlock_m(m_routes);
+		return true;
+	}
+	bool ServerCore::LoadRoutesFromDisk(const path& targetPath)
+	{
+		vector<string> lines{};
+
+		string errorMsg = ReadLinesFromFile(targetPath, lines);
+
+		if (!errorMsg.empty())
+		{
+			Log::Print(
+				"Failed to load routes from path '" + targetPath.string() + "'! Reason: " + errorMsg,
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		//TODO: add setup
+
+		return true;
+	}
+
+	const vector<DomainRoute>& ServerCore::GetRoutes() { return routes; }
 	mutex& ServerCore::GetRoutesMutex() { return m_routes; }
 
-	void ServerCore::AddBlacklistedKeyword(string_view newValue)
+	bool ServerCore::AddBlacklistedKeyword(string_view newKeyword)
 	{
 		lockwait_m(m_blacklistedKeywords);
 
 		for (const auto& r : blacklistedKeywords)
 		{
-			if (r == newValue)
+			if (r == newKeyword)
 			{
 				Log::Print(
-					"Failed to add new blacklisted keyword '" + string(newValue) + "' because it has already been added!",
+					"Failed to add new blacklisted keyword '" + string(newKeyword) + "' because it has already been added!",
 					"SERVER",
 					LogType::LOG_ERROR,
 					2);
 
 				unlock_m(m_blacklistedKeywords);
 
-				return;
+				return false;
 			}
 		}
 
-		blacklistedKeywords.push_back(string(newValue));
+		blacklistedKeywords.push_back(string(newKeyword));
 
 		unlock_m(m_blacklistedKeywords);
 
 		Log::Print(
-			"Added new blacklisted keyword '" + string(newValue) + "'!",
+			"Added new blacklisted keyword '" + string(newKeyword) + "'!",
 			"SERVER",
 			LogType::LOG_SUCCESS);
+
+		return true;
 	}
-	void ServerCore::RemoveBlacklistedKeyword(string_view newValue)
+	bool ServerCore::RemoveBlacklistedKeyword(string_view existingKeyword)
 	{
 		lockwait_m(m_blacklistedKeywords);
 
 		auto it = remove_if(
 			blacklistedKeywords.begin(),
 			blacklistedKeywords.end(),
-			[&newValue](const string& u) { return u == newValue; });
+			[&existingKeyword](const string& u) { return u == existingKeyword; });
 
 		if (it == blacklistedKeywords.end())
 		{
 			Log::Print(
-				"Failed to remove existing blacklisted keyword '" + string(newValue) + "' because it has not been added!",
+				"Failed to remove existing blacklisted keyword '" + string(existingKeyword) + "' because it has not been added!",
 				"SERVER",
 				LogType::LOG_ERROR,
 				2);
 
 			unlock_m(m_blacklistedKeywords);
 
-			return;
+			return false;
 		}
 
 		blacklistedKeywords.erase((it), blacklistedKeywords.end());
@@ -492,13 +709,72 @@ namespace KalaServer::Server
 		unlock_m(m_blacklistedKeywords);
 
 		Log::Print(
-			"Removed existing blacklisted keyword '" + string(newValue) + "'.",
+			"Removed existing blacklisted keyword '" + string(existingKeyword) + "'.",
 			"SERVER",
 			LogType::LOG_SUCCESS);
+
+		return true;
 	}
 
-	vector<string>& ServerCore::GetBlacklistedKeywords() { return blacklistedKeywords; }
-	mutex& ServerCore::GetBKMutex() { return m_blacklistedKeywords; }
+	bool ServerCore::SaveBlacklistedKeywordsToDisk(const path& targetPath)
+	{
+		lockwait_m(m_blacklistedKeywords);
+		if (routes.empty())
+		{
+			Log::Print(
+				"There are no blacklisted keywords to save to disk.",
+				"SERVER",
+				LogType::LOG_INFO);
+
+			unlock_m(m_blacklistedKeywords);
+			return false;
+		}
+
+		vector<string> lines{};
+
+		//TODO: add setup
+
+		string errorMsg = WriteLinesToFile(targetPath, lines);
+
+		if (!errorMsg.empty())
+		{
+			Log::Print(
+				"Failed to save blacklisted keywords to path '" + targetPath.string() + "'! Reason: " + errorMsg,
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			unlock_m(m_blacklistedKeywords);
+			return false;
+		}
+
+		unlock_m(m_blacklistedKeywords);
+		return true;
+	}
+	bool ServerCore::LoadBlacklistedKeywordsFromDisk(const path& targetPath)
+	{
+		vector<string> lines{};
+
+		string errorMsg = ReadLinesFromFile(targetPath, lines);
+
+		if (!errorMsg.empty())
+		{
+			Log::Print(
+				"Failed to load blacklisted keywords from path '" + targetPath.string() + "'! Reason: " + errorMsg,
+				"SERVER",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		//TODO: add setup
+
+		return true;
+	}
+
+	const vector<string>& ServerCore::GetBlacklistedKeywords() { return blacklistedKeywords; }
+	mutex& ServerCore::GetBlacklistedKeywordsMutex() { return m_blacklistedKeywords; }
 
 	void ServerCore::Shutdown()
 	{

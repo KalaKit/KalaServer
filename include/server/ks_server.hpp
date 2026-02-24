@@ -34,7 +34,16 @@ namespace KalaServer::Server
 	//Maximum port, cannot go past 16-bit unsigned integer TCP and UDP port fields
 	constexpr u16 MAX_PORT_RANGE = 65535u;
 
-	struct BannedIP
+	struct LIB_API DomainRoute
+	{
+		string domain{};  //the domain this route is added to
+		string route{};   //how the route is displayed in the url
+		path routePath{}; //path relative to executable path or full path
+
+		bool operator==(const DomainRoute&) const = default;
+	};
+
+	struct LIB_API BannedIP
 	{
 		string targetIP{};
 
@@ -86,26 +95,57 @@ namespace KalaServer::Server
 		static string_view GetServerIP();
 		static u16 GetServerPort();
 
+		//Does this IP match any valid ipv4 or ipv6 structure
 		static bool IsValidIP(string_view targetIP);
 
-		static bool IsBannedIP(string_view targetIP);
-		static void BanIP(string_view targetIP);
-		static void UnbanIP(string_view targetIP);
+		//Ban IP, doesn't matter if it is currently connected or not
+		static bool BanIP(string_view targetIP);
+		//Unban existing IP, doesn't matter if its currently connected or not
+		static bool UnbanIP(string_view targetIP);
 
-		static vector<BannedIP>& GetBannedIPs();
+		//Saves all existing banned ips to disk, overwrites existing txt file
+		static bool SaveBannedIPsToDisk(const path& targetPath);
+		//Loads all saved banned ips and appends to current list, duplicates are skipped
+		static bool LoadBannedIPsFromDisk(const path& targetPath);
+
+		//Returns mutable ref to existing banned IPs
+		static const vector<BannedIP>& GetBannedIPs();
+
+		//Returns the mutex that must be used for all the getters and setters for banned IPs
 		static mutex& GetBannedIPsMutex();
 
-		static void AddRoute(string_view newValue);
-		static void RemoveRoute(string_view newValue);
+		//Add new route, cannot add add duplicates if domain+route matches,
+		//cannot add routes if their path matches any existing route path of the same domain
+		static bool AddRoute(DomainRoute& newRoute);
+		//Remove existing route
+		static bool RemoveRoute(const DomainRoute& existingRoute);
 
-		static vector<string>& GetRoutes();
+		//Saves all existing routes to disk, overwrites existing txt file
+		static bool SaveRoutesToDisk(const path& targetPath);
+		//Loads all saved routes and appends to current list, duplicates are skipped
+		static bool LoadRoutesFromDisk(const path& targetPath);
+
+		//Returns mutable ref to existing routes
+		static const vector<DomainRoute>& GetRoutes();
+
+		//Returns the mutex that must be used for all the getters and setters for routes
 		static mutex& GetRoutesMutex();
 
-		static void AddBlacklistedKeyword(string_view newValue);
-		static void RemoveBlacklistedKeyword(string_view newValue);
+		//Add new blacklisted keyword, cannot add duplicates
+		static bool AddBlacklistedKeyword(string_view newKeyword);
+		//Remove existing blacklisted keyword
+		static bool RemoveBlacklistedKeyword(string_view existingKeyword);
 
-		static vector<string>& GetBlacklistedKeywords();
-		static mutex& GetBKMutex();
+		//Saves all existing blacklisted keywords to disk, overwrites existing txt file
+		static bool SaveBlacklistedKeywordsToDisk(const path& targetPath);
+		//Loads all saved blacklisted keywords and appends to current list, duplicates are skipped
+		static bool LoadBlacklistedKeywordsFromDisk(const path& targetPath);
+
+		//Returns mutable ref to existing blacklisted keywords
+		static const vector<string>& GetBlacklistedKeywords();
+
+		//Returns the mutex that must be used for all the getters and setters for blacklisted keywords
+		static mutex& GetBlacklistedKeywordsMutex();
 
 		//Close all sockets and clear all server resources
 		static void Shutdown();

@@ -12,6 +12,7 @@
 
 #include "KalaHeaders/core_utils.hpp"
 #include "KalaHeaders/thread_utils.hpp"
+#include "server/ks_server.hpp"
 
 namespace KalaServer::Server
 {
@@ -61,9 +62,8 @@ namespace KalaServer::Server
 	struct LIB_API RequestData
 	{
 		string method{};
-		string route{};
 		string httpVersion{};
-		string host{};
+		DomainRoute domainRoute{};
 		unordered_map<string, string> headers{};
 		string body{};
 	};
@@ -76,7 +76,7 @@ namespace KalaServer::Server
 		abool isRunning{};
 
 		string connectionIP{};
-		string connectionRoute{};
+		DomainRoute connectionRoute{};
 
 		auptr connectionSocket = UNASSIGNED_SOCKET_VALUE;
 

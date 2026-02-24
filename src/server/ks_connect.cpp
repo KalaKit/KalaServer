@@ -117,6 +117,15 @@ constexpr string_view response_success =
 	"            Check out the KalaKit server source code</a></p>\n"
 	"</body></html>";
 
+static string ReturnErrorBody(string_view error, ResponseType type)
+{
+	return 
+		"<html><body>\n"
+		"    <h1>" + string(Response::ResponseTypeToString(type)) + "</h1>\n"
+		"        <p>" + string(error) + "</p>\n"
+		"</body></html>";
+}
+
 namespace KalaServer::Server
 {
 	static unique_ptr<Connection> listenerSocket{};
@@ -760,6 +769,9 @@ namespace KalaServer::Server
 						"LISTENER_LOOP",
 						LogType::LOG_INFO);
 
+					string connectionIP = "[ " + string(ipStr) + " ] ";
+					string sendMsg{};
+
 					//
 					// CHECK USER COUNT, REJECT IF MAX
 					//
@@ -768,13 +780,12 @@ namespace KalaServer::Server
 
 					if (connectSockets.size() >= MAX_ACTIVE_CONNECTIONS)
 					{
-						string reason = "Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' was reached, cannot accept new connections!";
+						sendMsg = "Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' was reached, cannot accept new connections!";
 
 						Log::Print(
-							"[ " + string(ipStr) + " ] " + reason,
+							connectionIP + sendMsg,
 							"LISTENER_LOOP",
-							LogType::LOG_ERROR,
-							2);
+							LogType::LOG_WARNING);
 
 						unlock_m(m_connectSockets);
 
@@ -782,7 +793,9 @@ namespace KalaServer::Server
 							.responseType = ResponseType::R_503,
 							.contentType = ContentType::CT_HTML,
 							.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-							.responseBody = "Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' was reached, cannot accept new connections!",
+							.responseBody = 
+								ReturnErrorBody(sendMsg,
+								ResponseType::R_503),
 							.connectionSocket = FromVar(client)
 						});
 
@@ -804,7 +817,7 @@ namespace KalaServer::Server
 						if (ipStr == u.targetIP)
 						{
 							Log::Print(
-								"[ " + string(ipStr) + " ] Banned user tried to reconnect to server.",
+								connectionIP + "Banned user tried to reconnect to server.",
 								"LISTENER_LOOP",
 								LogType::LOG_INFO);
 
@@ -814,7 +827,9 @@ namespace KalaServer::Server
 								.responseType = ResponseType::R_418,
 								.contentType = ContentType::CT_HTML,
 								.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-								.responseBody = "Get banned nerd",
+								.responseBody = 
+								ReturnErrorBody("Get banned nerd",
+								ResponseType::R_418),
 								.connectionSocket = FromVar(client)
 							});
 
@@ -849,9 +864,12 @@ namespace KalaServer::Server
 					// START CLIENT SOCKET
 					//
 
-					raw->connectionThread = joinable_thread([raw]
+					raw->connectionThread = joinable_thread([&raw]
 						{
 							string readBuffer{};
+
+							string connectionIP = "[ " + string(raw->connectionIP) + " ] ";
+							string sendMsg{};
 
 							while (raw->isRunning.load(memory_order_acquire))
 							{
@@ -874,7 +892,7 @@ namespace KalaServer::Server
 									if (err == WSAETIMEDOUT)
 									{
 										Log::Print(
-											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
+											connectionIP + "BytesReceived recv read timed out.",
 											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
@@ -886,7 +904,7 @@ namespace KalaServer::Server
 										|| err == WSAECONNABORTED)
 									{
 										Log::Print(
-											"[ " + raw->connectionIP + " ] Connection was closed abruptly by client during bytesReceived recv read.",
+											connectionIP + "Connection was closed abruptly by client during bytesReceived recv read.",
 											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
@@ -896,10 +914,9 @@ namespace KalaServer::Server
 									}
 									
 									Log::Print(
-										"[ " + raw->connectionIP + " ] BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(err),
+										connectionIP + "BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(err),
 										"CONNECTION_LOOP",
-										LogType::LOG_ERROR,
-										2);
+										LogType::LOG_WARNING2);
 
 									raw->isRunning.store(false, memory_order_release);
 
@@ -909,7 +926,7 @@ namespace KalaServer::Server
 								if (bytesReceived == 0)
 								{
 									Log::Print(
-										"[ " + raw->connectionIP + " ] Connection was closed during bytesReceived recv read.",
+										connectionIP + "Connection was closed during bytesReceived recv read.",
 										"CONNECTION_LOOP",
 										LogType::LOG_INFO);
 
@@ -935,7 +952,7 @@ namespace KalaServer::Server
 										|| errno == EWOULDBLOCK)
 									{
 										Log::Print(
-											"[ " + raw->connectionIP + " ] BytesReceived recv read timed out.",
+											connectionIP + "BytesReceived recv read timed out.",
 											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
@@ -944,10 +961,10 @@ namespace KalaServer::Server
 										continue;
 									}
 									if (errno == ECONNRESET
-											 || errno == ECONNABORTED)
+										|| errno == ECONNABORTED)
 									{
 										Log::Print(
-											"[ " + raw->connectionIP + " ] Connection was closed abruptly by client during bytesReceived recv read.",
+											connectionIP + "Connection was closed abruptly by client during bytesReceived recv read.",
 											"CONNECTION_LOOP",
 											LogType::LOG_INFO);
 
@@ -957,10 +974,9 @@ namespace KalaServer::Server
 									}
 									
 									Log::Print(
-										"[ " + raw->connectionIP + " ] BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(errno),
+										connectionIP + "BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(errno),
 										"CONNECTION_LOOP",
-										LogType::LOG_ERROR,
-										2);
+										LogType::LOG_WARNING);
 
 									raw->isRunning.store(false, memory_order_release);
 
@@ -970,7 +986,7 @@ namespace KalaServer::Server
 								if (bytesReceived == 0)
 								{
 									Log::Print(
-										"[ " + raw->connectionIP + " ] Connection was closed by client during bytesReceived recv read.",
+										connectionIP + "Connection was closed by client during bytesReceived recv read.",
 										"CONNECTION_LOOP",
 										LogType::LOG_INFO);
 
@@ -984,18 +1000,25 @@ namespace KalaServer::Server
 
 								if (readBuffer.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
 								{
+									sendMsg = "Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload!";
+
+									Log::Print(
+										connectionIP + sendMsg,
+										"CONNECTION_SOCKET",
+										LogType::LOG_WARNING);
+
 									Response::SendResponse({
 										.responseType = ResponseType::R_413,
 										.contentType = ContentType::CT_HTML,
 										.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-										.responseBody = "Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload!",
+										.responseBody = 
+											ReturnErrorBody(sendMsg,
+											ResponseType::R_413),
 										.connection = raw
 									});
 
 									break;
 								}
-
-								Log::Print("[ " + raw->connectionIP + " ] Client sent '" + to_string(bytesReceived) + "' bytes with request.");
 
 								while (true)
 								{
@@ -1036,11 +1059,20 @@ namespace KalaServer::Server
 
 									if (fullRequest.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
 									{
+										sendMsg = "Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload!";
+
+										Log::Print(
+											connectionIP + sendMsg,
+											"CONNECTION_SOCKET",
+											LogType::LOG_WARNING);
+										
 										Response::SendResponse({
 											.responseType = ResponseType::R_413,
 											.contentType = ContentType::CT_HTML,
 											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-											.responseBody = "Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload!",
+											.responseBody = 
+												ReturnErrorBody(sendMsg,
+												ResponseType::R_413),
 											.connection = raw
 										});
 
@@ -1049,6 +1081,24 @@ namespace KalaServer::Server
 
 									//remove processed request from buffer
 									readBuffer.erase(0, totalRequired);
+
+									if (readBuffer.size() > 0)
+									{
+										Log::Print(
+											"There is '" + to_string(readBuffer.size()) + "' bytes of data remaining after removing the total required bytes from the readbuffer.",
+											"CONNECTION_LOOP",
+											LogType::LOG_INFO);
+									}
+
+									string fullRequestToLog = fullRequest;
+									if (fullRequestToLog.ends_with("\r\n\r\n")) fullRequestToLog.erase(fullRequestToLog.size() - 4);
+									if (fullRequestToLog.ends_with("\r\n")) fullRequestToLog.erase(fullRequestToLog.size() - 2);
+
+									Log::Print(
+											"------------------------------\n"
+											"Parsing client request (" + to_string(bytesReceived) + " bytes):\n"
+											+ fullRequestToLog
+											+ "\n------------------------------");
 
 									//
 									// PARSE HEADER AND BODY CONTENT
@@ -1076,19 +1126,28 @@ namespace KalaServer::Server
 											}
 
 											istringstream firstLine(line);
-											firstLine >> req.method >> req.route >> req.httpVersion;
+											firstLine >> req.method >> req.domainRoute.route >> req.httpVersion;
 
 											req.method = ToUpperString(req.method);
-											req.route = ToLowerString(req.route);
+											req.domainRoute.route = ToLowerString(req.domainRoute.route);
 											req.httpVersion = ToUpperString(req.httpVersion);
 
 											if (req.method.empty())
 											{
+												sendMsg = "Payload did not contain any method!";
+
+												Log::Print(
+													connectionIP + sendMsg,
+													"CONNECTION_SOCKET",
+													LogType::LOG_WARNING);
+
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
 													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-													.responseBody = "Payload did not contain any method!",
+													.responseBody = 
+														ReturnErrorBody(sendMsg,
+														ResponseType::R_400),
 													.connection = raw
 												});
 
@@ -1096,24 +1155,42 @@ namespace KalaServer::Server
 											}
 											if (req.method != "GET")
 											{
+												sendMsg = "Method '" + req.method + "' is not supported!";
+
+												Log::Print(
+													connectionIP + sendMsg,
+													"CONNECTION_SOCKET",
+													LogType::LOG_WARNING);
+
 												Response::SendResponse({
 													.responseType = ResponseType::R_405,
 													.contentType = ContentType::CT_HTML,
 													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-													.responseBody = "Method '" + req.method + "' is not supported!",
+													.responseBody = 
+														ReturnErrorBody(sendMsg,
+														ResponseType::R_405),
 													.connection = raw
 												});
 
 												break;
 											}
 
-											if (req.route.empty())
+											if (req.domainRoute.route.empty())
 											{
+												sendMsg = "Payload did not contain a route!";
+
+												Log::Print(
+													connectionIP + sendMsg,
+													"CONNECTION_SOCKET",
+													LogType::LOG_WARNING);
+
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
 													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-													.responseBody = "Payload did not contain a route!",
+													.responseBody = 
+														ReturnErrorBody(sendMsg,
+														ResponseType::R_400),
 													.connection = raw
 												});
 
@@ -1122,11 +1199,20 @@ namespace KalaServer::Server
 
 											if (req.httpVersion.empty())
 											{
+												sendMsg = "Payload did not contain any http version!";
+
+												Log::Print(
+													connectionIP + sendMsg,
+													"CONNECTION_SOCKET",
+													LogType::LOG_WARNING);
+
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
 													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-													.responseBody = "Payload did not contain any http version!",
+													.responseBody = 
+														ReturnErrorBody(sendMsg,
+														ResponseType::R_400),
 													.connection = raw
 												});
 
@@ -1134,11 +1220,20 @@ namespace KalaServer::Server
 											}
 											if (req.httpVersion != "HTTP/1.1")
 											{
+												sendMsg = "HTTP version '" + req.httpVersion + "' is not supported!";
+
+												Log::Print(
+													connectionIP + sendMsg,
+													"CONNECTION_SOCKET",
+													LogType::LOG_WARNING);
+
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
 													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-													.responseBody = "HTTP version '" + req.httpVersion + "' is not supported!",
+													.responseBody = 
+														ReturnErrorBody(sendMsg,
+														ResponseType::R_400),
 													.connection = raw
 												});
 
@@ -1159,11 +1254,20 @@ namespace KalaServer::Server
 											size_t colon = line.find(':');
 											if (colon == string::npos)
 											{
+												sendMsg = "Payload headers are malformed!";
+
+												Log::Print(
+													connectionIP + sendMsg,
+													"CONNECTION_SOCKET",
+													LogType::LOG_WARNING);
+
 												Response::SendResponse({
 													.responseType = ResponseType::R_400,
 													.contentType = ContentType::CT_HTML,
 													.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-													.responseBody = "Patyload headers are malformed!",
+													.responseBody = 
+														ReturnErrorBody(sendMsg,
+														ResponseType::R_400),
 													.connection = raw
 												});
 
@@ -1178,20 +1282,29 @@ namespace KalaServer::Server
 
 											if (key == "host")
 											{
-												if (!req.host.empty())
+												if (!req.domainRoute.domain.empty())
 												{
+													sendMsg = "Payload contained more than one 'host' field!";
+
+													Log::Print(
+														connectionIP + sendMsg,
+														"CONNECTION_SOCKET",
+														LogType::LOG_WARNING);
+
 													Response::SendResponse({
 														.responseType = ResponseType::R_400,
 														.contentType = ContentType::CT_HTML,
 														.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-														.responseBody = "Patyload contained more than one 'host' field!",
+														.responseBody = 
+														ReturnErrorBody(sendMsg,
+														ResponseType::R_400),
 														.connection = raw
 													});
 
 													break;
 												}
 
-												req.host = ToLowerString(value);
+												req.domainRoute.domain = ToLowerString(value);
 											}
 											else
 											{
@@ -1204,11 +1317,21 @@ namespace KalaServer::Server
 													}
 													else
 													{
+														sendMsg = "Payload contained more than one '" + key + "' field!";
+
+														Log::Print(
+															connectionIP + sendMsg,
+															"CONNECTION_LOOP",
+															LogType::LOG_ERROR,
+															2);
+
 														Response::SendResponse({
 															.responseType = ResponseType::R_400,
 															.contentType = ContentType::CT_HTML,
 															.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-															.responseBody = "Patyload contained more than one '" + key + "' field!",
+															.responseBody = 
+																ReturnErrorBody(sendMsg,
+																ResponseType::R_400),
 															.connection = raw
 														});
 
@@ -1224,13 +1347,22 @@ namespace KalaServer::Server
 									// VERIFY HOST
 									//
 
-									if (req.host.empty())
+									if (req.domainRoute.domain.empty())
 									{
+										sendMsg = "Payload did not contain host!";
+
+										Log::Print(
+											connectionIP + sendMsg,
+											"CONNECTION_SOCKET",
+											LogType::LOG_WARNING);
+
 										Response::SendResponse({
 											.responseType = ResponseType::R_400,
 											.contentType = ContentType::CT_HTML,
 											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-											.responseBody = "Payload did not contain host!",
+											.responseBody = 
+												ReturnErrorBody(sendMsg,
+												ResponseType::R_400),
 											.connection = raw
 										});
 
@@ -1238,8 +1370,8 @@ namespace KalaServer::Server
 									}
 
 									bool foundDomain{};
-									if (req.host == serverIPDomain 
-										|| req.host == serverIPPortDomain)
+									if (req.domainRoute.domain == serverIPDomain 
+										|| req.domainRoute.domain == serverIPPortDomain)
 									{
 										foundDomain = true;
 									}
@@ -1247,7 +1379,7 @@ namespace KalaServer::Server
 									{
 										for (const auto& d : ServerCore::GetServerDomains())
 										{
-											if (req.host == d)
+											if (req.domainRoute.domain == d)
 											{
 												foundDomain = true;
 												break;
@@ -1257,11 +1389,20 @@ namespace KalaServer::Server
 									
 									if (!foundDomain)
 									{
+										sendMsg = "Host '" + req.domainRoute.domain + "' was not found!";
+
+										Log::Print(
+											connectionIP + sendMsg,
+											"CONNECTION_SOCKET",
+											LogType::LOG_WARNING);
+
 										Response::SendResponse({
 											.responseType = ResponseType::R_400,
 											.contentType = ContentType::CT_HTML,
 											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-											.responseBody = "Host '" + req.host + "' was not found!",
+											.responseBody = 
+												ReturnErrorBody(sendMsg,
+												ResponseType::R_400),
 											.connection = raw
 										});
 
@@ -1272,28 +1413,28 @@ namespace KalaServer::Server
 									// PARSE ROUTE
 									//
 
-									if (req.route.starts_with("http://")) req.route.erase(0, 7);
-									if (req.route.starts_with("https://")) req.route.erase(0, 8);
-									if (req.route.starts_with("www.")) req.route.erase(0, 4);
-									if (req.route.starts_with(serverIPPortDomain)) req.route.erase(0, serverIPPortDomain.size());
-									if (req.route.starts_with(serverIPDomain)) req.route.erase(0, serverIPDomain.size());
+									if (req.domainRoute.route.starts_with("http://")) req.domainRoute.route.erase(0, 7);
+									if (req.domainRoute.route.starts_with("https://")) req.domainRoute.route.erase(0, 8);
+									if (req.domainRoute.route.starts_with("www.")) req.domainRoute.route.erase(0, 4);
+									if (req.domainRoute.route.starts_with(serverIPPortDomain)) req.domainRoute.route.erase(0, serverIPPortDomain.size());
+									if (req.domainRoute.route.starts_with(serverIPDomain)) req.domainRoute.route.erase(0, serverIPDomain.size());
 
-									if (!req.route.starts_with('/')) req.route.insert(req.route.begin(), '/');
+									if (!req.domainRoute.route.starts_with('/')) req.domainRoute.route.insert(req.domainRoute.route.begin(), '/');
 
 									mutex& m_routes = ServerCore::GetRoutesMutex();
-									mutex& m_blacklistedKeywords = ServerCore::GetBKMutex();
+									mutex& m_blacklistedKeywords = ServerCore::GetBlacklistedKeywordsMutex();
 
 									lockwait_m(m_routes);
 									lockwait_m(m_blacklistedKeywords);
 
-									vector<string>& blacklistedKeywords = ServerCore::GetBlacklistedKeywords();
-									vector<BannedIP>& bannedIPs = ServerCore::GetBannedIPs();
-									vector<string>& routes = ServerCore::GetRoutes();
+									const vector<string>& blacklistedKeywords = ServerCore::GetBlacklistedKeywords();
+									const vector<BannedIP>& bannedIPs = ServerCore::GetBannedIPs();
+									const vector<DomainRoute>& routes = ServerCore::GetRoutes();
 
 									string blacklistedKeyword{};
 									for (const auto& b : ServerCore::GetBlacklistedKeywords())
 									{
-										if (req.route.find(b) != string::npos)
+										if (req.domainRoute.route.find(b) != string::npos)
 										{
 											blacklistedKeyword = b;
 											break;
@@ -1301,7 +1442,7 @@ namespace KalaServer::Server
 									}
 									if (!blacklistedKeyword.empty())
 									{
-										bannedIPs.push_back({ .targetIP = raw->connectionIP });
+										ServerCore::BanIP(raw->connectionIP);
 
 										Log::Print(
 											"[ " + raw->connectionIP + " ] User was banned for trying to access route via blacklisted keyword '" + blacklistedKeyword + "'",
@@ -1315,7 +1456,9 @@ namespace KalaServer::Server
 											.responseType = ResponseType::R_418,
 											.contentType = ContentType::CT_HTML,
 											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-											.responseBody = "Get banned nerd",
+											.responseBody = 
+												ReturnErrorBody("Get banned nerd",
+												ResponseType::R_418),
 											.connection = raw
 										});
 
@@ -1327,7 +1470,7 @@ namespace KalaServer::Server
 									{
 										if (foundValidRoute) break;
 
-										if (r == req.route)
+										if (r.route == req.domainRoute.route)
 										{
 											foundValidRoute = true;
 											break;
@@ -1339,11 +1482,20 @@ namespace KalaServer::Server
 										unlock_m(m_blacklistedKeywords);
 										unlock_m(m_routes);
 
+										sendMsg = "Route '" + req.domainRoute.route + "' was not found!";
+
+										Log::Print(
+											connectionIP + sendMsg,
+											"CONNECTION_SOCKET",
+											LogType::LOG_WARNING);
+
 										Response::SendResponse({
 											.responseType = ResponseType::R_404,
 											.contentType = ContentType::CT_HTML,
 											.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
-											.responseBody = "Route '" + req.route + "' was not found!",
+											.responseBody = 
+												ReturnErrorBody(sendMsg,
+												ResponseType::R_404),
 											.connection = raw
 										});
 
@@ -1357,6 +1509,7 @@ namespace KalaServer::Server
 									// ALLOW CONNECTION
 									//
 
+									/*
 									string parsedHeaders = 
 										"    method: " + req.method + "\n"
 										"    route: " + req.route + "\n"
@@ -1369,6 +1522,7 @@ namespace KalaServer::Server
 									}
 
 									Log::Print(parsedHeaders);
+									*/
 
 									vector<OptionalSendType> optSendTypes{};
 									for (const auto& [k, v] : req.headers)
