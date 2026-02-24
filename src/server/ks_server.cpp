@@ -24,6 +24,7 @@
 #include "server/ks_server.hpp"
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_connect.hpp"
+#include "core/ks_core.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -35,6 +36,8 @@ using KalaHeaders::KalaThread::unlock_m;
 
 using KalaHeaders::KalaFile::WriteLinesToFile;
 using KalaHeaders::KalaFile::ReadLinesFromFile;
+
+using KalaServer::Core::KalaServerCore;
 
 using std::to_string;
 using std::string;
@@ -202,8 +205,8 @@ namespace KalaServer::Server
 			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 			{
 				Log::Print(
-					"Failed to check internet state for server '" + serverName + "' because WSAStartup failed!",
-					"INTERNET_ACCESS",
+					"Failed to call WSAStartup!",
+					"SERVER",
 					LogType::LOG_ERROR,
 					2);
 
@@ -256,11 +259,30 @@ namespace KalaServer::Server
 	bool ServerCore::HasInternet()
 	{
 #ifdef _WIN32
+		if (!startedWSA)
+		{
+			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+			{
+				Log::Print(
+					"Failed to call WSAStartup!",
+					"INTERNET_ACCESS",
+					LogType::LOG_ERROR,
+					2);
+
+				WSACleanup();
+
+				return false;
+			}
+			startedWSA = true;
+		}
+
 		SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (sock == INVALID_SOCKET)
 		{
+			string failReason = KalaServerCore::ErrorToString(WSAGetLastError());
+
 			Log::Print(
-				"Failed to check internet state for server '" + serverName + "' because socket creation failed!",
+				"Failed to check internet state for server '" + serverName + "' because socket creation failed! Reason: " + failReason,
 				"INTERNET_ACCESS",
 				LogType::LOG_ERROR,
 				2);

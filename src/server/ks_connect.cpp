@@ -12,13 +12,13 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <unistd.h>
+#include <cerrno>
 #endif
 
 #include <string>
 #include <thread>
 #include <chrono>
 #include <memory>
-#include <cerrno>
 #include <unordered_map>
 #include <sstream>
 #include <array>
