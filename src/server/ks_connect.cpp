@@ -3,6 +3,7 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
+#include <atomic>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -868,7 +869,7 @@ namespace KalaServer::Server
 						{
 							string readBuffer{};
 
-							string connectionIP = "[ " + string(raw->connectionIP) + " ] ";
+							string connectionIP = "[ " + raw->connectionIP + " ] ";
 							string sendMsg{};
 
 							while (raw->isRunning.load(memory_order_acquire))
