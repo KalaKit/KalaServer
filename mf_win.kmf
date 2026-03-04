@@ -31,27 +31,27 @@ action: forcecopy
 //
 
 //copy debug dll
-origin: build@windows-debug@KalaServer1d.dll
+origin: build@debug-window@KalaServer1d.dll
 target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.dll
 action: forcecopy
 
 //copy debug lib
-origin: build@windows-debug@KalaServer1d.lib
+origin: build@debug-window@KalaServer1d.lib
 target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.lib
 action: forcecopy
 
 //copy debug pdb
-origin: build@windows-debug@KalaServer1d.pdb
+origin: build@debug-window@KalaServer1d.pdb
 target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.pdb
 action: forcecopy
 
 //copy release lib
-origin: build@windows-release@KalaServer1.dll
+origin: build@release-window@KalaServer1.dll
 target: ..@..@_websites@server@_external_shared@KalaServer@release@KalaServer1.dll
 action: forcecopy
 
 //copy release lib
-origin: build@windows-release@KalaServer1.lib
+origin: build@release-window@KalaServer1.lib
 target: ..@..@_websites@server@_external_shared@KalaServer@release@KalaServer1.lib
 action: forcecopy
 

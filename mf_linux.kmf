@@ -31,12 +31,12 @@ action: forcecopy
 //
 
 //copy debug so
-origin: build@linux-debug@libKalaServer1d.so
+origin: build@debug-linux@libKalaServer1d.so
 target: ..@..@_websites@server@_external_shared@KalaServer@debug@libKalaServer1d.so
 action: forcecopy
 
 //copy release so
-origin: build@linux-release@libKalaServer1.so
+origin: build@release-linux@libKalaServer1.so
 target: ..@..@_websites@server@_external_shared@KalaServer@release@libKalaServer1.so
 action: forcecopy
 
