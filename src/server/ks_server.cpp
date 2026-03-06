@@ -24,7 +24,6 @@
 #include "server/ks_server.hpp"
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_connect.hpp"
-#include "core/ks_core.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -37,8 +36,6 @@ using KalaHeaders::KalaThread::unlock_m;
 using KalaHeaders::KalaFile::WriteLinesToFile;
 using KalaHeaders::KalaFile::ReadLinesFromFile;
 
-using KalaServer::Core::KalaServerCore;
-
 using std::to_string;
 using std::string;
 
@@ -48,7 +45,6 @@ namespace KalaServer::Server
 	static bool isReady{};
 
 	static bool cloudflareRequired{};
-	static bool isHealthy{};
 
 #ifdef _WIN32
 	static bool startedWSA{};
@@ -408,8 +404,6 @@ namespace KalaServer::Server
 	}
 	bool ServerCore::UnbanIP(string_view targetIP)
 	{
-		bool foundTarget{};
-
 		lockwait_m(m_bannedIPs);
 		for (auto it = bannedIPs.begin(); it != bannedIPs.end(); ++it)
 		{
@@ -549,7 +543,6 @@ namespace KalaServer::Server
 			return false;
 		}
 
-		bool foundExistingPath{};
 		for (const auto& r : routes)
 		{
 			if (r.routePath == cleanedPath)

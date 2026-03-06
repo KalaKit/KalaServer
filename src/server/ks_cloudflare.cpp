@@ -41,13 +41,9 @@ using KalaHeaders::KalaThread::memory_order_relaxed;
 
 using KalaServer::Core::KalaServerCore;
 using KalaServer::Server::ServerCore;
-using KalaServer::Server::Cloudflare;
 
 using std::filesystem::exists;
 using std::filesystem::path;
-using std::filesystem::current_path;
-using std::filesystem::directory_iterator;
-using std::filesystem::last_write_time;
 using std::filesystem::file_time_type;
 using std::string;
 using std::string_view;
@@ -574,7 +570,6 @@ namespace KalaServer::Server
 
 				//regular cloudflare message
 
-				size_t prefixEnd = line.find(' ', 24);
 				if (line.size() < 28
 					&& isVerboseLoggingEnabled.load(memory_order_relaxed))
 				{
@@ -602,11 +597,12 @@ namespace KalaServer::Server
 				debugEnabled = true;
 #endif
 
-				if (isVerboseLoggingEnabled.load(memory_order_relaxed)
-					|| (!isVerboseLoggingEnabled.load(memory_order_relaxed)
-					&& type == LogType::LOG_ERROR
+				bool verbose = isVerboseLoggingEnabled.load(memory_order_relaxed);
+
+				if (verbose
+					|| type == LogType::LOG_ERROR
 					|| (type == LogType::LOG_DEBUG
-					&& debugEnabled)))
+					&& debugEnabled))
 				{
 					Log::Print(
 						line,

@@ -20,7 +20,6 @@
 #include <thread>
 #include <chrono>
 #include <memory>
-#include <unordered_map>
 #include <sstream>
 #include <array>
 #include <chrono>
@@ -55,8 +54,6 @@ using KalaHeaders::KalaString::ToUpperString;
 using KalaServer::Server::Response;
 using KalaServer::Server::Connection;
 using KalaServer::Server::ResponseType;
-using KalaServer::Server::ContentType;
-using KalaServer::Server::ResponseData;
 using KalaServer::Core::KalaServerCore;
 
 using std::memory_order_acquire;
@@ -69,10 +66,8 @@ using std::chrono::seconds;
 using std::chrono::milliseconds;
 using std::unique_ptr;
 using std::make_unique;
-using std::unordered_map;
 using std::istringstream;
 using std::array;
-using std::chrono::steady_clock;
 using std::vector;
 
 using u16 = uint16_t;
@@ -1431,8 +1426,6 @@ namespace KalaServer::Server
 									lockwait_m(m_routes);
 									lockwait_m(m_blacklistedKeywords);
 
-									const vector<string>& blacklistedKeywords = ServerCore::GetBlacklistedKeywords();
-									const vector<BannedIP>& bannedIPs = ServerCore::GetBannedIPs();
 									const vector<DomainRoute>& routes = ServerCore::GetRoutes();
 
 									string blacklistedKeyword{};
