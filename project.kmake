@@ -2,38 +2,44 @@
 
 #version 1.0
 
-#include
-kh: "_external_shared"
+#references
+name_bin: KalaServer1
+dir_release: build/release-
+dir_debug: build/debug-
+dir_openssl_deb: _external_shared/OpenSSL/debug
+dir_openssl_rel: _external_shared/OpenSSL/release
 
 #global
 compilerlauncher: ccache
 standard: c++20
 binarytype: shared
 sources: "src"
-headers: "include", #kh
+headers: "include", "_external_shared"
 warninglevel: normal
 customflags: export-compile-commands
 
 #profile debug-windows
-binaryname: KalaServer1d
+binaryname: ${name_bin}d
 compiler: clang-cl
 buildtype: debug
-buildpath: "build/debug-windows"
+buildpath: "${dir_debug}windows"
 
 #profile release-windows
-binaryname: KalaServer1
+binaryname: ${name_bin}
 compiler: clang-cl
 buildtype: minsizerel
-buildpath: "build/release-windows"
+buildpath: "${dir_release}windows"
 
 #profile debug-linux
-binaryname: libKalaServer1d
+binaryname: lib${name_bin}d
 compiler: clang++
 buildtype: debug
-buildpath: "build/debug-linux"
+buildpath: "${dir_debug}linux"
+links: "${dir_openssl_deb}/libcrypto.a", "${dir_openssl_deb}/libssl.a"
 
 #profile release-linux
-binaryname: libKalaServer1
+binaryname: lib${name_bin}
 compiler: clang++
 buildtype: minsizerel
-buildpath: "build/release-linux"
+buildpath: "${dir_release}linux"
+links: "${dir_openssl_rel}/libcrypto.a", "${dir_openssl_rel}/libssl.a"
