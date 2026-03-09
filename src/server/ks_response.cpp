@@ -15,8 +15,8 @@
 #include <atomic>
 #include <cerrno>
 
-#include "KalaHeaders/core_utils.hpp"
-#include "KalaHeaders/log_utils.hpp"
+#include "core_utils.hpp"
+#include "log_utils.hpp"
 
 #include "server/ks_response.hpp"
 #include "server/ks_connect.hpp"

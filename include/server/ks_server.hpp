@@ -10,8 +10,8 @@
 #include <vector>
 #include <chrono>
 
-#include "KalaHeaders/core_utils.hpp"
-#include "KalaHeaders/thread_utils.hpp"
+#include "core_utils.hpp"
+#include "thread_utils.hpp"
 
 #include "server/ks_cloudflare.hpp"
 

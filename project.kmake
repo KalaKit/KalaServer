@@ -14,7 +14,7 @@ compilerlauncher: ccache
 standard: c++20
 binarytype: shared
 sources: "src"
-headers: "include", "_external_shared"
+headers: "include", "_external_shared/KalaHeaders"
 warninglevel: normal
 customflags: export-compile-commands
 

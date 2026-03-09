@@ -9,8 +9,8 @@
 #include <csignal>
 #endif
 
-#include "KalaHeaders/log_utils.hpp"
-#include "KalaHeaders/string_utils.hpp"
+#include "log_utils.hpp"
+#include "string_utils.hpp"
 
 #include "core/ks_core.hpp"
 

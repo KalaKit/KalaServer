@@ -9,7 +9,7 @@
 #include <string_view>
 #include <thread>
 
-#include "KalaHeaders/core_utils.hpp"
+#include "core_utils.hpp"
 
 namespace KalaServer::Server
 {

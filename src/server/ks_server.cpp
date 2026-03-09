@@ -3,7 +3,7 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include "KalaHeaders/thread_utils.hpp"
+#include "thread_utils.hpp"
 #ifdef _WIN32
 #include <ws2tcpip.h>
 #include <winsock2.h>
@@ -17,9 +17,9 @@
 
 #include <string>
 
-#include "KalaHeaders/log_utils.hpp"
-#include "KalaHeaders/string_utils.hpp"
-#include "KalaHeaders/file_utils.hpp"
+#include "log_utils.hpp"
+#include "string_utils.hpp"
+#include "file_utils.hpp"
 
 #include "server/ks_server.hpp"
 #include "server/ks_cloudflare.hpp"

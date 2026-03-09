@@ -24,10 +24,10 @@
 #include <array>
 #include <chrono>
 
-#include "KalaHeaders/core_utils.hpp"
-#include "KalaHeaders/log_utils.hpp"
-#include "KalaHeaders/thread_utils.hpp"
-#include "KalaHeaders/string_utils.hpp"
+#include "core_utils.hpp"
+#include "log_utils.hpp"
+#include "thread_utils.hpp"
+#include "string_utils.hpp"
 
 #include "server/ks_connect.hpp"
 #include "server/ks_server.hpp"
