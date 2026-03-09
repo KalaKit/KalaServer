@@ -9,10 +9,11 @@ get latest release: https://github.com/openssl/openssl
 ## linux build
 
 rm -rf _build && \
-make clean && \
+make clean || true && \
 \
 mkdir -p _build/release && \
 \
+CFLAGS="-O3 -DNDEBUG -fno-stack-protector -fno-common" \
 ./Configure linux-x86_64 \
     --prefix=$PWD/_build/release \
     no-tests \
@@ -34,6 +35,7 @@ rm -rf _build/release/bin && \
 \
 mkdir -p _build/debug && \
 \
+CFLAGS="-O0 -g -fno-stack-protector -fno-common" \
 ./Configure linux-x86_64 \
     --debug \
     --prefix=$PWD/_build/debug \
@@ -52,4 +54,5 @@ make install_sw && \
 mv _build/debug/lib64/*.a _build/debug && \
 rm -rf _build/debug/lib64 && \
 rm -rf _build/debug/bin && \
+\
 echo -e "\n##########\n\nFinished building into _build/release and _build/debug.\n\n##########\n"
