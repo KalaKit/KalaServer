@@ -30,14 +30,14 @@ action: forcecopy
 // BINARIES
 //
 
-//copy debug so
-origin: build@debug-linux@libkalaserverd.so
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@libkalaserverd.so
+//copy debug a
+origin: build@debug-linux@libkalaserverd.a
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@libkalaserverd.a
 action: forcecopy
 
-//copy release so
-origin: build@release-linux@libkalaserver.so
-target: ..@..@_websites@server@_external_shared@KalaServer@release@libkalaserver.so
+//copy release a
+origin: build@release-linux@libkalaserver.a
+target: ..@..@_websites@server@_external_shared@KalaServer@release@libkalaserver.a
 action: forcecopy
 
 //
