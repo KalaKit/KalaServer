@@ -24,6 +24,7 @@
 #include "server/ks_server.hpp"
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_connect.hpp"
+#include "core/ks_core.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -35,6 +36,8 @@ using KalaHeaders::KalaThread::unlock_m;
 
 using KalaHeaders::KalaFile::WriteLinesToFile;
 using KalaHeaders::KalaFile::ReadLinesFromFile;
+
+using KalaServer::Core::KalaServerCore;
 
 using std::to_string;
 using std::string;

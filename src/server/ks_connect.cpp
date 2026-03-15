@@ -84,11 +84,6 @@ constexpr ksocket invalid_socket = INVALID_SOCKET;
 constexpr ksocket invalid_socket = -1;
 #endif
 
-#ifdef _WIN32
-using std::wstring;
-static wstring ToWide(const string& input);
-#endif
-
 static string serverIPDomain{};
 static string serverIPPortDomain{};
 
@@ -253,8 +248,6 @@ namespace KalaServer::Server
 		//
 
 #ifdef _WIN32
-		int iResult{};
-
 		SOCKET listener = socket(
 			AF_INET,
 			SOCK_STREAM,
@@ -1840,30 +1833,3 @@ namespace KalaServer::Server
 			LogType::LOG_SUCCESS);
 	}
 }
-
-#ifdef _WIN32
-wstring ToWide(const string& input)
-{
-	if (input.empty()) return wstring();
-
-	int size_needed = MultiByteToWideChar(
-		CP_UTF8,
-		0,
-		input.data(),
-		scast<int>(input.size()),
-		nullptr,
-		0);
-
-	wstring wstr(size_needed - 1, 0);
-
-	MultiByteToWideChar(
-		CP_UTF8,
-		0,
-		input.data(),
-		scast<int>(input.size()),
-		wstr.data(),
-		size_needed);
-
-	return wstr;
-}
-#endif

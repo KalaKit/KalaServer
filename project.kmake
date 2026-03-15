@@ -3,7 +3,7 @@
 #version 1.0
 
 #references
-name_bin: KalaServer1
+name_bin: kalaserver
 dir_release: build/release-
 dir_debug: build/debug-
 dir_openssl_deb: _external_shared/OpenSSL/debug
@@ -12,11 +12,12 @@ dir_openssl_rel: _external_shared/OpenSSL/release
 #global
 compilerlauncher: ccache
 standard: c++20
-binarytype: shared
+binarytype: static
 sources: "src"
 headers: "include", "_external_shared/KalaHeaders"
+defines: LIB_STATIC
 warninglevel: normal
-customflags: export-compile-commands
+customflags: export-compile-commands, export-vscode-sln
 
 #profile debug-windows
 binaryname: ${name_bin}d
@@ -43,3 +44,4 @@ compiler: clang++
 buildtype: minsizerel
 buildpath: "${dir_release}linux"
 links: "${dir_openssl_rel}/libcrypto.a", "${dir_openssl_rel}/libssl.a"
+postbuildaction: strip --strip-unneeded ${dir_release}linux/${name_bin}.a

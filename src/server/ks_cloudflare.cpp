@@ -15,7 +15,6 @@
 
 #include <filesystem>
 #include <string>
-#include <vector>
 #include <array>
 #include <sstream>
 #include <fstream>
@@ -23,7 +22,6 @@
 
 #include "core_utils.hpp"
 #include "log_utils.hpp"
-#include "string_utils.hpp"
 #include "thread_utils.hpp"
 
 #include "server/ks_cloudflare.hpp"
@@ -34,7 +32,6 @@ using KalaHeaders::KalaCore::FromVar;
 using KalaHeaders::KalaCore::ToVar;
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
-using KalaHeaders::KalaString::SplitString;
 using KalaHeaders::KalaThread::joinable_thread;
 using KalaHeaders::KalaThread::abool;
 using KalaHeaders::KalaThread::memory_order_relaxed;
@@ -44,11 +41,11 @@ using KalaServer::Server::ServerCore;
 
 using std::filesystem::exists;
 using std::filesystem::path;
+using std::filesystem::current_path;
 using std::filesystem::file_time_type;
 using std::string;
 using std::string_view;
 using std::to_string;
-using std::vector;
 using std::array;
 using std::istringstream;
 using std::ofstream;

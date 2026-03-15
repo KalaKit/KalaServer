@@ -30,29 +30,14 @@ action: forcecopy
 // BINARIES
 //
 
-//copy debug dll
-origin: build@debug-window@KalaServer1d.dll
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.dll
-action: forcecopy
-
 //copy debug lib
-origin: build@debug-window@KalaServer1d.lib
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.lib
-action: forcecopy
-
-//copy debug pdb
-origin: build@debug-window@KalaServer1d.pdb
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@KalaServer1d.pdb
+origin: build@debug-windows@kalaserverd.lib
+target: ..@..@_websites@server@_external_shared@KalaServer@debug@kalaserverd.lib
 action: forcecopy
 
 //copy release lib
-origin: build@release-window@KalaServer1.dll
-target: ..@..@_websites@server@_external_shared@KalaServer@release@KalaServer1.dll
-action: forcecopy
-
-//copy release lib
-origin: build@release-window@KalaServer1.lib
-target: ..@..@_websites@server@_external_shared@KalaServer@release@KalaServer1.lib
+origin: build@release-windows@kalaserver.lib
+target: ..@..@_websites@server@_external_shared@KalaServer@release@kalaserver.lib
 action: forcecopy
 
 //

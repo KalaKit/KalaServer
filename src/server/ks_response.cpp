@@ -9,11 +9,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <cerrno>
 #endif
 
 #include <unordered_map>
 #include <atomic>
-#include <cerrno>
 
 #include "core_utils.hpp"
 #include "log_utils.hpp"
@@ -24,19 +24,16 @@
 #include "core/ks_core.hpp"
 
 using KalaHeaders::KalaCore::ToVar;
-using KalaHeaders::KalaCore::FromVar;
 using KalaHeaders::KalaCore::RemoveDuplicates;
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
-using KalaServer::Server::UNASSIGNED_SOCKET_VALUE;
 using KalaServer::Server::ResponseData;
 using KalaServer::Server::ResponseType;
 using KalaServer::Server::ContentType;
 using KalaServer::Server::OptionalSendType;
 using KalaServer::Server::Response;
-using KalaServer::Server::ServerCore;
 using KalaServer::Core::KalaServerCore;
 
 using std::unordered_map;
@@ -382,9 +379,7 @@ void Send(const ResponseData& data)
     int totalSent{};
 
     auto send_all = [
-        &data, 
         &fullResponse, 
-        &responseLogContent, 
         &connectionIP,
         &sock,
         &totalSent]() -> bool
