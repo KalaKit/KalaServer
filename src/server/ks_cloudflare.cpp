@@ -3,7 +3,6 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-#include <atomic>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -13,9 +12,11 @@
 #include <errno.h>
 #endif
 
+#include <atomic>
 #include <filesystem>
 #include <string>
 #include <array>
+#include <vector>
 #include <sstream>
 #include <fstream>
 #include <iterator>
@@ -23,6 +24,7 @@
 #include "core_utils.hpp"
 #include "log_utils.hpp"
 #include "thread_utils.hpp"
+#include "string_utils.hpp"
 
 #include "server/ks_cloudflare.hpp"
 #include "server/ks_server.hpp"
@@ -30,11 +32,15 @@
 
 using KalaHeaders::KalaCore::FromVar;
 using KalaHeaders::KalaCore::ToVar;
+
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
+
 using KalaHeaders::KalaThread::joinable_thread;
 using KalaHeaders::KalaThread::abool;
 using KalaHeaders::KalaThread::memory_order_relaxed;
+
+using KalaHeaders::KalaString::SplitString;
 
 using KalaServer::Core::KalaServerCore;
 using KalaServer::Server::ServerCore;
@@ -47,6 +53,7 @@ using std::string;
 using std::string_view;
 using std::to_string;
 using std::array;
+using std::vector;
 using std::istringstream;
 using std::ofstream;
 using std::ifstream;
