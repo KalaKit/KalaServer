@@ -6,8 +6,6 @@
 name_bin: kalaserver
 dir_release: build/release-
 dir_debug: build/debug-
-dir_openssl_deb: _external_shared/OpenSSL/debug
-dir_openssl_rel: _external_shared/OpenSSL/release
 
 #global
 compilerlauncher: ccache
@@ -23,12 +21,14 @@ customflags: export-compile-commands, export-vscode-sln
 binaryname: ${name_bin}d
 compiler: clang-cl
 buildtype: debug
+links: todo-add-for-windows
 buildpath: "${dir_debug}windows"
 
 #profile release-windows
 binaryname: ${name_bin}
 compiler: clang-cl
 buildtype: minsizerel
+links: todo-add-for-windows
 buildpath: "${dir_release}windows"
 
 #profile debug-linux
@@ -36,12 +36,12 @@ binaryname: lib${name_bin}d
 compiler: clang++
 buildtype: debug
 buildpath: "${dir_debug}linux"
-links: "${dir_openssl_deb}/libcrypto.a", "${dir_openssl_deb}/libssl.a"
+links: ssl, crypto
 
 #profile release-linux
 binaryname: lib${name_bin}
 compiler: clang++
 buildtype: minsizerel
 buildpath: "${dir_release}linux"
-links: "${dir_openssl_rel}/libcrypto.a", "${dir_openssl_rel}/libssl.a"
+links: ssl, crypto
 postbuildaction: strip --strip-unneeded ${dir_release}linux/lib${name_bin}.a
