@@ -21,14 +21,12 @@ customflags: export-compile-commands, export-vscode-sln
 binaryname: ${name_bin}d
 compiler: clang-cl
 buildtype: debug
-links: todo-add-for-windows
 buildpath: "${dir_debug}windows"
 
 #profile release-windows
 binaryname: ${name_bin}
 compiler: clang-cl
 buildtype: minsizerel
-links: todo-add-for-windows
 buildpath: "${dir_release}windows"
 
 #profile debug-linux
@@ -36,12 +34,10 @@ binaryname: lib${name_bin}d
 compiler: clang++
 buildtype: debug
 buildpath: "${dir_debug}linux"
-links: ssl, crypto
 
 #profile release-linux
 binaryname: lib${name_bin}
 compiler: clang++
 buildtype: minsizerel
 buildpath: "${dir_release}linux"
-links: ssl, crypto
 postbuildaction: strip --strip-unneeded ${dir_release}linux/lib${name_bin}.a
