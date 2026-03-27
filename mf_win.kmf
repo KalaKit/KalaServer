@@ -8,43 +8,34 @@
 
 //copy readme
 origin: README.md
-target: ..@..@_websites@server@_external_shared@KalaServer@README.md
+target: ..@external-shared@KalaServer@README.md
 action: forcecopy
 
 //copy license
 origin: LICENSE.md
-target: ..@..@_websites@server@_external_shared@KalaServer@LICENSE.md
+target: ..@external-shared@KalaServer@LICENSE.md
 action: forcecopy
 
 //copy include files
 origin: include
-target: ..@..@_websites@server@_external_shared@KalaServer@include
+target: ..@external-shared@KalaServer@include
 action: forcecopy
 
 //copy docs
 origin: docs
-target: ..@..@_websites@server@_external_shared@KalaServer@docs
+target: ..@external-shared@KalaServer@docs
 action: forcecopy
 
 //
 // BINARIES
 //
 
-//copy debug lib
+//copy debug
 origin: build@debug-windows@kalaserverd.lib
-target: ..@..@_websites@server@_external_shared@KalaServer@debug@kalaserverd.lib
+target: ..@external-shared@KalaServer@debug@kalaserverd.lib
 action: forcecopy
 
-//copy release lib
+//copy release
 origin: build@release-windows@kalaserver.lib
-target: ..@..@_websites@server@_external_shared@KalaServer@release@kalaserver.lib
+target: ..@external-shared@KalaServer@release@kalaserver.lib
 action: forcecopy
-
-//
-// EXTERNAL LIBRARIES
-//
-
-//KalaHeaders
-origin: _external_shared@KalaHeaders
-target: ..@..@_websites@server@_external_shared@KalaHeaders
-action: copy

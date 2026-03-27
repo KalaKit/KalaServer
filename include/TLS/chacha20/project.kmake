@@ -1,0 +1,14 @@
+#version 1.0
+
+#global
+binaryname: test-chacha
+buildtype: release
+binarytype: executable
+compiler: clang++
+standard: c++20
+sources: "src"
+headers: "../_kh", "include"
+customflags: export-compile-commands, export-vscode-sln
+
+#profile release-linux
+buildpath: "build/linux-release"
