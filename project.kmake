@@ -12,7 +12,7 @@ compilerlauncher: ccache
 standard: c++20
 binarytype: static
 sources: "src"
-headers: "include", "../kalaheaders"
+headers: "include", "../external-shared/KalaHeaders"
 defines: LIB_STATIC
 warninglevel: normal
 customflags: export-compile-commands, export-vscode-sln
