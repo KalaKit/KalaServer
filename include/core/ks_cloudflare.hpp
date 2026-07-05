@@ -35,6 +35,10 @@ namespace KalaServer::Core
 
 		static bool IsInitialized();
 
+		//Returns false if server cannot connect to google.com
+		//or if cloudflare tunnel is not healthy if cloudflare is required
+		static bool IsHealthy();
+
 		//Shut down the Cloudflare tunnel
 		static void Shutdown();
 	private:

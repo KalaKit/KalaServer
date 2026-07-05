@@ -13,13 +13,11 @@
 #endif
 
 #include <unordered_map>
-#include <atomic>
 
 #include "core_utils.hpp"
 #include "log_utils.hpp"
 
 #include "core/ks_response.hpp"
-#include "core/ks_connect.hpp"
 #include "core/ks_core.hpp"
 
 using KalaHeaders::KalaCore::ToVar;
@@ -40,7 +38,6 @@ using std::string;
 using std::string_view;
 using std::to_string;
 using std::vector;
-using std::memory_order_acquire;
 
 const string response_missing = 
 	"<html><body>\n"
@@ -152,8 +149,8 @@ namespace KalaServer::Core
 		}
 
         uintptr_t sock = data.connection
-            ? data.connection->connectionSocket.load(memory_order_acquire)
-            : data.connectionSocket.load(memory_order_acquire);
+            ? data.connection->connectionSocket
+            : data.connectionSocket;
 
         auto close_socket = [&data, &sock]()
             {
@@ -189,7 +186,7 @@ namespace KalaServer::Core
                 close(csock);
 #endif
 
-                if (data.connection) data.connection->isRunning.store(false, std::memory_order_release);
+                if (data.connection) data.connection->isRunning = false;
             };
 
         bool invalidResponseType = data.responseType == ResponseType::R_INVALID;
@@ -330,8 +327,8 @@ void Send(const ResponseData& data)
             : "";
 
     uintptr_t sock = data.connection
-        ? data.connection->connectionSocket.load(memory_order_acquire)
-        : data.connectionSocket.load(memory_order_acquire);
+        ? data.connection->connectionSocket
+        : data.connectionSocket;
 
     const string_view statusLine = Response::ResponseTypeToString(data.responseType);
     const string_view contentType = Response::ContentTypeToMimeType(data.contentType);
@@ -531,7 +528,7 @@ void Send(const ResponseData& data)
                 LogType::LOG_INFO);
         }
 
-        if (data.connection) data.connection->isRunning.store(false, std::memory_order_release);
+        if (data.connection) data.connection->isRunning = false;
         else
         {
 #ifdef _WIN32

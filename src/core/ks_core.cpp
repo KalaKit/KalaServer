@@ -3,7 +3,6 @@
 //This is free software, and you are welcome to redistribute it under certain conditions.
 //Read LICENSE.md for more information.
 
-
 #ifdef _WIN32
 #include <ws2tcpip.h>
 #include <winsock2.h>
@@ -12,19 +11,27 @@
 #include <sys/socket.h>
 #include <sys/capability.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
+#include <cerrno>
 #endif
 
 #include <string>
+#include <chrono>
+#include <sstream>
+#include <array>
+#include <vector>
 
+#include "core_utils.hpp"
 #include "log_utils.hpp"
 #include "string_utils.hpp"
 #include "file_utils.hpp"
-#include "thread_utils.hpp"
 
 #include "core/ks_core.hpp"
 #include "core/ks_cloudflare.hpp"
-#include "core/ks_connect.hpp"
+#include "core/ks_response.hpp"
+
+using KalaHeaders::KalaCore::ToVar;
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -34,48 +41,105 @@ using KalaHeaders::KalaLog::DateFormat;
 using KalaHeaders::KalaString::SplitString;
 using KalaHeaders::KalaString::TrimString;
 
-using KalaHeaders::KalaThread::lockwait_m;
-using KalaHeaders::KalaThread::unlock_m;
-
 using KalaHeaders::KalaFile::WriteLinesToFile;
 using KalaHeaders::KalaFile::ReadLinesFromFile;
 
 using KalaServer::Core::KalaServerCore;
+using KalaServer::Core::DomainRoute;
+using KalaServer::Core::BannedIP;
+using KalaServer::Core::Connection;
+using KalaServer::Core::Response;
+using KalaServer::Core::ResponseType;
 
 using std::to_string;
 using std::string;
+using std::string_view;
+using std::istringstream;
+using std::vector;
+using std::array;
+using std::chrono::duration_cast;
+using std::chrono::seconds;
+using std::chrono::milliseconds;
+using std::chrono::steady_clock;
+using std::filesystem::path;
 
 #ifdef _WIN32
 using std::wstring;
 #endif
 
-namespace KalaServer::Core
-{
-	static bool isInitialized{};
-	static bool isReady{};
+using u16 = uint16_t;
+using u64 = uint64_t;
 
-	static bool cloudflareRequired{};
+#ifdef _WIN32
+using ksocket = SOCKET;
+#else
+using ksocket = int;
+#endif
+
+#ifdef _WIN32
+constexpr ksocket invalid_socket = INVALID_SOCKET;
+#else
+constexpr ksocket invalid_socket = -1;
+#endif
+
+static bool isInitialized{};
+static bool isReady{};
+
+static bool cloudflareRequired{};
 
 #ifdef _WIN32
 	static bool startedWSA{};
 	WSADATA wsaData{};
 #endif
 
-	static string serverName{};
-	static path serverRoot{};
-	static vector<string> serverDomains{};
-	static string serverIP{};
-	static u16 serverPort{};
+static string serverName{};
+static path serverRoot{};
+static vector<string> serverDomains{};
+static string serverIP{};
+static u16 serverPort{};
 
-	static vector<BannedIP> bannedIPs{};
-	static mutex m_bannedIPs{};
+static string serverIPDomain{};
+static string serverIPPortDomain{};
 
-	static vector<DomainRoute> routes{};
-	static mutex m_routes{};
+static Connection listenerSocket{};
+static vector<Connection> connectSockets{};
 
-	static vector<string> blacklistedKeywords{};
-	static mutex m_blacklistedKeywords{};
+static vector<BannedIP> bannedIPs{};
+static vector<DomainRoute> routes{};
+static vector<string> blacklistedKeywords{};
 
+constexpr array<string_view, 8> allowedDuplicateHeaders
+{
+	"accept",
+	"accept-encoding",
+	"accept-language",
+	"cache-control",
+	"pragma",
+	"warning",
+	"via",
+	"x-forwarded-for"
+};
+
+constexpr string_view response_success = 
+	"<html><body>\n"
+	"    <h1>linux webserver lul</h1>\n"
+	"        <p><a href=\"https://github.com/Lost-Empire-Entertainment/Websites\">\n"
+	"            Check out the Website source code</a></p>\n"
+	"        <p><a href=\"https://github.com/KalaKit/KalaServer\">\n"
+	"            Check out the KalaKit server source code</a></p>\n"
+	"</body></html>";
+
+static string ReturnErrorBody(string_view error, ResponseType type)
+{
+	return 
+		"<html><body>\n"
+		"    <h1>" + string(Response::ResponseTypeToString(type)) + "</h1>\n"
+		"        <p>" + string(error) + "</p>\n"
+		"</body></html>";
+}
+
+namespace KalaServer::Core
+{
 	string KalaServerCore::ErrorToString(int error)
 	{
 		static string empty{};
@@ -295,15 +359,12 @@ namespace KalaServer::Core
 #ifdef _WIN32
 		if (!startedWSA)
 		{
-			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+			u32 errorCode = WSAStartup(MAKEWORD(2, 2), &wsaData);
+			if (errorCode != 0)
 			{
-				Log::Print(
-					"Failed to call WSAStartup!",
-					"SERVER",
-					LogType::LOG_ERROR,
-					2);
-
-				WSACleanup();
+				ForceClose(
+					"Server init error",
+					"Failed to call WSASTARTUP! Error code: " + to_string(errorCode));
 
 				return false;
 			}
@@ -345,24 +406,65 @@ namespace KalaServer::Core
 
 	bool KalaServerCore::IsInitialized() { return isInitialized; }
 
+	void KalaServerCore::Update()
+	{
+		if (!isInitialized)
+		{
+			Log::Print(
+				"Cannot update server '" + serverName + "' because it has not been initialized!",
+				"SERVER_CORE",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		if (!isReady)
+		{
+			Log::Print(
+				"Cannot update server '" + serverName + "' because it is not ready for use yet!",
+				"SERVER_CORE",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		if (!HasInternet())
+		{
+			Log::Print(
+				"Cannot update server '" + serverName + "' because it has no internet!",
+				"SERVER_CORE",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+
+	}
+
 	bool KalaServerCore::IsReady() { return isReady; }
 
 	bool KalaServerCore::IsCloudflareRequired() { return cloudflareRequired; }
 
 	bool KalaServerCore::HasInternet()
 	{
+		static bool cachedResult{};
+		static u64 lastCheckedTime{};
+
+		u64 now = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		if (now - lastCheckedTime < SERVER_HEALTH_WAIT_S * 1000ULL) return cachedResult;
+
 #ifdef _WIN32
 		if (!startedWSA)
 		{
-			if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+			u32 errorCode = WSAStartup(MAKEWORD(2, 2), &wsaData);
+			if (errorCode != 0)
 			{
-				Log::Print(
-					"Failed to call WSAStartup!",
-					"INTERNET_ACCESS",
-					LogType::LOG_ERROR,
-					2);
-
-				WSACleanup();
+				ForceClose(
+					"Internet health check error",
+					"Failed to call WSASTARTUP! Error code: " + to_string(errorCode));
 
 				return false;
 			}
@@ -448,15 +550,10 @@ namespace KalaServer::Core
 		close(sock);
 #endif
 
-		return ok;
-	}
+		cachedResult = ok;
+		lastCheckedTime = now;
 
-	bool KalaServerCore::IsHealthy()
-	{
-		return cloudflareRequired
-			? Cloudflare::IsTunnelAlive()
-			&& Cloudflare::IsTunnelHealthy()
-			: true;
+		return cachedResult;
 	}
 
 	string_view KalaServerCore::GetServerName() { return serverName; }
@@ -464,6 +561,182 @@ namespace KalaServer::Core
 	const vector<string>& KalaServerCore::GetServerDomains() { return serverDomains; };
 	string_view KalaServerCore::GetServerIP() { return serverIP; }
 	u16 KalaServerCore::GetServerPort() { return serverPort; }
+
+	const Connection& KalaServerCore::GetListenerSocket() { return listenerSocket; }
+
+	const vector<Connection> KalaServerCore::GetConnectSockets()
+	{ 
+		static vector<Connection> connectSocketView{};
+
+		connectSocketView.clear();
+		connectSocketView.reserve(connectSockets.size());
+
+		for (const auto& c : connectSockets)
+		{
+			connectSocketView.push_back(c);
+		}
+
+		return connectSocketView;
+	}
+
+	void KalaServerCore::DisconnectConnectedUser(uintptr_t targetSocket)
+	{
+		if (!KalaServerCore::IsReady())
+		{
+			Log::Print(
+				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				"DISCONNECT_TARGET",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		ksocket target = 
+#ifdef _WIN32
+			ToVar<SOCKET>(targetSocket);
+#else
+			ToVar<int>(targetSocket);
+#endif
+
+		if (target == invalid_socket)
+		{
+			Log::Print(
+				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the socket is unassigned or invalid!",
+				"DISCONNECT_TARGET",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		Connection targetUser{};
+
+		for (auto it = connectSockets.begin(); it != connectSockets.end(); ++it)
+		{
+			ksocket sock =
+#ifdef _WIN32
+				ToVar<SOCKET>(it->connectionSocket);
+#else
+				ToVar<int>(i->connectionSocket);
+#endif
+
+			if (sock == target)
+			{
+				targetUser = std::move(*it);
+				connectSockets.erase(it);
+
+				break;
+			}
+		}
+
+		if (targetUser.connectionSocket == NULL)
+		{
+			Log::Print(
+				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the target socket was not found!",
+				"DISCONNECT_TARGET",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		targetUser.isRunning = false;
+
+#ifdef _WIN32
+		ksocket cs = ToVar<SOCKET>(targetUser.connectionSocket);
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SD_BOTH);
+			closesocket(cs);
+		}
+#else
+		ksocket cs = ToVar<int>(targetUser.connectionSocket);
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SHUT_RDWR);
+			close(cs);
+		}
+#endif
+
+		Log::Print(
+			"Disconnected target via socket for server '" + string(KalaServerCore::GetServerName()) + "'!",
+			"DISCONNECT_TARGET",
+			LogType::LOG_SUCCESS);
+	}
+	void KalaServerCore::DisconnectConnectedUser(string_view targetIP)
+	{
+				if (!KalaServerCore::IsReady())
+		{
+			Log::Print(
+				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				"DISCONNECT_TARGET",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		if (!KalaServerCore::IsValidIP(targetIP))
+		{
+			Log::Print(
+				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the IP structure is invalid!",
+				"DISCONNECT_TARGET",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		Connection targetUser{};
+
+		for (auto it = connectSockets.begin(); it != connectSockets.end(); ++it)
+		{
+			string connectionIP = it->connectionIP;
+
+			if (connectionIP == targetIP)
+			{
+				targetUser = std::move(*it);
+				connectSockets.erase(it);
+
+				break;
+			}
+		}
+
+		if (targetUser.connectionSocket == NULL)
+		{
+			Log::Print(
+				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the target IP was not found!",
+				"DISCONNECT_TARGET",
+				LogType::LOG_ERROR,
+				2);
+
+			return;
+		}
+
+		targetUser.isRunning = false;
+
+#ifdef _WIN32
+		ksocket cs = ToVar<SOCKET>(targetUser.connectionSocket);
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SD_BOTH);
+			closesocket(cs);
+		}
+#else
+		ksocket cs = ToVar<int>(targetUser,connectionSocket);
+		if (cs != invalid_socket)
+		{
+			shutdown(cs, SHUT_RDWR);
+			close(cs);
+		}
+#endif
+
+		Log::Print(
+			"Disconnected target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "'!",
+			"DISCONNECT_TARGET",
+			LogType::LOG_SUCCESS);
+	}
 
 	bool KalaServerCore::IsValidIP(string_view targetIP)
 	{
@@ -478,7 +751,6 @@ namespace KalaServer::Core
 
 	bool KalaServerCore::BanIP(string_view targetIP)
 	{
-		lockwait_m(m_bannedIPs);
 		for (const auto& b : bannedIPs)
 		{
 			if (b.targetIP == targetIP)
@@ -489,30 +761,25 @@ namespace KalaServer::Core
 					LogType::LOG_ERROR,
 					2);
 
-				unlock_m(m_bannedIPs);
 				return false;
 			}
 		}
 
 		bannedIPs.push_back({.targetIP = string(targetIP)});
-		unlock_m(m_bannedIPs);
 
 		return true;
 	}
 	bool KalaServerCore::UnbanIP(string_view targetIP)
 	{
-		lockwait_m(m_bannedIPs);
 		for (auto it = bannedIPs.begin(); it != bannedIPs.end(); ++it)
 		{
 			if (it->targetIP == targetIP)
 			{
 				bannedIPs.erase(it);
 
-				unlock_m(m_bannedIPs);
 				return false;
 			}
 		}
-		unlock_m(m_bannedIPs);
 
 		Log::Print(
 			"Failed to unban IP '" + string(targetIP) + "' because it has not been banned!",
@@ -525,7 +792,6 @@ namespace KalaServer::Core
 
 	bool KalaServerCore::SaveBannedIPsToDisk(const path& targetPath)
 	{
-		lockwait_m(m_bannedIPs);
 		if (bannedIPs.empty())
 		{
 			Log::Print(
@@ -533,7 +799,6 @@ namespace KalaServer::Core
 				"SERVER",
 				LogType::LOG_INFO);
 
-			unlock_m(m_bannedIPs);
 			return false;
 		}
 
@@ -551,11 +816,9 @@ namespace KalaServer::Core
 				LogType::LOG_ERROR,
 				2);
 
-			unlock_m(m_bannedIPs);
 			return false;
 		}
 
-		unlock_m(m_bannedIPs);
 		return true;
 	}
 	bool KalaServerCore::LoadBannedIPsFromDisk(const path& targetPath)
@@ -581,7 +844,6 @@ namespace KalaServer::Core
 	}
 
 	const vector<BannedIP>& KalaServerCore::GetBannedIPs() { return bannedIPs; }
-	mutex& KalaServerCore::GetBannedIPsMutex() { return m_bannedIPs; }
 
 	bool KalaServerCore::AddRoute(const DomainRoute& newRoute)
 	{
@@ -606,8 +868,6 @@ namespace KalaServer::Core
 			return false;
 		}
 
-		lockwait_m(m_routes);
-
 		for (const auto& r : routes)
 		{
 			if (r.domain == newRoute.domain
@@ -618,8 +878,6 @@ namespace KalaServer::Core
 					"SERVER",
 					LogType::LOG_ERROR,
 					2);
-
-				unlock_m(m_routes);
 
 				return false;
 			}
@@ -635,8 +893,6 @@ namespace KalaServer::Core
 				LogType::LOG_ERROR,
 				2);
 
-			unlock_m(m_routes);
-
 			return false;
 		}
 
@@ -650,8 +906,6 @@ namespace KalaServer::Core
 					LogType::LOG_ERROR,
 					2);
 
-				unlock_m(m_routes);
-
 				return false;
 			}
 		}
@@ -663,8 +917,6 @@ namespace KalaServer::Core
 				.routePath = cleanedPath 
 			});
 
-		unlock_m(m_routes);
-
 		Log::Print(
 			"Added new domain '" + newRoute.domain + "' with route '" + newRoute.route + "' and path '" + cleanedPath.string() + "'!",
 			"SERVER",
@@ -674,8 +926,6 @@ namespace KalaServer::Core
 	}
 	bool KalaServerCore::RemoveRoute(const DomainRoute& existingRoute)
 	{
-		lockwait_m(m_routes);
-
 		auto it = remove_if(
 			routes.begin(),
 			routes.end(),
@@ -689,14 +939,10 @@ namespace KalaServer::Core
 				LogType::LOG_ERROR,
 				2);
 
-			unlock_m(m_routes);
-
 			return false;
 		}
 
 		routes.erase((it), routes.end());
-
-		unlock_m(m_routes);
 
 		Log::Print(
 			"Removed existing domain '" + existingRoute.domain + "' with route '" + existingRoute.route + "'.",
@@ -708,7 +954,6 @@ namespace KalaServer::Core
 
 	bool KalaServerCore::SaveRoutesToDisk(const path& targetPath)
 	{
-		lockwait_m(m_routes);
 		if (routes.empty())
 		{
 			Log::Print(
@@ -716,7 +961,6 @@ namespace KalaServer::Core
 				"SERVER",
 				LogType::LOG_INFO);
 
-			unlock_m(m_routes);
 			return false;
 		}
 
@@ -734,11 +978,9 @@ namespace KalaServer::Core
 				LogType::LOG_ERROR,
 				2);
 
-			unlock_m(m_routes);
 			return false;
 		}
 
-		unlock_m(m_routes);
 		return true;
 	}
 	bool KalaServerCore::LoadRoutesFromDisk(const path& targetPath)
@@ -764,12 +1006,9 @@ namespace KalaServer::Core
 	}
 
 	const vector<DomainRoute>& KalaServerCore::GetRoutes() { return routes; }
-	mutex& KalaServerCore::GetRoutesMutex() { return m_routes; }
 
 	bool KalaServerCore::AddBlacklistedKeyword(string_view newKeyword)
 	{
-		lockwait_m(m_blacklistedKeywords);
-
 		for (const auto& r : blacklistedKeywords)
 		{
 			if (r == newKeyword)
@@ -780,15 +1019,11 @@ namespace KalaServer::Core
 					LogType::LOG_ERROR,
 					2);
 
-				unlock_m(m_blacklistedKeywords);
-
 				return false;
 			}
 		}
 
 		blacklistedKeywords.push_back(string(newKeyword));
-
-		unlock_m(m_blacklistedKeywords);
 
 		Log::Print(
 			"Added new blacklisted keyword '" + string(newKeyword) + "'!",
@@ -799,8 +1034,6 @@ namespace KalaServer::Core
 	}
 	bool KalaServerCore::RemoveBlacklistedKeyword(string_view existingKeyword)
 	{
-		lockwait_m(m_blacklistedKeywords);
-
 		auto it = remove_if(
 			blacklistedKeywords.begin(),
 			blacklistedKeywords.end(),
@@ -814,14 +1047,10 @@ namespace KalaServer::Core
 				LogType::LOG_ERROR,
 				2);
 
-			unlock_m(m_blacklistedKeywords);
-
 			return false;
 		}
 
 		blacklistedKeywords.erase((it), blacklistedKeywords.end());
-
-		unlock_m(m_blacklistedKeywords);
 
 		Log::Print(
 			"Removed existing blacklisted keyword '" + string(existingKeyword) + "'.",
@@ -833,7 +1062,6 @@ namespace KalaServer::Core
 
 	bool KalaServerCore::SaveBlacklistedKeywordsToDisk(const path& targetPath)
 	{
-		lockwait_m(m_blacklistedKeywords);
 		if (routes.empty())
 		{
 			Log::Print(
@@ -841,7 +1069,6 @@ namespace KalaServer::Core
 				"SERVER",
 				LogType::LOG_INFO);
 
-			unlock_m(m_blacklistedKeywords);
 			return false;
 		}
 
@@ -859,11 +1086,9 @@ namespace KalaServer::Core
 				LogType::LOG_ERROR,
 				2);
 
-			unlock_m(m_blacklistedKeywords);
 			return false;
 		}
 
-		unlock_m(m_blacklistedKeywords);
 		return true;
 	}
 	bool KalaServerCore::LoadBlacklistedKeywordsFromDisk(const path& targetPath)
@@ -889,7 +1114,6 @@ namespace KalaServer::Core
 	}
 
 	const vector<string>& KalaServerCore::GetBlacklistedKeywords() { return blacklistedKeywords; }
-	mutex& KalaServerCore::GetBlacklistedKeywordsMutex() { return m_blacklistedKeywords; }
 
 	void KalaServerCore::Shutdown()
 	{
@@ -904,7 +1128,75 @@ namespace KalaServer::Core
 			return;
 		}
 
-		Connect::DisconnectListener();
+		if (listenerSocket.connectionSocket == NULL)
+		{
+			Log::Print(
+				"Failed to disconnect listener for server '" + string(KalaServerCore::GetServerName()) + "' because the server has no listener socket!",
+				"LISTENER_DISCONNECT",
+				LogType::LOG_WARNING);
+
+			return;
+		}
+
+		ksocket ls = 
+#ifdef _WIN32
+			ToVar<SOCKET>(listenerSocket.connectionSocket);
+#else
+			ToVar<int>(listenerSocket.connectionSocket);
+#endif
+
+		if (ls == UNASSIGNED_SOCKET_VALUE)
+		{
+			Log::Print(
+				"Failed to disconnect listener for server '" + string(KalaServerCore::GetServerName()) + "' because the server has not assigned a listener socket!",
+				"LISTENER_DISCONNECT",
+				LogType::LOG_WARNING);
+
+			return;
+		}
+
+		listenerSocket.isRunning = false;
+
+#ifdef _WIN32
+		ksocket thisls = ToVar<SOCKET>(listenerSocket.connectionSocket);
+		if (thisls != invalid_socket)
+		{
+			shutdown(thisls, SD_BOTH);
+			closesocket(thisls);
+		}
+#else
+		ksocket thisls = ToVar<int>(listenerSocket.connectionSocket);
+		if (thisls != invalid_socket)
+		{
+			shutdown(thisls, SHUT_RDWR);
+			close(thisls);
+		}
+#endif
+
+		vector<Connection> cconnects{};
+
+		cconnects = std::move(connectSockets);
+
+		for (auto& conn : cconnects)
+		{
+			conn.isRunning = false;
+
+#ifdef _WIN32
+			ksocket cs = ToVar<SOCKET>(conn.connectionSocket);
+			if (cs != invalid_socket)
+			{
+				shutdown(cs, SD_BOTH);
+				closesocket(cs);
+			}
+#else
+			ksocket cs = ToVar<int>(conn.connectionSocket);
+			if (cs != invalid_socket)
+			{
+				shutdown(cs, SHUT_RDWR);
+				close(cs);
+			}
+#endif
+		}
 		
 #ifdef _WIN32
 		if (startedWSA)

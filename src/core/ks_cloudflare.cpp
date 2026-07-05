@@ -298,6 +298,36 @@ namespace KalaServer::Core
 
 	bool Cloudflare::IsInitialized() { return isInitialized; }
 
+	bool Cloudflare::IsHealthy()
+	{
+		if (!KalaServerCore::IsInitialized())
+		{
+			Log::Print(
+				"Cannot check Cloudflare health because server '" + string(KalaServerCore::GetServerName()) + "' has not been initialized!",
+				"CLOUDFLARE_HEALTH_CHECK",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		if (!isInitialized)
+		{
+			Log::Print(
+				"Cannot check Cloudflare health because it has not been initialized!",
+				"CLOUDFLARE_HEALTH_CHECK",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		return KalaServerCore::IsCloudflareRequired()
+			? IsTunnelAlive()
+			&& IsTunnelHealthy()
+			: true;
+	}
+
 	void Cloudflare::Shutdown()
 	{
 		if (!KalaServerCore::IsInitialized())

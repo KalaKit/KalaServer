@@ -8,12 +8,10 @@
 #include <string>
 #include <filesystem>
 #include <vector>
+#include <unordered_map>
 #include <chrono>
 
 #include "core_utils.hpp"
-#include "thread_utils.hpp"
-
-#include "core/ks_cloudflare.hpp"
 
 namespace KalaServer::Core
 {
@@ -21,11 +19,10 @@ namespace KalaServer::Core
 	using std::string_view;
 	using std::filesystem::path;
 	using std::vector;
+	using std::unordered_map;
 	using std::chrono::steady_clock;
 
-	using KalaHeaders::KalaThread::abool;
-	using KalaHeaders::KalaThread::mutex;
-
+	using u8 = uint8_t;
 	using u16 = uint16_t;
 	using u32 = uint32_t;
 
@@ -33,6 +30,33 @@ namespace KalaServer::Core
 	constexpr u16 MIN_PORT_RANGE = 1u;
 	//Maximum port, cannot go past 16-bit unsigned integer TCP and UDP port fields
 	constexpr u16 MAX_PORT_RANGE = 65535u;
+
+	//How long is a user by IP timed out for in minutes
+	//when violating max payload size or min packet spacing
+	constexpr u8 TIME_OUT_PERIOD_M = 10u;
+
+	//How long in seconds do we store all connections and check if the connected IP
+	//has connected faster than MIN_PACKET_SPACING within this time period
+	constexpr u8 ROLLING_WINDOW_TIMER_S = 5u;
+	//Whats the shortest allowed time in milliseconds that a client
+	//is allowed to have between each connection attempt
+	constexpr u8 MIN_PACKET_SPACING_MS = 200u;
+
+	//Wait for this amount of seconds before deeming the connection as inactive.
+	constexpr u16 ACCEPT_WAIT_TIME_S = 60u;
+
+	//Client must not exceed this max payload capacity in bytes at accept loop
+	constexpr u16 MAX_TOTAL_PAYLOAD_SIZE_BYTES = 8192u;
+
+	//Unreachable socket value for unassigned socket
+	constexpr u32 UNASSIGNED_SOCKET_VALUE = 1000000u;
+
+	//All further connect sockets are closed if this amount of total connections is reached
+	constexpr u16 MAX_ACTIVE_CONNECTIONS = 1000u;
+
+	//Wait this many seconds to wait before allowing real health socket to check for server health,
+	//otherwise return cached value 
+	constexpr u8 SERVER_HEALTH_WAIT_S = 10;
 
 	struct LIB_API DomainRoute
 	{
@@ -49,6 +73,31 @@ namespace KalaServer::Core
 
 		//Leave unassigned to mark as permanent ban
 		steady_clock::time_point expiresAt{};
+	};
+
+	//The data received from an accepted socket ready to be parsed
+	struct LIB_API RequestData
+	{
+		string method{};
+		string httpVersion{};
+		DomainRoute domainRoute{};
+		unordered_map<string, string> headers{};
+		string body{};
+	};
+
+	//Any inbound or outbound socket and its data regardless of origin or destination,
+	//connectionSocket will not be filled if it belongs to an
+	//outgoing packet created by the server via SendPacketLocal
+	struct LIB_API Connection
+	{
+		bool isRunning{};
+
+		string connectionIP{};
+		DomainRoute connectionRoute{};
+
+		uintptr_t connectionSocket = UNASSIGNED_SOCKET_VALUE;
+
+		RequestData requestData{};
 	};
 
 	class LIB_API KalaServerCore
@@ -83,7 +132,8 @@ namespace KalaServer::Core
 		//Returns true if this server instance has been initialized successfully
 		static bool IsInitialized();
 
-		//The core update loop for the server
+		//Process incoming requests,
+		//should be ran once per frame
 		static void Update();
 
 		//Returns true if the server Cloudflare backend has been initialized successfully,
@@ -96,15 +146,18 @@ namespace KalaServer::Core
 		//Returns true if this process can reach http://1.1.1.1 on port 53
 		static bool HasInternet();
 
-		//Returns false if server cannot connect to google.com
-		//or if cloudflare tunnel is not healthy if cloudflare is required
-		static bool IsHealthy();
-
 		static string_view GetServerName();
 		static const path& GetServerRoot();
 		static const vector<string>& GetServerDomains();
 		static string_view GetServerIP();
 		static u16 GetServerPort();
+
+		static const Connection& GetListenerSocket();
+
+		const vector<Connection> GetConnectSockets();
+
+		static void DisconnectConnectedUser(uintptr_t targetSocket);
+		static void DisconnectConnectedUser(string_view targetIP);
 
 		//Does this IP match any valid ipv4 or ipv6 structure
 		static bool IsValidIP(string_view targetIP);
@@ -119,11 +172,8 @@ namespace KalaServer::Core
 		//Loads all saved banned ips and appends to current list, duplicates are skipped
 		static bool LoadBannedIPsFromDisk(const path& targetPath);
 
-		//Returns mutable ref to existing banned IPs
+		//Lists banned IPs
 		static const vector<BannedIP>& GetBannedIPs();
-
-		//Returns the mutex that must be used for all the getters and setters for banned IPs
-		static mutex& GetBannedIPsMutex();
 
 		//Add new route, cannot add add duplicates if domain+route matches,
 		//cannot add routes if their path matches any existing route path of the same domain
@@ -136,11 +186,8 @@ namespace KalaServer::Core
 		//Loads all saved routes and appends to current list, duplicates are skipped
 		static bool LoadRoutesFromDisk(const path& targetPath);
 
-		//Returns mutable ref to existing routes
+		//Lists existing routes
 		static const vector<DomainRoute>& GetRoutes();
-
-		//Returns the mutex that must be used for all the getters and setters for routes
-		static mutex& GetRoutesMutex();
 
 		//Add new blacklisted keyword, cannot add duplicates
 		static bool AddBlacklistedKeyword(string_view newKeyword);
@@ -152,11 +199,8 @@ namespace KalaServer::Core
 		//Loads all saved blacklisted keywords and appends to current list, duplicates are skipped
 		static bool LoadBlacklistedKeywordsFromDisk(const path& targetPath);
 
-		//Returns mutable ref to existing blacklisted keywords
+		//Lists blacklisted keywords
 		static const vector<string>& GetBlacklistedKeywords();
-
-		//Returns the mutex that must be used for all the getters and setters for blacklisted keywords
-		static mutex& GetBlacklistedKeywordsMutex();
 
 		//Close all sockets and clear all server resources
 		static void Shutdown();

@@ -6,20 +6,17 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "core_utils.hpp"
-#include "thread_utils.hpp"
-
-#include "core/ks_connect.hpp"
 
 namespace KalaServer::Core
 {
     using std::string;
     using std::string_view;
+    using std::vector;
 
     using u8 = uint8_t;
-
-    using KalaHeaders::KalaThread::auptr;
 
     enum class OptionalSendType : u8
     {
@@ -197,6 +194,9 @@ namespace KalaServer::Core
         CT_OCTET = 39u
     };
 
+    //forward-declare ks_core.hpp Connection struct
+	struct Connection;
+
     //Who receives what response
     struct LIB_API ResponseData
     {
@@ -211,7 +211,7 @@ namespace KalaServer::Core
         string responseBody{};
 
         Connection* connection{};
-        auptr connectionSocket{};
+        uintptr_t connectionSocket{};
     };
 
     class LIB_API Response
