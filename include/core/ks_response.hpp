@@ -10,9 +10,9 @@
 #include "core_utils.hpp"
 #include "thread_utils.hpp"
 
-#include "server/ks_connect.hpp"
+#include "core/ks_connect.hpp"
 
-namespace KalaServer::Server
+namespace KalaServer::Core
 {
     using std::string;
     using std::string_view;

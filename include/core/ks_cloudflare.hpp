@@ -11,7 +11,7 @@
 
 #include "core_utils.hpp"
 
-namespace KalaServer::Server
+namespace KalaServer::Core
 {
 	using std::filesystem::path;
 	using std::string_view;
@@ -21,7 +21,7 @@ namespace KalaServer::Server
 
 	class LIB_API Cloudflare
 	{
-	friend class ServerCore;
+	friend class KalaServerCore;
 	public:
 		static void SetVerboseLoggingState(bool state);
 

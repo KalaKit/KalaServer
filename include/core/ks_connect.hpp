@@ -12,9 +12,10 @@
 
 #include "core_utils.hpp"
 #include "thread_utils.hpp"
-#include "server/ks_server.hpp"
 
-namespace KalaServer::Server
+#include "core/ks_core.hpp"
+
+namespace KalaServer::Core
 {
     using std::string;
     using std::string_view;

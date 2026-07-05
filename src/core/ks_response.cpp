@@ -18,9 +18,8 @@
 #include "core_utils.hpp"
 #include "log_utils.hpp"
 
-#include "server/ks_response.hpp"
-#include "server/ks_connect.hpp"
-#include "server/ks_server.hpp"
+#include "core/ks_response.hpp"
+#include "core/ks_connect.hpp"
 #include "core/ks_core.hpp"
 
 using KalaHeaders::KalaCore::ToVar;
@@ -29,11 +28,11 @@ using KalaHeaders::KalaCore::RemoveDuplicates;
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
-using KalaServer::Server::ResponseData;
-using KalaServer::Server::ResponseType;
-using KalaServer::Server::ContentType;
-using KalaServer::Server::OptionalSendType;
-using KalaServer::Server::Response;
+using KalaServer::Core::ResponseData;
+using KalaServer::Core::ResponseType;
+using KalaServer::Core::ContentType;
+using KalaServer::Core::OptionalSendType;
+using KalaServer::Core::Response;
 using KalaServer::Core::KalaServerCore;
 
 using std::unordered_map;
@@ -51,7 +50,7 @@ const string response_missing =
 
 static void Send(const ResponseData& data);
 
-namespace KalaServer::Server
+namespace KalaServer::Core
 {
     static const unordered_map<OptionalSendType, string_view> optionalSendTypes
     {
@@ -141,7 +140,7 @@ namespace KalaServer::Server
 
     void Response::SendResponse(const ResponseData& data)
     {
-        if (!ServerCore::IsReady())
+        if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
 				"Failed to send response because the server is not running or not ready!",

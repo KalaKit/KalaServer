@@ -29,10 +29,9 @@
 #include "thread_utils.hpp"
 #include "string_utils.hpp"
 
-#include "server/ks_connect.hpp"
-#include "server/ks_server.hpp"
-#include "server/ks_cloudflare.hpp"
-#include "server/ks_response.hpp"
+#include "core/ks_connect.hpp"
+#include "core/ks_cloudflare.hpp"
+#include "core/ks_response.hpp"
 #include "core/ks_core.hpp"
 
 using KalaHeaders::KalaCore::FromVar;
@@ -51,9 +50,9 @@ using KalaHeaders::KalaString::TrimString;
 using KalaHeaders::KalaString::ToLowerString;
 using KalaHeaders::KalaString::ToUpperString;
 
-using KalaServer::Server::Response;
-using KalaServer::Server::Connection;
-using KalaServer::Server::ResponseType;
+using KalaServer::Core::Response;
+using KalaServer::Core::Connection;
+using KalaServer::Core::ResponseType;
 using KalaServer::Core::KalaServerCore;
 
 using std::memory_order_acquire;
@@ -117,7 +116,7 @@ static string ReturnErrorBody(string_view error, ResponseType type)
 		"</body></html>";
 }
 
-namespace KalaServer::Server
+namespace KalaServer::Core
 {
 	static unique_ptr<Connection> listenerSocket{};
 	static mutex m_listenerSocket{};
@@ -127,7 +126,7 @@ namespace KalaServer::Server
 
 	bool Connect::CreateListenerSocket()
 	{
-		if (!ServerCore::IsReady())
+		if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
 				"Failed to create new listener socket for server because the server is not running or not ready!",
@@ -141,7 +140,7 @@ namespace KalaServer::Server
 		if (TIME_OUT_PERIOD_M == 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the TIME_OUT_PERIOD_M value was set to 0!",
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the TIME_OUT_PERIOD_M value was set to 0!",
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -151,7 +150,7 @@ namespace KalaServer::Server
 		if (ROLLING_WINDOW_TIMER_S == 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the ROLLING_WINDOW_TIMER_S value was set to 0!",
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the ROLLING_WINDOW_TIMER_S value was set to 0!",
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -161,7 +160,7 @@ namespace KalaServer::Server
 		if (MIN_PACKET_SPACING_MS == 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the MIN_PACKET_SPACING_MS value was set to 0!",
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the MIN_PACKET_SPACING_MS value was set to 0!",
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -171,7 +170,7 @@ namespace KalaServer::Server
 		if (ACCEPT_WAIT_TIME_S == 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the ACCEPT_WAIT_TIME_S value was set to 0!",
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the ACCEPT_WAIT_TIME_S value was set to 0!",
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -181,7 +180,7 @@ namespace KalaServer::Server
 		if (MAX_TOTAL_PAYLOAD_SIZE_BYTES == 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the MAX_TOTAL_PAYLOAD_SIZE_BYTES value was set to 0!",
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the MAX_TOTAL_PAYLOAD_SIZE_BYTES value was set to 0!",
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -191,7 +190,7 @@ namespace KalaServer::Server
 		if (UNASSIGNED_SOCKET_VALUE < 8192)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the UNASSIGNED_SOCKET_VALUE value was set below 8192!",
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the UNASSIGNED_SOCKET_VALUE value was set below 8192!",
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -201,7 +200,7 @@ namespace KalaServer::Server
 		if (MAX_ACTIVE_CONNECTIONS == 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the MAX_ACTIVE_CONNECTIONS value was set to 0!",
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the MAX_ACTIVE_CONNECTIONS value was set to 0!",
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -210,7 +209,7 @@ namespace KalaServer::Server
 		}
 
 		Log::Print(
-			"Creating a new listener socket for server '" + string(ServerCore::GetServerName()) + "'!",
+			"Creating a new listener socket for server '" + string(KalaServerCore::GetServerName()) + "'!",
 			"LISTENER_INIT",
 			LogType::LOG_INFO);
 
@@ -231,7 +230,7 @@ namespace KalaServer::Server
 			if (readls != UNASSIGNED_SOCKET_VALUE)
 			{
 				Log::Print(
-					"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because the server already has a listener socket!",
+					"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because the server already has a listener socket!",
 					"LISTENER_INIT",
 					LogType::LOG_ERROR,
 					2);
@@ -256,7 +255,7 @@ namespace KalaServer::Server
 		if (listener == INVALID_SOCKET)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -267,7 +266,7 @@ namespace KalaServer::Server
 		sockaddr_in serverAddress{};
 		serverAddress.sin_family = AF_INET;
 		serverAddress.sin_addr.s_addr = INADDR_ANY;
-		serverAddress.sin_port = htons(ServerCore::GetServerPort());
+		serverAddress.sin_port = htons(KalaServerCore::GetServerPort());
 
 		int opt = 1;
 
@@ -297,7 +296,7 @@ namespace KalaServer::Server
 			sizeof(serverAddress)) == SOCKET_ERROR)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -310,7 +309,7 @@ namespace KalaServer::Server
 		if (listen(listener, SOMAXCONN) == SOCKET_ERROR)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()),
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -324,7 +323,7 @@ namespace KalaServer::Server
 		if (listener < 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(errno),
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because socket creation failed! Reason: " + KalaServerCore::ErrorToString(errno),
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -335,7 +334,7 @@ namespace KalaServer::Server
 		sockaddr_in serverAddress{};
 		serverAddress.sin_family = AF_INET;
 		serverAddress.sin_addr.s_addr = INADDR_ANY;
-		serverAddress.sin_port = htons(ServerCore::GetServerPort());
+		serverAddress.sin_port = htons(KalaServerCore::GetServerPort());
 
 		int opt = 1;
 
@@ -365,7 +364,7 @@ namespace KalaServer::Server
 			sizeof(serverAddress)) < 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(errno),
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because socket bind failed! Reason: " + KalaServerCore::ErrorToString(errno),
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -378,7 +377,7 @@ namespace KalaServer::Server
 		if (listen(listener, SOMAXCONN) < 0)
 		{
 			Log::Print(
-				"Failed to create new listener socket for server '" + string(ServerCore::GetServerName()) + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(errno),
+				"Failed to create new listener socket for server '" + string(KalaServerCore::GetServerName()) + "' because socket listen failed! Reason: " + KalaServerCore::ErrorToString(errno),
 				"LISTENER_INIT",
 				LogType::LOG_ERROR,
 				2);
@@ -404,13 +403,13 @@ namespace KalaServer::Server
 
 		unlock_m(m_listenerSocket);
 
-		if (serverIPDomain.empty()) serverIPDomain = string(ServerCore::GetServerIP());
+		if (serverIPDomain.empty()) serverIPDomain = string(KalaServerCore::GetServerIP());
 		if (serverIPPortDomain.empty())
 		{
 			serverIPPortDomain = 
-				string(ServerCore::GetServerIP())
+				string(KalaServerCore::GetServerIP())
 				+ ":"
-				+ to_string(ServerCore::GetServerPort());
+				+ to_string(KalaServerCore::GetServerPort());
 		}
 
 		//
@@ -418,7 +417,7 @@ namespace KalaServer::Server
 		//
 
 		Log::Print(
-			"Created a new listener socket for server '" + string(ServerCore::GetServerName()) + "', starting the listener loop!",
+			"Created a new listener socket for server '" + string(KalaServerCore::GetServerName()) + "', starting the listener loop!",
 			"LISTENER_INIT",
 			LogType::LOG_SUCCESS);
 
@@ -429,14 +428,14 @@ namespace KalaServer::Server
 					if (!localListener->isRunning.load(memory_order_acquire))
 					{
 						Log::Print(
-							"Listener socket for server '" + string(ServerCore::GetServerName()) + "' has been shut down.",
+							"Listener socket for server '" + string(KalaServerCore::GetServerName()) + "' has been shut down.",
 							"LISTENER_LOOP",
 							LogType::LOG_INFO);
 
 						return;
 					}
 
-					if (!ServerCore::IsHealthy())
+					if (!KalaServerCore::IsHealthy())
 					{
 						Log::Print(
 							"Server is not healthy, waiting until trying again.",
@@ -797,11 +796,11 @@ namespace KalaServer::Server
 					// CHECK IF IP IS NOT BANNED
 					//
 
-					mutex& m_bannedIPs = ServerCore::GetBannedIPsMutex();
+					mutex& m_bannedIPs = KalaServerCore::GetBannedIPsMutex();
 					lockwait_m(m_bannedIPs);
 
 					bool foundBannedUser{};
-					for (const auto& u : ServerCore::GetBannedIPs())
+					for (const auto& u : KalaServerCore::GetBannedIPs())
 					{
 						if (ipStr == u.targetIP)
 						{
@@ -1370,7 +1369,7 @@ namespace KalaServer::Server
 										size_t dcolon = req.domainRoute.domain.find(':');
 										if (dcolon != string::npos) req.domainRoute.domain.erase(dcolon);
 
-										for (const auto& d : ServerCore::GetServerDomains())
+										for (const auto& d : KalaServerCore::GetServerDomains())
 										{
 											if (req.domainRoute.domain == d)
 											{
@@ -1413,16 +1412,16 @@ namespace KalaServer::Server
 
 									if (!req.domainRoute.route.starts_with('/')) req.domainRoute.route.insert(req.domainRoute.route.begin(), '/');
 
-									mutex& m_routes = ServerCore::GetRoutesMutex();
-									mutex& m_blacklistedKeywords = ServerCore::GetBlacklistedKeywordsMutex();
+									mutex& m_routes = KalaServerCore::GetRoutesMutex();
+									mutex& m_blacklistedKeywords = KalaServerCore::GetBlacklistedKeywordsMutex();
 
 									lockwait_m(m_routes);
 									lockwait_m(m_blacklistedKeywords);
 
-									const vector<DomainRoute>& routes = ServerCore::GetRoutes();
+									const vector<DomainRoute>& routes = KalaServerCore::GetRoutes();
 
 									string blacklistedKeyword{};
-									for (const auto& b : ServerCore::GetBlacklistedKeywords())
+									for (const auto& b : KalaServerCore::GetBlacklistedKeywords())
 									{
 										if (req.domainRoute.route.find(b) != string::npos)
 										{
@@ -1432,7 +1431,7 @@ namespace KalaServer::Server
 									}
 									if (!blacklistedKeyword.empty())
 									{
-										ServerCore::BanIP(raw->connectionIP);
+										KalaServerCore::BanIP(raw->connectionIP);
 
 										Log::Print(
 											"[ " + raw->connectionIP + " ] User was banned for trying to access route via blacklisted keyword '" + blacklistedKeyword + "'",
@@ -1566,10 +1565,10 @@ namespace KalaServer::Server
 
 	void Connect::DisconnectConnectedUser(uintptr_t targetSocket)
 	{
-		if (!ServerCore::IsReady())
+		if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to disconnect target via socket for server '" + string(ServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -1587,7 +1586,7 @@ namespace KalaServer::Server
 		if (target == invalid_socket)
 		{
 			Log::Print(
-				"Failed to disconnect target via socket for server '" + string(ServerCore::GetServerName()) + "' because the socket is unassigned or invalid!",
+				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the socket is unassigned or invalid!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -1620,7 +1619,7 @@ namespace KalaServer::Server
 		if (targetUser == nullptr)
 		{
 			Log::Print(
-				"Failed to disconnect target via socket for server '" + string(ServerCore::GetServerName()) + "' because the target socket was not found!",
+				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the target socket was not found!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -1649,17 +1648,17 @@ namespace KalaServer::Server
 		if (targetUser->connectionThread.joinable()) targetUser->connectionThread.join();
 
 		Log::Print(
-			"Disconnected target via socket for server '" + string(ServerCore::GetServerName()) + "'!",
+			"Disconnected target via socket for server '" + string(KalaServerCore::GetServerName()) + "'!",
 			"DISCONNECT_TARGET",
 			LogType::LOG_SUCCESS);
 	}
 
 	void Connect::DisconnectConnectedUser(string_view targetIP)
 	{
-		if (!ServerCore::IsReady())
+		if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(ServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -1667,10 +1666,10 @@ namespace KalaServer::Server
 			return;
 		}
 
-		if (!ServerCore::IsValidIP(targetIP))
+		if (!KalaServerCore::IsValidIP(targetIP))
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(ServerCore::GetServerName()) + "' because the IP structure is invalid!",
+				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the IP structure is invalid!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -1698,7 +1697,7 @@ namespace KalaServer::Server
 		if (targetUser == nullptr)
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(ServerCore::GetServerName()) + "' because the target IP was not found!",
+				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the target IP was not found!",
 				"DISCONNECT_TARGET",
 				LogType::LOG_ERROR,
 				2);
@@ -1727,17 +1726,17 @@ namespace KalaServer::Server
 		if (targetUser->connectionThread.joinable()) targetUser->connectionThread.join();
 
 		Log::Print(
-			"Disconnected target via IP '" + string(targetIP) + "' for server '" + string(ServerCore::GetServerName()) + "'!",
+			"Disconnected target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "'!",
 			"DISCONNECT_TARGET",
 			LogType::LOG_SUCCESS);
 	}
 
 	void Connect::DisconnectListener()
 	{
-		if (!ServerCore::IsReady())
+		if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to disconnect listener for server '" + string(ServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				"Failed to disconnect listener for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
 				"LISTENER_DISCONNECT",
 				LogType::LOG_ERROR,
 				2);
@@ -1748,7 +1747,7 @@ namespace KalaServer::Server
 		if (!listenerSocket)
 		{
 			Log::Print(
-				"Failed to disconnect listener for server '" + string(ServerCore::GetServerName()) + "' because the server has no listener socket!",
+				"Failed to disconnect listener for server '" + string(KalaServerCore::GetServerName()) + "' because the server has no listener socket!",
 				"LISTENER_DISCONNECT",
 				LogType::LOG_WARNING);
 
@@ -1765,7 +1764,7 @@ namespace KalaServer::Server
 		if (ls == UNASSIGNED_SOCKET_VALUE)
 		{
 			Log::Print(
-				"Failed to disconnect listener for server '" + string(ServerCore::GetServerName()) + "' because the server has not assigned a listener socket!",
+				"Failed to disconnect listener for server '" + string(KalaServerCore::GetServerName()) + "' because the server has not assigned a listener socket!",
 				"LISTENER_DISCONNECT",
 				LogType::LOG_WARNING);
 
@@ -1828,7 +1827,7 @@ namespace KalaServer::Server
 		}
 
 		Log::Print(
-			"Disconnected listener socket for server '" + string(ServerCore::GetServerName()) + "'!",
+			"Disconnected listener socket for server '" + string(KalaServerCore::GetServerName()) + "'!",
 			"LISTENER_DISCONNECT",
 			LogType::LOG_SUCCESS);
 	}
