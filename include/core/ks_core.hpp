@@ -54,6 +54,9 @@ namespace KalaServer::Core
 	//All further connect sockets are closed if this amount of total connections is reached
 	constexpr u16 MAX_ACTIVE_CONNECTIONS = 1000u;
 
+	//How many connections are allowed in one frame
+	constexpr u8 MAX_CONNECTIONS_PER_FRAME = 10u;
+
 	//Wait this many seconds to wait before allowing real health socket to check for server health,
 	//otherwise return cached value 
 	constexpr u8 SERVER_HEALTH_WAIT_S = 10;
@@ -91,12 +94,12 @@ namespace KalaServer::Core
 	struct LIB_API Connection
 	{
 		bool isRunning{};
-
 		string connectionIP{};
-		DomainRoute connectionRoute{};
-
 		uintptr_t connectionSocket = UNASSIGNED_SOCKET_VALUE;
 
+		//unparsed data
+		string partialBuffer{};
+		//parsed data
 		RequestData requestData{};
 	};
 
@@ -121,7 +124,7 @@ namespace KalaServer::Core
 		//Server port is the local TCP port this server binds to and listens on.
 		//Set requireCloudflare to false if you dont want to use Cloudflare tunnel,
 		//otherwise it must be enabled before any connections are accepted.
-		static bool Initialize(
+		static void Initialize(
 			string_view serverName,
 			const path& serverRoot,
 			vector<string> serverDomains,
@@ -154,7 +157,7 @@ namespace KalaServer::Core
 
 		static const Connection& GetListenerSocket();
 
-		const vector<Connection> GetConnectSockets();
+		const vector<Connection>& GetConnectSockets();
 
 		static void DisconnectConnectedUser(uintptr_t targetSocket);
 		static void DisconnectConnectedUser(string_view targetIP);

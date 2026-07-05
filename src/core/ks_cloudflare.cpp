@@ -12,7 +12,6 @@
 #include <errno.h>
 #endif
 
-#include <atomic>
 #include <filesystem>
 #include <string>
 #include <array>
@@ -36,8 +35,6 @@ using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
 using KalaHeaders::KalaThread::joinable_thread;
-using KalaHeaders::KalaThread::abool;
-using KalaHeaders::KalaThread::memory_order_relaxed;
 
 using KalaHeaders::KalaString::SplitString;
 
@@ -62,7 +59,7 @@ using std::ios;
 using std::wstring;
 #endif
 
-static abool isVerboseLoggingEnabled{ false };
+static bool isVerboseLoggingEnabled{ false };
 
 static string validTunnelName{};
 static path validCFExePath{};
@@ -142,7 +139,7 @@ namespace KalaServer::Core
 	static bool isThirdHealthy{};
 	static bool isFourthHealthy{};
 
-	void Cloudflare::SetVerboseLoggingState(bool state) { isVerboseLoggingEnabled.store(state, memory_order_relaxed); }
+	void Cloudflare::SetVerboseLoggingState(bool state) { isVerboseLoggingEnabled = state; }
 
 	bool Cloudflare::Initialize(
 		string_view tunnelName,
@@ -153,7 +150,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot initialize server Cloudflare tunnel because the server is not running or not ready!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -162,14 +159,14 @@ namespace KalaServer::Core
 
 		Log::Print(
 			"Starting to initialize server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel '" + string(tunnelName) + "'",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 
 		if (Cloudflare::IsInitialized())
 		{
 			Log::Print(
 				"Cannot initialize server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel because it has already been initialized!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -180,7 +177,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot initialize server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel because its name cannot be empty!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -190,7 +187,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot initialize server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel because its name '" + string(tunnelName) + "' is too short!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -200,7 +197,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot initialize server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel because its name '" + string(tunnelName) + "' is too long!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -213,7 +210,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot initialize server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel because its exe path '" + cfExePath.string() + "' does not exist!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -223,7 +220,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot initialize server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel because its folder path '" + cfFolderPath.string() + "' does not exist!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -238,7 +235,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel cert file already exists at '" + cfCertFile.string() + "', skipping creation and using existing one.",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_INFO);
 		}
 		else
@@ -258,7 +255,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel json file already exists at '" + cfJsonFile.string() + "', skipping creation and using existing one.",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_INFO);
 		}
 		else
@@ -280,7 +277,7 @@ namespace KalaServer::Core
 
 		Log::Print(
 			"Initialized server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel '" + validTunnelName + "' and starting run process.",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 
 		cfThread = joinable_thread([command]()
@@ -438,7 +435,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to create server '" + string(KalaServerCore::GetServerName()) + "' read/write pipe for tunnel '" + validTunnelName + "'!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -451,7 +448,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to set up server '" + string(KalaServerCore::GetServerName()) + "' pipe handle inheritance for tunnel '" + validTunnelName + "'!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -466,7 +463,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to create server '" + string(KalaServerCore::GetServerName()) + "' read/write pipe for tunnel '" + validTunnelName + "'!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -482,7 +479,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to set up server '" + string(KalaServerCore::GetServerName()) + "' pipe handle inheritance for tunnel '" + validTunnelName + "'!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -507,11 +504,11 @@ namespace KalaServer::Core
 
 	void Cloudflare::PipeCloudflareMessages(uintptr_t readPipe)
 	{
-		if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+		if (isVerboseLoggingEnabled)
 		{
 			Log::Print(
 				"Piping server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare messages to internal console for tunnel '" + validTunnelName + "'!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_INFO);
 		}
 
@@ -566,7 +563,7 @@ namespace KalaServer::Core
 
 					Log::Print(
 						"Server '" + string(KalaServerCore::GetServerName()) + "' connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked healthy!",
-						"CLOUDFLARE",
+						"KS_CLOUDFLARE",
 						LogType::LOG_INFO);
 
 					if (isFirstHealthy
@@ -579,7 +576,7 @@ namespace KalaServer::Core
 
 						Log::Print(
 							"Server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel '" + validTunnelName + "' has connected successfully and server '" + string(KalaServerCore::GetServerName()) + "' is ready!",
-							"CLOUDFLARE",
+							"KS_CLOUDFLARE",
 							LogType::LOG_SUCCESS);
 					}
 				}
@@ -596,14 +593,14 @@ namespace KalaServer::Core
 
 					Log::Print(
 						"Server '" + string(KalaServerCore::GetServerName()) + "' connection '" + to_string(index) + "' for tunnel '" + validTunnelName + "' has been marked unhealthy.",
-						"CLOUDFLARE",
+						"KS_CLOUDFLARE",
 						LogType::LOG_WARNING);
 				}
 
 				//regular cloudflare message
 
 				if (line.size() < 28
-					&& isVerboseLoggingEnabled.load(memory_order_relaxed))
+					&& isVerboseLoggingEnabled)
 				{
 					Log::Print(
 						line,
@@ -629,9 +626,7 @@ namespace KalaServer::Core
 				debugEnabled = true;
 #endif
 
-				bool verbose = isVerboseLoggingEnabled.load(memory_order_relaxed);
-
-				if (verbose
+				if (isVerboseLoggingEnabled
 					|| type == LogType::LOG_ERROR
 					|| (type == LogType::LOG_DEBUG
 					&& debugEnabled))
@@ -738,12 +733,12 @@ namespace KalaServer::Core
 
 bool CreateCertFile()
 {
-	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+	if (isVerboseLoggingEnabled)
 	{
 		Log::Print(
 			"Creating new Cloudflare tunnel cert file for server '" + string(KalaServerCore::GetServerName()) + "' tunnel '" + validTunnelName + "' at '" + cfCertFile.string() + "'. "
 			"A browser window or tab will now open for authentication. Do not close it until you've successfully authenticated.",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
 
@@ -758,7 +753,7 @@ bool CreateCertFile()
 	{
 		Log::Print(
 			"Failed to create Cloudflare cert for server '" + string(KalaServerCore::GetServerName()) + "' tunnel '" + validTunnelName + "' because user did not successfully authenticate via browser!",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_ERROR,
 			2);
 
@@ -773,11 +768,11 @@ bool CreateTunnelCredentials()
 	cfTunnelID = GetTunnelID(validTunnelName);
 	cfJsonFile = (validCFFolderPath / string(cfTunnelID + ".json"));
 
-	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+	if (isVerboseLoggingEnabled)
 	{
 		Log::Print(
 			"Creating server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel credentials.",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
 
@@ -792,7 +787,7 @@ bool CreateTunnelCredentials()
 
 		Log::Print(
 			"Deleted existing Cloudflare tunnel '" + validTunnelName + "'.",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
 
@@ -809,7 +804,7 @@ bool CreateTunnelCredentials()
 	{
 		Log::Print(
 			"Failed to create server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "' because newly created tunnel ID was not found!!",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_ERROR,
 			2);
 
@@ -822,7 +817,7 @@ bool CreateTunnelCredentials()
 	{
 		Log::Print(
 			"Failed to create server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare json file '" + cfJsonFile.string() + "' for tunnel '" + validTunnelName + "'!",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_ERROR,
 			2);
 
@@ -831,7 +826,7 @@ bool CreateTunnelCredentials()
 
 	Log::Print(
 		"Created new server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare json file at '" + cfJsonFile.string() + "'!",
-		"CLOUDFLARE",
+		"KS_CLOUDFLARE",
 		LogType::LOG_SUCCESS);
 
 	return true;
@@ -839,11 +834,11 @@ bool CreateTunnelCredentials()
 
 bool RouteTunnel()
 {
-	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+	if (isVerboseLoggingEnabled)
 	{
 		Log::Print(
 			"Starting to route server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel '" + validTunnelName + "'.",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
 
@@ -874,7 +869,7 @@ bool RouteTunnel()
 
 	Log::Print(
 		"Routed server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare tunnel '" + validTunnelName + "'!",
-		"CLOUDFLARE",
+		"KS_CLOUDFLARE",
 		LogType::LOG_SUCCESS);
 
 	return true;
@@ -885,11 +880,11 @@ bool CreateConfigFile(string& outCommand)
 	path certPath = validCFFolderPath / "cert.pem";
 	path configPath = validCFFolderPath / "config.yml";
 
-	if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+	if (isVerboseLoggingEnabled)
 	{
 		Log::Print(
 			"Starting to create server '" + string(KalaServerCore::GetServerName()) + "' config file '" + configPath.string() + "'.",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
 
@@ -930,7 +925,7 @@ bool CreateConfigFile(string& outCommand)
 		{
 			Log::Print(
 				"Failed to check contents of server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' to verify if it is up to date!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -950,21 +945,21 @@ bool CreateConfigFile(string& outCommand)
 	{
 		if (!exists(configPath))
 		{
-			if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+			if (isVerboseLoggingEnabled)
 			{
 				Log::Print(
 					"Server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' does not exist and will be made.",
-					"CLOUDFLARE",
+					"KS_CLOUDFLARE",
 					LogType::LOG_INFO);
 			}
 		}
 		else
 		{
-			if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+			if (isVerboseLoggingEnabled)
 			{
 				Log::Print(
 					"Server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "' is out of date and will be rewritten.",
-					"CLOUDFLARE",
+					"KS_CLOUDFLARE",
 					LogType::LOG_INFO);
 			}
 		}
@@ -975,7 +970,7 @@ bool CreateConfigFile(string& outCommand)
 		{
 			Log::Print(
 				"Failed to create server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare config file to '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -988,7 +983,7 @@ bool CreateConfigFile(string& outCommand)
 		{
 			Log::Print(
 				"Failed to write into newly created server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare config file '" + configPath.string() + "' for tunnel '" + validTunnelName + "'!",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -1001,7 +996,7 @@ bool CreateConfigFile(string& outCommand)
 	{
 		Log::Print(
 			"Server '" + string(KalaServerCore::GetServerName()) + "' Cloudflare config file already exists at '" + configPath.string() + "', skipping creation and using existing one.",
-			"CLOUDFLARE",
+			"KS_CLOUDFLARE",
 			LogType::LOG_INFO);
 	}
 
@@ -1026,11 +1021,11 @@ bool CreateCloudflareProcess(
 		string_view failureReason,
 		uintptr_t writePipe)
 	{
-		if (isVerboseLoggingEnabled.load(memory_order_relaxed))
+		if (isVerboseLoggingEnabled)
 		{
 			Log::Print(
 				"Starting to create server '" + string(KalaServerCore::GetServerName()) + "' process with command '" + string(command) + "' for tunnel '" + validTunnelName + "'",
-				"CLOUDFLARE",
+				"KS_CLOUDFLARE",
 				LogType::LOG_INFO);
 		}
 

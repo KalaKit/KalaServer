@@ -5,7 +5,11 @@
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
+#include <ws2ipdef.h>
+#include <winsock.h>
 #include <winsock2.h>
+#include <minwindef.h>
+#include <winerror.h>
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -32,6 +36,7 @@
 #include "core/ks_response.hpp"
 
 using KalaHeaders::KalaCore::ToVar;
+using KalaHeaders::KalaCore::FromVar;
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -82,6 +87,12 @@ constexpr ksocket invalid_socket = INVALID_SOCKET;
 constexpr ksocket invalid_socket = -1;
 #endif
 
+#ifdef _WIN32
+#define kclose(sock) closesocket((SOCKET)(sock))
+#else
+#define kclose(sock) close((int)(sock))
+#endif
+
 static bool isInitialized{};
 static bool isReady{};
 
@@ -97,9 +108,6 @@ static path serverRoot{};
 static vector<string> serverDomains{};
 static string serverIP{};
 static u16 serverPort{};
-
-static string serverIPDomain{};
-static string serverIPPortDomain{};
 
 static Connection listenerSocket{};
 static vector<Connection> connectSockets{};
@@ -122,7 +130,7 @@ constexpr array<string_view, 8> allowedDuplicateHeaders
 
 constexpr string_view response_success = 
 	"<html><body>\n"
-	"    <h1>linux webserver lul</h1>\n"
+	"    <h1>custom webserver lul</h1>\n"
 	"        <p><a href=\"https://github.com/Lost-Empire-Entertainment/Websites\">\n"
 	"            Check out the Website source code</a></p>\n"
 	"        <p><a href=\"https://github.com/KalaKit/KalaServer\">\n"
@@ -227,7 +235,7 @@ namespace KalaServer::Core
 #endif
 	}
 
-	bool KalaServerCore::Initialize(
+	void KalaServerCore::Initialize(
 		string_view newServerName,
 		const path& newServerRoot,
 		vector<string> newServerDomains,
@@ -237,41 +245,29 @@ namespace KalaServer::Core
 	{
 		Log::Print(
 			"Starting to initialize server '" + string(newServerName) + "'.",
-			"SERVER",
+			"KS_CORE",
 			LogType::LOG_INFO);
 
 		if (newServerName.empty()
 			|| newServerName.length() > 50)
 		{
-			Log::Print(
-				"Failed to initialize server because its name is empty or too long!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			ForceClose(
+				"Server init error",
+				"Failed to initialize server because its name is empty or too long!");
 		}
 
 		if (!exists(newServerRoot))
 		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because its server root '" + newServerRoot.string() + "' is empty or does not exist!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			ForceClose(
+				"Server init error",
+				"Failed to initialize server '" + string(newServerName) + "' because its server root '" + newServerRoot.string() + "' is empty or does not exist!");
 		}
 
 		if (newServerDomains.empty())
 		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because it has no assigned domains!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			ForceClose(
+				"Server init error",
+				"Failed to initialize server '" + string(newServerName) + "' because it has no assigned domains!");
 		}
 
 		for (const auto& d : newServerDomains)
@@ -280,7 +276,7 @@ namespace KalaServer::Core
 			{
 				Log::Print(
 					"Server '" + string(newServerName) + "' did not initialize all domains because one of its assigned domains is empty!",
-					"SERVER",
+					"KS_CORE",
 					LogType::LOG_ERROR,
 					2);
 
@@ -290,7 +286,7 @@ namespace KalaServer::Core
 			{
 				Log::Print(
 					"Server '" + string(newServerName) + "' did not initialize all domains because domain '" + d + "' has no extension splitters!",
-					"SERVER",
+					"KS_CORE",
 					LogType::LOG_ERROR,
 					2);
 
@@ -302,7 +298,7 @@ namespace KalaServer::Core
 			{
 				Log::Print(
 					"Server '" + string(newServerName) + "' did not initialize all domains because domain '" + d + "' has a malformed structure!",
-					"SERVER",
+					"KS_CORE",
 					LogType::LOG_ERROR,
 					2);
 
@@ -314,46 +310,30 @@ namespace KalaServer::Core
 
 		if (MIN_PORT_RANGE == 0)
 		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because the MIN_PORT_RANGE value was set to 0!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			ForceClose(
+				"Server init error",
+				"Failed to initialize server '" + string(newServerName) + "' because the MIN_PORT_RANGE value was set to 0!");
 		}
 		if (MIN_PORT_RANGE > MAX_PORT_RANGE)
 		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because the MIN_PORT_RANGE value was set higher than the MAX_PORT_RANGE value!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			ForceClose(
+				"Server init error",
+				"Failed to initialize server '" + string(newServerName) + "' because the MIN_PORT_RANGE value was set higher than the MAX_PORT_RANGE value!");
 		}
 
 		if (newServerPort < MIN_PORT_RANGE
 			|| newServerPort > MAX_PORT_RANGE)
 		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because its port '" + to_string(newServerPort) + "' is out of range!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			ForceClose(
+				"Server init error",
+				"Failed to initialize server '" + string(newServerName) + "' because its port '" + to_string(newServerPort) + "' is out of range!");
 		}
 
 		if (!IsValidIP(newServerIP))
 		{
-			Log::Print(
-				"Failed to initialize server '" + string(newServerName) + "' because its IP '" + string(newServerIP) + "' is not a valid IP address!",
-				"SERVER",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
+			ForceClose(
+				"Server init error",
+				"Failed to initialize server '" + string(newServerName) + "' because its IP '" + string(newServerIP) + "' is not a valid IP address!");
 		}
 
 #ifdef _WIN32
@@ -364,13 +344,153 @@ namespace KalaServer::Core
 			{
 				ForceClose(
 					"Server init error",
-					"Failed to call WSASTARTUP! Error code: " + to_string(errorCode));
-
-				return false;
+					"Failed to call WSASTARTUP! Error code: " + KalaServerCore::ErrorToString(errorCode));
 			}
 			startedWSA = true;
 		}
 #endif
+
+		ksocket listener = 
+#ifdef _WIN32
+		socket(
+			AF_INET,
+			SOCK_STREAM,
+			IPPROTO_TCP);
+
+		if (listener == INVALID_SOCKET)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) 
+				+ "'! Reason: " + KalaServerCore::ErrorToString(WSAGetLastError()));
+		}
+
+		sockaddr_in serverAddress{};
+		serverAddress.sin_family = AF_INET;
+		serverAddress.sin_port = htons(newServerPort);
+
+		if (inet_pton(
+			AF_INET, 
+			string(newServerIP).c_str(),
+			&serverAddress.sin_addr) != 1)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) 
+				+ "' because IP '" + string(newServerIP) + "' is invalid!");
+		}
+
+		int opt = 1;
+
+		int result_reuse_addr = setsockopt(
+			listener,
+			SOL_SOCKET,
+			SO_REUSEADDR,
+			(const char*)&opt,
+			sizeof(opt));
+
+		if (result_reuse_addr == SOCKET_ERROR)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) + " because SO_REUSEADDR couldn't be set!");
+		}
+
+		if (bind(
+			listener,
+			(sockaddr*)&serverAddress,
+			sizeof(serverAddress)) == SOCKET_ERROR)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) + " because socket bind failed!");
+		}
+
+		if (listen(listener, SOMAXCONN) == SOCKET_ERROR)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) + " because socket listen failed!");
+		}
+
+		//make listener non-blocking
+
+		u_long mode = 1;
+		ioctlsocket(
+			listener,
+			FIONBIO,
+			&mode);
+#else
+		socket(
+			AF_INET,
+			SOCK_STREAM,
+			0);
+
+		if (listener < 0)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) + " because socket creation failed!");
+		}
+
+		sockaddr_in serverAddress{};
+		serverAddress.sin_family = AF_INET;
+		serverAddress.sin_port = htons(newServerPort);
+
+		if (inet_pton(
+			AF_INET, 
+			string(newServerIP).c_str(),
+			&serverAddress.sin_addr) != 1)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) 
+				+ "' because IP '" + string(newServerIP) + "' is invalid!");
+		}
+
+		int opt = 1;
+
+		int result_reuse_addr = setsockopt(
+			listener,
+			SOL_SOCKET,
+			SO_REUSEADDR,
+			(const char*)&opt,
+			sizeof(opt));
+
+		if (result_reuse_addr < 0)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) + " because SO_REUSEADDR couldn't be set!");
+		}
+
+		if (bind(
+			listener,
+			(sockaddr*)&serverAddress,
+			sizeof(serverAddress)) < 0)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) + " because socket bind failed!");
+		}
+
+		if (listen(listener, SOMAXCONN) < 0)
+		{
+			ForceClose(
+				"Server init error",
+				"Failed to create listener socket for server '" + string(newServerName) + " because socket listen failed!");
+		}
+
+		//make listener non-blocking
+
+		fcntl(
+			listener,
+			F_SETFL,
+			O_NONBLOCK);
+#endif
+
+		listenerSocket.connectionSocket = listener;
+		listenerSocket.isRunning = true;
 
 		serverName = newServerName;
 		serverRoot = newServerRoot;
@@ -398,10 +518,8 @@ namespace KalaServer::Core
 
 		Log::Print(
 			output,
-			"SERVER",
+			"KS_CORE",
 			LogType::LOG_SUCCESS);
-
-		return true;
 	}
 
 	bool KalaServerCore::IsInitialized() { return isInitialized; }
@@ -412,7 +530,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot update server '" + serverName + "' because it has not been initialized!",
-				"SERVER_CORE",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -423,7 +541,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot update server '" + serverName + "' because it is not ready for use yet!",
-				"SERVER_CORE",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -434,14 +552,457 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot update server '" + serverName + "' because it has no internet!",
-				"SERVER_CORE",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
 			return;
 		}
 
+		//
+		// REMOVE DISABLED SOCKETS
+		//
 
+		for (auto it = connectSockets.begin(); it != connectSockets.end();)
+		{
+			ksocket sock = 
+#ifdef _WIN32			
+			ToVar<SOCKET>(listenerSocket.connectionSocket);
+#else
+			ToVar<int>(listenerSocket.connectionSocket);
+#endif
+
+			if (sock == invalid_socket
+				|| !it->isRunning)
+			{
+				it = connectSockets.erase(it);
+			}
+			else ++it;
+		}
+
+		string sendMsg{};
+
+		//
+		// VERIFY CONNECTING SOCKETS
+		//
+
+		for (int i = 0; i < MAX_CONNECTIONS_PER_FRAME; ++i)
+		{
+			ksocket lsock = 
+#ifdef _WIN32
+			ToVar<SOCKET>(listenerSocket.connectionSocket);
+
+			sockaddr_storage clientAddress{};
+			int addressLength = sizeof(clientAddress);
+
+			ksocket client = accept(
+				lsock,
+				rcast<sockaddr*>(&clientAddress),
+				&addressLength);
+
+			if (client == invalid_socket)
+			{
+				DWORD err = WSAGetLastError();
+
+				//interrupted, try again
+				if (err == WSAEINTR) continue;
+				//queue empty, stop accepting this frame
+				else if (err == WSAEWOULDBLOCK) break;
+				else if (err == WSAECONNRESET
+						 || err == WSAECONNABORTED)
+				{
+					Log::Print(
+						"Socket was closed abruptly by client during accept.",
+						"KS_CORE",
+						LogType::LOG_INFO);
+
+					continue;
+				}
+
+				Log::Print(
+					"Failed to accept new connection! Reason: " + ErrorToString(err),
+					"KS_CORE",
+					LogType::LOG_ERROR,
+					2);
+
+				continue;
+			}
+
+			//make socket non-blocking
+			u_long mode = 1;
+			ioctlsocket(
+				client,
+				FIONBIO,
+				&mode);
+
+			BOOL no_delay = TRUE;
+
+			int result_no_delay = setsockopt(
+				client,
+				IPPROTO_TCP,
+				TCP_NODELAY,
+				(char*)&no_delay,
+				sizeof(no_delay));
+
+			if (result_no_delay == SOCKET_ERROR)
+			{
+				Log::Print(
+					"Failed to accept new connection because TCP_NODELAY couldn't be set!",
+					"KS_CORE",
+					LogType::LOG_ERROR,
+					2);
+
+				kclose(client);
+				continue;
+			}
+#else
+			ToVar<int>(listenerSocket.connectionSocket);
+
+			sockaddr_storage clientAddress{};
+			socklen_t addressLength = sizeof(clientAddress);
+
+			ksocket client = accept(
+				lsock,
+				rcast<sockaddr*>(&clientAddress),
+				&addressLength);
+
+			if (client < 0)
+			{
+				//interrupted, try again
+				if (errno == EINTR) continue;
+				else if (errno == EAGAIN
+						 || errno == EWOULDBLOCK)
+				{
+					//queue empty, stop accepting this frame
+					break;
+				}
+				else if (errno == ECONNRESET
+						 || errno == ECONNABORTED)
+				{
+					Log::Print(
+						"Socket was closed abruptly by client during accept.",
+						"KS_CORE",
+						LogType::LOG_INFO);
+
+					continue;
+				}
+
+				Log::Print(
+					"Failed to accept new connection! Reason: " + ErrorToString(errno),
+					"KS_CORE",
+					LogType::LOG_ERROR,
+					2);
+
+				continue;
+			}
+
+			//make socket non-blocking
+			fcntl(
+				client,
+				F_SETFL,
+				O_NONBLOCK);
+
+			int no_delay = 1;
+
+			int result_no_delay = setsockopt(
+				client,
+				IPPROTO_TCP,
+				TCP_NODELAY,
+				(char*)&no_delay,
+				sizeof(no_delay));
+
+			if (result_no_delay < 0)
+			{
+				Log::Print(
+					"Failed to accept new connection because TCP_NODELAY couldn't be set!",
+					"KS_CORE",
+					LogType::LOG_ERROR,
+					2);
+
+				kclose(client);
+				continue;
+			}
+#endif
+
+			//
+			// DROP USER IF SERVER IS FULL
+			//
+
+			if (connectSockets.size() >= MAX_ACTIVE_CONNECTIONS)
+			{
+				sendMsg = "Max user count '" + to_string(MAX_ACTIVE_CONNECTIONS) + "' was reached, cannot accept new connections!";
+
+				Log::Print(
+					sendMsg,
+					"KS_CORE",
+					LogType::LOG_WARNING);
+
+				Response::SendResponse({
+					.responseType = ResponseType::R_503,
+					.contentType = ContentType::CT_HTML,
+					.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
+					.responseBody =
+						ReturnErrorBody(
+							sendMsg,
+							ResponseType::R_503),
+					.connectionSocket = FromVar(client)
+				});
+
+				continue;
+			}
+
+			//
+			// GET USER IP
+			//
+
+			char ipStr[INET6_ADDRSTRLEN]{};
+
+			if (clientAddress.ss_family == AF_INET)
+			{
+				auto* addr = rcast<sockaddr_in*>(&clientAddress);
+				if (inet_ntop(
+					AF_INET,
+					&addr->sin_addr,
+					ipStr,
+					sizeof(ipStr)) == nullptr)
+				{
+					ipStr[0] = '\0';
+
+					Log::Print(
+						"Failed to accept new connection because ipv4 couldn't be found from it!",
+						"KS_CORE",
+						LogType::LOG_ERROR,
+						2);
+
+					kclose(client);
+					continue;
+				}
+			}
+			else if (clientAddress.ss_family == AF_INET6)
+			{
+				auto* addr = rcast<sockaddr_in6*>(&clientAddress);
+				if (inet_ntop(
+					AF_INET6,
+					&addr->sin6_addr,
+					ipStr,
+					sizeof(ipStr)) == nullptr)
+				{
+					ipStr[0] = '\0';
+
+					Log::Print(
+						"Failed to accept new connection because ipv6 couldn't be found from it!",
+						"KS_CORE",
+						LogType::LOG_ERROR,
+						2);
+
+					kclose(client);
+					continue;
+				}
+			}
+			else snprintf(
+				ipStr, 
+				sizeof(ipStr), 
+				"UNKNOWN");
+
+			string connectionIP = "[ " + string(ipStr) + " ] ";
+			
+			Log::Print(
+				connectionIP + "New client connected.",
+				"KS_CORE",
+				LogType::LOG_INFO);
+
+			//
+			// CHECK IF IP IS NOT BANNED
+			//
+
+			bool foundBannedUser{};
+
+			for (const auto& u : bannedIPs)
+			{
+				if (string(ipStr) == u.targetIP)
+				{
+					Log::Print(
+						connectionIP + "Banned user tried to reconnect to server.",
+						"KS_CORE",
+						LogType::LOG_INFO);
+
+					Response::SendResponse({
+						.responseType = ResponseType::R_418,
+						.contentType = ContentType::CT_HTML,
+						.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
+						.responseBody =
+							ReturnErrorBody(
+								"Get kicked nerd",
+								ResponseType::R_418),
+						.connectionSocket = FromVar(client)
+					});
+
+					foundBannedUser = true;
+
+					break;
+				}
+			}
+
+			if (foundBannedUser) continue;
+
+			connectSockets.push_back({
+				.isRunning = true,
+				.connectionIP = string(ipStr),
+				.connectionSocket = FromVar(client)
+			});
+		}
+
+		for (auto& c : connectSockets)
+		{
+			//
+			// CHECK CLIENT PAYLOAD REQUEST
+			//
+
+			string connectionIP = "[ " + c.connectionIP + " ] ";
+
+			ksocket client = 
+#ifdef _WIN32
+			ToVar<SOCKET>(c.connectionSocket);
+
+			char buffer[MAX_TOTAL_PAYLOAD_SIZE_BYTES]{};
+			int bytesReceived = recv(
+				client,
+				buffer,
+				sizeof(buffer),
+				0);
+
+			if (bytesReceived == SOCKET_ERROR)
+			{
+				DWORD err = WSAGetLastError();
+
+				//interrupted or no data, try again
+				if (err == WSAEINTR
+					|| err == WSAEWOULDBLOCK)
+				{
+					continue;
+				}
+				else if (err == WSAECONNRESET
+						 || err == WSAECONNABORTED)
+				{
+					Log::Print(
+						connectionIP + "Socket was closed abruptly by client during bytesReceived recv read.",
+						"KS_CORE",
+						LogType::LOG_INFO);
+
+					c.isRunning = false;
+
+					continue;
+				}
+
+				Log::Print(
+					"BytesReceived recv read failed! Reason: " + ErrorToString(err),
+					"KS_CORE",
+					LogType::LOG_ERROR,
+					2);
+
+				c.isRunning = false;
+
+				continue;
+			}
+
+			if (bytesReceived == 0)
+			{
+				Log::Print(
+					connectionIP + "Socket was closed gracefully by client during bytesReceived recv read.",
+					"KS_CORE",
+					LogType::LOG_INFO);
+
+				c.isRunning = false;
+
+				continue;
+			}
+#else
+			ToVar<int>(c.connectionSocket);
+
+			char buffer[MAX_TOTAL_PAYLOAD_SIZE_BYTES]{};
+			int bytesReceived = recv(
+				client,
+				buffer,
+				sizeof(buffer),
+				0);
+
+			if (bytesReceived < 0)
+			{
+				//interrupted or no data, try again
+				if (errno == EINTR
+					|| errno == EWOULDBLOCK
+					|| errno == EAGAIN)
+				{
+					continue;
+				}
+				else if (errno == ECONNRESET
+						 || errno == ECONNABORTED)
+				{
+					Log::Print(
+						connectionIP + "Socket was closed abruptly by client during bytesReceived recv read.",
+						"KS_CORE",
+						LogType::LOG_INFO);
+
+					c.isRunning = false;
+
+					continue;
+				}
+
+				Log::Print(
+					"BytesReceived recv read failed! Reason: " + ErrorToString(errno),
+					"KS_CORE",
+					LogType::LOG_ERROR,
+					2);
+
+				c.isRunning = false;
+
+				continue;
+			}
+
+			if (bytesReceived == 0)
+			{
+				Log::Print(
+					connectionIP + "Socket was closed gracefully by client during bytesReceived recv read.",
+					"KS_CORE",
+					LogType::LOG_INFO);
+
+				c.isRunning = false;
+
+				continue;
+			}
+#endif
+
+			c.partialBuffer.append(buffer, bytesReceived);
+
+			if (c.partialBuffer.size() > MAX_TOTAL_PAYLOAD_SIZE_BYTES)
+			{
+				sendMsg = "Max payload size '" + to_string(MAX_TOTAL_PAYLOAD_SIZE_BYTES) + "' was reached, cannot accept bigger payload!";
+
+				Response::SendResponse({
+					.responseType = ResponseType::R_413,
+					.contentType = ContentType::CT_HTML,
+					.optionalSendTypes = { OptionalSendType::S_FORCE_CLOSE },
+					.responseBody =
+						ReturnErrorBody(
+							sendMsg,
+							ResponseType::R_413),
+					.connectionSocket = c.connectionSocket
+				});
+
+				continue;
+			}
+
+			//
+			// PARSE CLIENT PAYLOAD
+			//
+
+			Response::SendResponse({
+				.responseType = ResponseType::R_200,
+				.contentType = ContentType::CT_HTML,
+				.responseBody = string(response_success),
+				.connectionSocket = c.connectionSocket
+			});
+		}
 	}
 
 	bool KalaServerCore::IsReady() { return isReady; }
@@ -464,21 +1025,21 @@ namespace KalaServer::Core
 			{
 				ForceClose(
 					"Internet health check error",
-					"Failed to call WSASTARTUP! Error code: " + to_string(errorCode));
+					"Failed to call WSASTARTUP! Reason: " + KalaServerCore::ErrorToString(errorCode));
 
 				return false;
 			}
 			startedWSA = true;
 		}
 
-		SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		ksocket sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (sock == INVALID_SOCKET)
 		{
 			string failReason = KalaServerCore::ErrorToString(WSAGetLastError());
 
 			Log::Print(
 				"Failed to check internet state for server '" + serverName + "' because socket creation failed! Reason: " + failReason,
-				"INTERNET_ACCESS",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -499,12 +1060,12 @@ namespace KalaServer::Core
 			(const char*)&timeout, 
 			sizeof(timeout));
 #else
-		int sock = socket(AF_INET, SOCK_STREAM, 0);
+		ksocket sock = socket(AF_INET, SOCK_STREAM, 0);
 		if (sock < 0)
 		{
 			Log::Print(
 				"Failed to check internet state for server '" + serverName + "' because socket creation failed!",
-				"INTERNET_ACCESS",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -533,24 +1094,20 @@ namespace KalaServer::Core
 		addr.sin_port = htons(53);
 		if (inet_pton(AF_INET, "1.1.1.1", &addr.sin_addr) != 1)
 		{
-#ifdef _WIN32
-		closesocket(sock);
-#else
-		close(sock);
-#endif
+			kclose(sock);
 
 			return false;
 		}
 
+		cachedResult = 
 #ifdef _WIN32
-		bool ok = (connect(sock, (sockaddr*)&addr, sizeof(addr)) != SOCKET_ERROR);
-		closesocket(sock);
+		(connect(sock, (sockaddr*)&addr, sizeof(addr)) != SOCKET_ERROR);
 #else
-		bool ok = (connect(sock, (sockaddr*)&addr, sizeof(addr)) == 0);
-		close(sock);
+		(connect(sock, (sockaddr*)&addr, sizeof(addr)) == 0);
 #endif
 
-		cachedResult = ok;
+		kclose(sock);
+
 		lastCheckedTime = now;
 
 		return cachedResult;
@@ -564,28 +1121,16 @@ namespace KalaServer::Core
 
 	const Connection& KalaServerCore::GetListenerSocket() { return listenerSocket; }
 
-	const vector<Connection> KalaServerCore::GetConnectSockets()
-	{ 
-		static vector<Connection> connectSocketView{};
-
-		connectSocketView.clear();
-		connectSocketView.reserve(connectSockets.size());
-
-		for (const auto& c : connectSockets)
-		{
-			connectSocketView.push_back(c);
-		}
-
-		return connectSocketView;
-	}
+	const vector<Connection>& KalaServerCore::GetConnectSockets() { return connectSockets; }
 
 	void KalaServerCore::DisconnectConnectedUser(uintptr_t targetSocket)
 	{
 		if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
-				"DISCONNECT_TARGET",
+				"Failed to disconnect target via socket for server '" 
+				+ string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -594,83 +1139,63 @@ namespace KalaServer::Core
 
 		ksocket target = 
 #ifdef _WIN32
-			ToVar<SOCKET>(targetSocket);
+		ToVar<SOCKET>(targetSocket);
 #else
-			ToVar<int>(targetSocket);
+		ToVar<int>(targetSocket);
 #endif
 
 		if (target == invalid_socket)
 		{
 			Log::Print(
-				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the socket is unassigned or invalid!",
-				"DISCONNECT_TARGET",
+				"Failed to disconnect target via socket for server '" 
+				+ string(KalaServerCore::GetServerName()) + "' because the socket is unassigned or invalid!",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
 			return;
 		}
 
-		Connection targetUser{};
+		bool foundTarget{};
 
 		for (auto it = connectSockets.begin(); it != connectSockets.end(); ++it)
 		{
-			ksocket sock =
-#ifdef _WIN32
-				ToVar<SOCKET>(it->connectionSocket);
-#else
-				ToVar<int>(i->connectionSocket);
-#endif
-
-			if (sock == target)
+			if (it->connectionSocket == target)
 			{
-				targetUser = std::move(*it);
-				connectSockets.erase(it);
+				kclose(target);
+
+				it->isRunning = false;
+				foundTarget = true;
 
 				break;
 			}
 		}
 
-		if (targetUser.connectionSocket == NULL)
+		if (!foundTarget)
 		{
 			Log::Print(
-				"Failed to disconnect target via socket for server '" + string(KalaServerCore::GetServerName()) + "' because the target socket was not found!",
-				"DISCONNECT_TARGET",
+				"Failed to disconnect target for server '" 
+				+ string(KalaServerCore::GetServerName()) + "' because the requested socket was not found!",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
 			return;
 		}
 
-		targetUser.isRunning = false;
-
-#ifdef _WIN32
-		ksocket cs = ToVar<SOCKET>(targetUser.connectionSocket);
-		if (cs != invalid_socket)
-		{
-			shutdown(cs, SD_BOTH);
-			closesocket(cs);
-		}
-#else
-		ksocket cs = ToVar<int>(targetUser.connectionSocket);
-		if (cs != invalid_socket)
-		{
-			shutdown(cs, SHUT_RDWR);
-			close(cs);
-		}
-#endif
-
 		Log::Print(
 			"Disconnected target via socket for server '" + string(KalaServerCore::GetServerName()) + "'!",
-			"DISCONNECT_TARGET",
+			"KS_CORE",
 			LogType::LOG_SUCCESS);
 	}
 	void KalaServerCore::DisconnectConnectedUser(string_view targetIP)
 	{
-				if (!KalaServerCore::IsReady())
+		if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
-				"DISCONNECT_TARGET",
+				"Failed to disconnect target via IP '" + string(targetIP) 
+				+ "' for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -680,15 +1205,16 @@ namespace KalaServer::Core
 		if (!KalaServerCore::IsValidIP(targetIP))
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the IP structure is invalid!",
-				"DISCONNECT_TARGET",
+				"Failed to disconnect target via IP '" + string(targetIP) 
+				+ "' for server '" + string(KalaServerCore::GetServerName()) + "' because the IP structure is invalid!",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
 			return;
 		}
 
-		Connection targetUser{};
+		bool foundTarget{};
 
 		for (auto it = connectSockets.begin(); it != connectSockets.end(); ++it)
 		{
@@ -696,45 +1222,49 @@ namespace KalaServer::Core
 
 			if (connectionIP == targetIP)
 			{
-				targetUser = std::move(*it);
-				connectSockets.erase(it);
+				if (it->connectionSocket == invalid_socket)
+				{
+					Log::Print(
+						"Failed to disconnect target via IP '" + string(targetIP) 
+						+ "' for server '" + string(KalaServerCore::GetServerName()) + "' because the socket was invalid!",
+						"KS_CORE",
+						LogType::LOG_ERROR,
+						2);
+				}
+				else 
+				{
+					ksocket sock = 
+#ifdef _WIN32			
+					ToVar<SOCKET>(it->connectionSocket);
+#else
+					ToVar<int>(it->connectionSocket);
+#endif
+
+					kclose(sock);
+				}
+	
+				it->isRunning = false;
+				foundTarget = true;
 
 				break;
 			}
 		}
 
-		if (targetUser.connectionSocket == NULL)
+		if (!foundTarget)
 		{
 			Log::Print(
-				"Failed to disconnect target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "' because the target IP was not found!",
-				"DISCONNECT_TARGET",
+				"Failed to disconnect target via IP '" + string(targetIP) 
+				+ "' for server '" + string(KalaServerCore::GetServerName()) + "' because no socket with the IP is connected!",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
 			return;
 		}
 
-		targetUser.isRunning = false;
-
-#ifdef _WIN32
-		ksocket cs = ToVar<SOCKET>(targetUser.connectionSocket);
-		if (cs != invalid_socket)
-		{
-			shutdown(cs, SD_BOTH);
-			closesocket(cs);
-		}
-#else
-		ksocket cs = ToVar<int>(targetUser,connectionSocket);
-		if (cs != invalid_socket)
-		{
-			shutdown(cs, SHUT_RDWR);
-			close(cs);
-		}
-#endif
-
 		Log::Print(
 			"Disconnected target via IP '" + string(targetIP) + "' for server '" + string(KalaServerCore::GetServerName()) + "'!",
-			"DISCONNECT_TARGET",
+			"KS_CORE",
 			LogType::LOG_SUCCESS);
 	}
 
@@ -757,7 +1287,7 @@ namespace KalaServer::Core
 			{
 				Log::Print(
 					"Failed to ban IP '" + string(targetIP) + "' because it is already banned!",
-					"SERVER",
+					"KS_CORE",
 					LogType::LOG_ERROR,
 					2);
 
@@ -783,7 +1313,7 @@ namespace KalaServer::Core
 
 		Log::Print(
 			"Failed to unban IP '" + string(targetIP) + "' because it has not been banned!",
-			"SERVER",
+			"KS_CORE",
 			LogType::LOG_ERROR,
 			2);
 
@@ -796,7 +1326,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"There are no banned IPs to save to disk.",
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_INFO);
 
 			return false;
@@ -812,7 +1342,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to save banned IPs to path '" + targetPath.string() + "'! Reason: " + errorMsg,
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -831,7 +1361,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to load banned IPs from path '" + targetPath.string() + "'! Reason: " + errorMsg,
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -861,7 +1391,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because the domain does not exist!",
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -875,7 +1405,7 @@ namespace KalaServer::Core
 			{
 				Log::Print(
 					"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because it has already been added!",
-					"SERVER",
+					"KS_CORE",
 					LogType::LOG_ERROR,
 					2);
 
@@ -889,7 +1419,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because its path '" + cleanedPath.string() + "' does not exist!",
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -902,7 +1432,7 @@ namespace KalaServer::Core
 			{
 				Log::Print(
 					"Failed to add new route with domain '" + newRoute.domain + "' and route '" + newRoute.route + "' because it has already been added!",
-					"SERVER",
+					"KS_CORE",
 					LogType::LOG_ERROR,
 					2);
 
@@ -919,7 +1449,7 @@ namespace KalaServer::Core
 
 		Log::Print(
 			"Added new domain '" + newRoute.domain + "' with route '" + newRoute.route + "' and path '" + cleanedPath.string() + "'!",
-			"SERVER",
+			"KS_CORE",
 			LogType::LOG_SUCCESS);
 
 		return true;
@@ -935,7 +1465,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to remove existing domain '" + existingRoute.domain + "' with route '" + existingRoute.route + "' because it has not been added!",
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -946,7 +1476,7 @@ namespace KalaServer::Core
 
 		Log::Print(
 			"Removed existing domain '" + existingRoute.domain + "' with route '" + existingRoute.route + "'.",
-			"SERVER",
+			"KS_CORE",
 			LogType::LOG_SUCCESS);
 
 		return true;
@@ -958,7 +1488,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"There are no routes to save to disk.",
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_INFO);
 
 			return false;
@@ -974,7 +1504,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to save routes to path '" + targetPath.string() + "'! Reason: " + errorMsg,
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -993,7 +1523,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to load routes from path '" + targetPath.string() + "'! Reason: " + errorMsg,
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -1015,7 +1545,7 @@ namespace KalaServer::Core
 			{
 				Log::Print(
 					"Failed to add new blacklisted keyword '" + string(newKeyword) + "' because it has already been added!",
-					"SERVER",
+					"KS_CORE",
 					LogType::LOG_ERROR,
 					2);
 
@@ -1027,7 +1557,7 @@ namespace KalaServer::Core
 
 		Log::Print(
 			"Added new blacklisted keyword '" + string(newKeyword) + "'!",
-			"SERVER",
+			"KS_CORE",
 			LogType::LOG_SUCCESS);
 
 		return true;
@@ -1043,7 +1573,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to remove existing blacklisted keyword '" + string(existingKeyword) + "' because it has not been added!",
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -1054,7 +1584,7 @@ namespace KalaServer::Core
 
 		Log::Print(
 			"Removed existing blacklisted keyword '" + string(existingKeyword) + "'.",
-			"SERVER",
+			"KS_CORE",
 			LogType::LOG_SUCCESS);
 
 		return true;
@@ -1066,7 +1596,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"There are no blacklisted keywords to save to disk.",
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_INFO);
 
 			return false;
@@ -1082,7 +1612,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to save blacklisted keywords to path '" + targetPath.string() + "'! Reason: " + errorMsg,
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -1101,7 +1631,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to load blacklisted keywords from path '" + targetPath.string() + "'! Reason: " + errorMsg,
-				"SERVER",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -1121,18 +1651,18 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Cannot shut down the server because it is not running or not ready!",
-				"SERVER_SHUTDOWN",
+				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
 			return;
 		}
 
-		if (listenerSocket.connectionSocket == NULL)
+		if (listenerSocket.connectionSocket == invalid_socket)
 		{
 			Log::Print(
 				"Failed to disconnect listener for server '" + string(KalaServerCore::GetServerName()) + "' because the server has no listener socket!",
-				"LISTENER_DISCONNECT",
+				"KS_CORE",
 				LogType::LOG_WARNING);
 
 			return;
@@ -1149,7 +1679,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to disconnect listener for server '" + string(KalaServerCore::GetServerName()) + "' because the server has not assigned a listener socket!",
-				"LISTENER_DISCONNECT",
+				"KS_CORE",
 				LogType::LOG_WARNING);
 
 			return;
@@ -1157,21 +1687,14 @@ namespace KalaServer::Core
 
 		listenerSocket.isRunning = false;
 
+		ksocket thisls = 
 #ifdef _WIN32
-		ksocket thisls = ToVar<SOCKET>(listenerSocket.connectionSocket);
-		if (thisls != invalid_socket)
-		{
-			shutdown(thisls, SD_BOTH);
-			closesocket(thisls);
-		}
+		ToVar<SOCKET>(listenerSocket.connectionSocket);
 #else
-		ksocket thisls = ToVar<int>(listenerSocket.connectionSocket);
-		if (thisls != invalid_socket)
-		{
-			shutdown(thisls, SHUT_RDWR);
-			close(thisls);
-		}
+		ToVar<int>(listenerSocket.connectionSocket);
 #endif
+
+		if (thisls != invalid_socket) kclose(thisls);
 
 		vector<Connection> cconnects{};
 
@@ -1181,21 +1704,14 @@ namespace KalaServer::Core
 		{
 			conn.isRunning = false;
 
+			ksocket cs = 
 #ifdef _WIN32
-			ksocket cs = ToVar<SOCKET>(conn.connectionSocket);
-			if (cs != invalid_socket)
-			{
-				shutdown(cs, SD_BOTH);
-				closesocket(cs);
-			}
+			ToVar<SOCKET>(conn.connectionSocket);
 #else
 			ksocket cs = ToVar<int>(conn.connectionSocket);
-			if (cs != invalid_socket)
-			{
-				shutdown(cs, SHUT_RDWR);
-				close(cs);
-			}
 #endif
+
+			if (cs != invalid_socket) kclose(cs);
 		}
 		
 #ifdef _WIN32

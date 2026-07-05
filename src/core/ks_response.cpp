@@ -141,7 +141,7 @@ namespace KalaServer::Core
 		{
 			Log::Print(
 				"Failed to send response because the server is not running or not ready!",
-				"SEND_RESPONSE",
+				"KS_RESPONSE",
 				LogType::LOG_ERROR,
 				2);
 
@@ -160,14 +160,13 @@ namespace KalaServer::Core
                 {
                     Log::Print(
                         "Cannot close socket because its unassigned!",
-                        "SEND_RESPONSE",
+                        "KS_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
 
                     return;
                 }
 
-                shutdown(csock, SD_BOTH);
                 closesocket(csock);
 #else
                 int csock = ToVar<int>(sock);
@@ -175,18 +174,17 @@ namespace KalaServer::Core
                 {
                     Log::Print(
                         "Cannot close socket because its unassigned!",
-                        "SEND_RESPONSE",
+                        "KS_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
 
                     return;
                 }
 
-                shutdown(csock, SHUT_RDWR);
                 close(csock);
 #endif
 
-                if (data.connection) data.connection->isRunning = false;
+                data.connection->isRunning = false;
             };
 
         bool invalidResponseType = data.responseType == ResponseType::R_INVALID;
@@ -197,7 +195,7 @@ namespace KalaServer::Core
         {
             Log::Print(
                 "Failed to send response because no Connection struct or connectionSocket has been assigned!",
-                "SEND_RESPONSE",
+                "KS_RESPONSE",
                 LogType::LOG_ERROR,
                 2);
 
@@ -207,7 +205,7 @@ namespace KalaServer::Core
         {
             Log::Print(
                 "Failed to send response because response type was invalid or unassigned!",
-                "SEND_RESPONSE",
+                "KS_RESPONSE",
                 LogType::LOG_ERROR,
                 2);
 
@@ -219,7 +217,7 @@ namespace KalaServer::Core
         {
             Log::Print(
                 "Failed to send response because content type was invalid or unassigned!",
-                "SEND_RESPONSE",
+                "KS_RESPONSE",
                 LogType::LOG_ERROR,
                 2);
 
@@ -231,7 +229,7 @@ namespace KalaServer::Core
         {
             Log::Print(
                 "No response body was assigned, using placeholder.",
-                "SEND_RESPONSE",
+                "KS_RESPONSE",
                 LogType::LOG_WARNING);
 
             ResponseData newData
@@ -402,7 +400,7 @@ void Send(const ResponseData& data)
 					{
 						Log::Print(
 							connectionIP + "Send timed out.",
-							"SEND_RESPONSE",
+							"KS_RESPONSE",
 							LogType::LOG_INFO);
 
 						return false;
@@ -413,7 +411,7 @@ void Send(const ResponseData& data)
 					{
 						Log::Print(
 							connectionIP + "Response was closed abruptly by client during send.",
-							"SEND_RESPONSE",
+							"KS_RESPONSE",
 							LogType::LOG_INFO);
 
 						return false;
@@ -421,7 +419,7 @@ void Send(const ResponseData& data)
 
                     Log::Print(
                         connectionIP + "Failed to finish sending response! Reason: " + KalaServerCore::ErrorToString(err),
-                        "SEND_RESPONSE",
+                        "KS_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
 
@@ -432,7 +430,7 @@ void Send(const ResponseData& data)
                 {
                     Log::Print(
                         connectionIP + "Failed to finish sending response because send returned 0 bytes!",
-                        "SEND_RESPONSE",
+                        "KS_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
 
@@ -461,7 +459,7 @@ void Send(const ResponseData& data)
 					{
 						Log::Print(
 							connectionIP + "Send timed out.",
-							"SEND_RESPONSE",
+							"KS_RESPONSE",
 							LogType::LOG_INFO);
 
 						return false;
@@ -473,7 +471,7 @@ void Send(const ResponseData& data)
 					{
 						Log::Print(
 							connectionIP + "Response was closed abruptly by client during send.",
-							"SEND_RESPONSE",
+							"KS_RESPONSE",
 							LogType::LOG_INFO);
 
 						return false;
@@ -481,7 +479,7 @@ void Send(const ResponseData& data)
 
                     Log::Print(
                         connectionIP + "Failed to finish sending response! Reason: " + KalaServerCore::ErrorToString(errno),
-                        "SEND_RESPONSE",
+                        "KS_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
 
@@ -492,7 +490,7 @@ void Send(const ResponseData& data)
                 {
                     Log::Print(
                         connectionIP + "Failed to finish sending response because send returned 0 bytes!",
-                        "SEND_RESPONSE",
+                        "KS_RESPONSE",
                         LogType::LOG_ERROR,
                         2);
 
@@ -513,7 +511,7 @@ void Send(const ResponseData& data)
     {
         Log::Print(
             connectionIP + "Sent '" + to_string(totalSent) + "' bytes of data as response.",
-            "SEND_RESPONSE",
+            "KS_RESPONSE",
             LogType::LOG_INFO);
     }
 
@@ -524,7 +522,7 @@ void Send(const ResponseData& data)
         {
             Log::Print(
                 connectionIP + "Connection was closed at the end of sent response.",
-                "SEND_RESPONSE",
+                "KS_RESPONSE",
                 LogType::LOG_INFO);
         }
 
