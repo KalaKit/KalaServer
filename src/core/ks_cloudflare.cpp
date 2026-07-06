@@ -327,17 +327,6 @@ namespace KalaServer::Core
 
 	void Cloudflare::Shutdown()
 	{
-		if (!KalaServerCore::IsInitialized())
-		{
-			Log::Print(
-				"Cannot shut down server '" + string(KalaServerCore::GetServerName()) + "' Clouflare tunnel because the server has not been initialized!",
-				"CLOUDFLARE_SHUTDOWN",
-				LogType::LOG_ERROR,
-				2);
-
-			return;
-		}
-
 		if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
@@ -846,7 +835,7 @@ bool RouteTunnel()
 	// ROOT DOMAIN
 	//
 
-	for (const auto& d : KalaServerCore::GetServerDomains())
+	for (const auto& d : KalaServerCore::GetDomains())
 	{
 		if (!CreateCloudflareProcess(
 			"tunnel route dns " + validTunnelName + " " + d, 
@@ -896,7 +885,7 @@ bool CreateConfigFile(string& outCommand)
 		+ "\n"
 		+ "ingress:\n";
 
-	for (const auto& d : KalaServerCore::GetServerDomains())
+	for (const auto& d : KalaServerCore::GetDomains())
 	{
 		output += "  - hostname: " + d + "\n"
 			+ "    service: http://localhost:" + port + "\n"

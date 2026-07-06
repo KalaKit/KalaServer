@@ -119,7 +119,6 @@ namespace KalaServer::Core
 		//Server name helps distinguish this server from other servers.
 		//Server root is the true origin where the server will expose
 		//routes from relative to where the process was run.
-		//Server domains are the allowed hostnames this server will accept connections for.
 		//Server IP is the IP address users will connect to.
 		//Server port is the local TCP port this server binds to and listens on.
 		//Set requireCloudflare to false if you dont want to use Cloudflare tunnel,
@@ -127,13 +126,15 @@ namespace KalaServer::Core
 		static void Initialize(
 			string_view serverName,
 			const path& serverRoot,
-			vector<string> serverDomains,
 			string_view serverIP,
 			u16 serverPort,
 			bool requireCloudflare);
 
 		//Returns true if this server instance has been initialized successfully
 		static bool IsInitialized();
+
+		//Creates a new listener socket if there is none created
+		static void CreateListenerSocket();
 
 		//Process incoming requests,
 		//should be ran once per frame
@@ -151,7 +152,6 @@ namespace KalaServer::Core
 
 		static string_view GetServerName();
 		static const path& GetServerRoot();
-		static const vector<string>& GetServerDomains();
 		static string_view GetServerIP();
 		static u16 GetServerPort();
 
@@ -165,6 +165,8 @@ namespace KalaServer::Core
 		//Does this IP match any valid ipv4 or ipv6 structure
 		static bool IsValidIP(string_view targetIP);
 
+		//Lists banned IPs
+		static const vector<BannedIP>& GetBannedIPs();
 		//Ban IP, doesn't matter if it is currently connected or not
 		static bool BanIP(string_view targetIP);
 		//Unban existing IP, doesn't matter if its currently connected or not
@@ -175,9 +177,10 @@ namespace KalaServer::Core
 		//Loads all saved banned ips and appends to current list, duplicates are skipped
 		static bool LoadBannedIPsFromDisk(const path& targetPath);
 
-		//Lists banned IPs
-		static const vector<BannedIP>& GetBannedIPs();
-
+		//Lists existing domains
+		static const vector<string>& GetDomains();
+		//Lists existing routes
+		static const vector<DomainRoute>& GetRoutes();
 		//Add new route, cannot add add duplicates if domain+route matches,
 		//cannot add routes if their path matches any existing route path of the same domain
 		static bool AddRoute(const DomainRoute& newRoute);
@@ -188,9 +191,6 @@ namespace KalaServer::Core
 		static bool SaveRoutesToDisk(const path& targetPath);
 		//Loads all saved routes and appends to current list, duplicates are skipped
 		static bool LoadRoutesFromDisk(const path& targetPath);
-
-		//Lists existing routes
-		static const vector<DomainRoute>& GetRoutes();
 
 		//Add new blacklisted keyword, cannot add duplicates
 		static bool AddBlacklistedKeyword(string_view newKeyword);

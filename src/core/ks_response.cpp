@@ -140,7 +140,7 @@ namespace KalaServer::Core
         if (!KalaServerCore::IsReady())
 		{
 			Log::Print(
-				"Failed to send response because the server is not running or not ready!",
+				"Failed to send response because the server is not ready!",
 				"KS_RESPONSE",
 				LogType::LOG_ERROR,
 				2);
