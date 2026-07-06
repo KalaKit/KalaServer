@@ -150,7 +150,7 @@ static string ReturnErrorBody(string_view error, ResponseType type)
 		"</body></html>";
 }
 
-static void HandleClient(Connection c);
+static void HandleClient(Connection& c);
 
 namespace KalaServer::Core
 {
@@ -1556,7 +1556,7 @@ namespace KalaServer::Core
 	}
 }
 
-void HandleClient(Connection c)
+void HandleClient(Connection& c)
 {
 	string sendMsg{};
 
