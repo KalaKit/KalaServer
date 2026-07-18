@@ -137,10 +137,10 @@ namespace KalaServer::Core
 
     void Response::SendResponse(const ResponseData& data)
     {
-        if (!KalaServerCore::IsReady())
+        if (!KalaServerCore::IsInitialized())
 		{
 			Log::Print(
-				"Failed to send response because the server is not ready!",
+				"Failed to send response because the server is not initialized!",
 				"KS_RESPONSE",
 				LogType::LOG_ERROR,
 				2);

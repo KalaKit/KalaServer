@@ -121,14 +121,11 @@ namespace KalaServer::Core
 		//routes from relative to where the process was run.
 		//Server IP is the IP address users will connect to.
 		//Server port is the local TCP port this server binds to and listens on.
-		//Set requireCloudflare to false if you dont want to use Cloudflare tunnel,
-		//otherwise it must be enabled before any connections are accepted.
 		static void Initialize(
 			string_view serverName,
 			const path& serverRoot,
 			string_view serverIP,
-			u16 serverPort,
-			bool requireCloudflare);
+			u16 serverPort);
 
 		//Returns true if this server instance has been initialized successfully
 		static bool IsInitialized();
@@ -139,13 +136,6 @@ namespace KalaServer::Core
 		//Process incoming requests,
 		//should be ran once per frame
 		static void Update();
-
-		//Returns true if the server Cloudflare backend has been initialized successfully,
-		//the server cannot be started if its not ready yet, even if its instance is already initialized
-		static bool IsReady();
-
-		//Returns true if user set requireCloudflare as true during ServerCore::Initialize
-		static bool IsCloudflareRequired();
 
 		//Returns true if this process can reach http://1.1.1.1 on port 53
 		static bool HasInternet();

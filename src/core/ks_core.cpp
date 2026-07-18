@@ -16,8 +16,10 @@
 #include <sys/capability.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <cerrno>
+#include <csignal>
 #endif
 
 #include <string>
@@ -32,7 +34,6 @@
 #include "file_utils.hpp"
 
 #include "core/ks_core.hpp"
-#include "core/ks_cloudflare.hpp"
 #include "core/ks_response.hpp"
 
 using KalaHeaders::KalaCore::ToVar;
@@ -98,9 +99,6 @@ constexpr ksocket invalid_socket = -1;
 #endif
 
 static bool isInitialized{};
-static bool isReady{};
-
-static bool cloudflareRequired{};
 
 #ifdef _WIN32
 	static bool startedWSA{};
@@ -245,8 +243,7 @@ namespace KalaServer::Core
 		string_view newServerName,
 		const path& newServerRoot,
 		string_view newServerIP,
-		u16 newServerPort,
-		bool requireCloudflare)
+		u16 newServerPort)
 	{
 		if (newServerName.empty()
 			|| newServerName.length() > 50)
@@ -312,10 +309,7 @@ namespace KalaServer::Core
 
 		CreateListenerSocket();
 
-		cloudflareRequired = requireCloudflare;
-
 		isInitialized = true;
-		if (!cloudflareRequired) isReady = true;
 
 		string output = 
 			"Created new server '" + serverName + "' "
@@ -386,7 +380,7 @@ namespace KalaServer::Core
 		{
 			ForceClose(
 				"Server init error",
-				"Failed to create listener socket for server '" + serverName + " because socket bind failed!");
+				"Failed to create listener socket for server '" + serverName + "' because socket bind failed! Error code: " + to_string(WSAGetLastError()));
 		}
 
 		if (listen(listener, SOMAXCONN) == SOCKET_ERROR)
@@ -450,11 +444,11 @@ namespace KalaServer::Core
 		if (bind(
 			listener,
 			(sockaddr*)&serverAddress,
-			sizeof(serverAddress)) < 0)
+			sizeof(serverAddress)) == -1)
 		{
 			ForceClose(
 				"Server init error",
-				"Failed to create listener socket for server '" + serverName + " because socket bind failed!");
+				"Failed to create listener socket for server '" + serverName + "' because socket bind failed! Error code: " + to_string(errno));
 		}
 
 		if (listen(listener, SOMAXCONN) < 0)
@@ -483,10 +477,10 @@ namespace KalaServer::Core
 
 	void KalaServerCore::Update()
 	{
-		if (!isReady)
+		if (!isInitialized)
 		{
 			Log::Print(
-				"Cannot update server '" + serverName + "' because it is not ready for use yet!",
+				"Cannot update server '" + serverName + "' because it is not initialized!",
 				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
@@ -812,10 +806,6 @@ namespace KalaServer::Core
 		for (auto& c : connectSockets) HandleClient(c);
 	}
 
-	bool KalaServerCore::IsReady() { return isReady; }
-
-	bool KalaServerCore::IsCloudflareRequired() { return cloudflareRequired; }
-
 	bool KalaServerCore::HasInternet()
 	{
 		static bool cachedResult{};
@@ -931,11 +921,11 @@ namespace KalaServer::Core
 
 	void KalaServerCore::DisconnectConnectedUser(uintptr_t targetSocket)
 	{
-		if (!KalaServerCore::IsReady())
+		if (!KalaServerCore::IsInitialized())
 		{
 			Log::Print(
 				"Failed to disconnect target via socket for server '" 
-				+ string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				+ string(KalaServerCore::GetServerName()) + "' because the server is not initialized!",
 				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
@@ -996,11 +986,11 @@ namespace KalaServer::Core
 	}
 	void KalaServerCore::DisconnectConnectedUser(string_view targetIP)
 	{
-		if (!KalaServerCore::IsReady())
+		if (!KalaServerCore::IsInitialized())
 		{
 			Log::Print(
 				"Failed to disconnect target via IP '" + string(targetIP) 
-				+ "' for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not running or not ready!",
+				+ "' for server '" + string(KalaServerCore::GetServerName()) + "' because the server is not initialized!",
 				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
@@ -1186,10 +1176,10 @@ namespace KalaServer::Core
 
 	bool KalaServerCore::AddRoute(const DomainRoute& newRoute)
 	{
-		if (!isReady)
+		if (!isInitialized)
 		{
 			Log::Print(
-				"Cannot add route the server is not ready for use!",
+				"Cannot add route the server is not initialized!",
 				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
@@ -1496,25 +1486,17 @@ namespace KalaServer::Core
 
 	const vector<string>& KalaServerCore::GetBlacklistedKeywords() { return blacklistedKeywords; }
 
-	void KalaServerCore::SetServerReadyState(bool state) { isReady = state; }
-
 	void KalaServerCore::Shutdown()
 	{
-		if (!KalaServerCore::IsReady())
+		if (!KalaServerCore::IsInitialized())
 		{
 			Log::Print(
-				"Cannot shut down the server because it is not running or not ready!",
+				"Cannot shut down the server because it is not initialized!",
 				"KS_CORE",
 				LogType::LOG_ERROR,
 				2);
 
 			return;
-		}
-
-		if (cloudflareRequired
-			&& Cloudflare::IsInitialized())
-		{
-			Cloudflare::Shutdown();
 		}
 
 		listenerSocket.isRunning = false;
@@ -1527,9 +1509,8 @@ namespace KalaServer::Core
 		{
 			conn.isRunning = false;
 
-			ksocket cs = 
 #ifdef _WIN32
-			ToVar<SOCKET>(conn.connectionSocket);
+			ksocket cs = ToVar<SOCKET>(conn.connectionSocket);
 #else
 			ksocket cs = ToVar<int>(conn.connectionSocket);
 #endif
@@ -1547,7 +1528,6 @@ namespace KalaServer::Core
 #endif
 
 		isInitialized = false;
-		isReady = false;
 
 		Log::Print(
 			"Server '" + serverName + "' has been fully shut down!",
@@ -1639,7 +1619,7 @@ void HandleClient(Connection& c)
 			|| errno == EWOULDBLOCK
 			|| errno == EAGAIN)
 		{
-			continue;
+			return;
 		}
 		else if (errno == ECONNRESET
 					|| errno == ECONNABORTED)
@@ -1651,18 +1631,18 @@ void HandleClient(Connection& c)
 
 			c.isRunning = false;
 
-			continue;
+			return;
 		}
 
 		Log::Print(
-			"BytesReceived recv read failed! Reason: " + ErrorToString(errno),
+			"BytesReceived recv read failed! Reason: " + KalaServerCore::ErrorToString(errno),
 			"KS_CORE",
 			LogType::LOG_ERROR,
 			2);
 
 		c.isRunning = false;
 
-		continue;
+		return;
 	}
 
 	if (bytesReceived == 0)
@@ -1674,7 +1654,7 @@ void HandleClient(Connection& c)
 
 		c.isRunning = false;
 
-		continue;
+		return;
 	}
 #endif
 
