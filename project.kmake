@@ -28,6 +28,18 @@ binaryname: ${name_bin}
 buildtype: minsizerel
 buildpath: "${dir_release}windows"
 
+#profile debug-win-on-linux
+targettype: windows-gnu
+binaryname: ${name_bin}-gnud
+buildtype: debug
+buildpath: "${dir_debug}win-on-linux"
+
+#profile release-win-on-linux
+targettype: windows-gnu
+binaryname: ${name_bin}-gnu
+buildtype: minsizerel
+buildpath: "${dir_release}win-on-linux"
+
 #profile debug-linux
 binaryname: lib${name_bin}d
 buildtype: debug
@@ -37,4 +49,3 @@ buildpath: "${dir_debug}linux"
 binaryname: lib${name_bin}
 buildtype: minsizerel
 buildpath: "${dir_release}linux"
-postbuildaction: strip --strip-unneeded ${dir_release}linux/lib${name_bin}.a
