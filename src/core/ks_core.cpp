@@ -207,7 +207,9 @@ namespace KalaServer::Core
 
 		if (buffer) LocalFree(buffer);
 
-		return TrimString(to_short(wmsg)) + " [" + to_string(error) + "]";
+		string ts{};
+		string _ = TrimString(to_short(wmsg) + " [" + to_string(error) + "]", ts);
+		return ts;
 #else
 		return string(strerror(error)) + " [" + to_string(error) + "]";
 #endif
@@ -1213,7 +1215,8 @@ namespace KalaServer::Core
 			domains.push_back(newRoute.domain);
 		}
 
-		vector<string> split = SplitString(newRoute.domain, ".");
+		vector<string> split{};
+		string _ = SplitString(newRoute.domain, ".", split);
 		if (split.size() != 2)
 		{
 			Log::Print(
