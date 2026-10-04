@@ -18,6 +18,7 @@ ks_bin_deb=[ "build/temp/debug-windows/kalaserverd.lib", "build/${version}/kalas
 ks_include=[ "include", "build/${version}/include", "copy" ]
 ks_license=[ "LICENSE.md", "build/${version}/LICENSE.md", "copy" ]
 ks_readme=[ "README.md", "build/${version}/README.md", "copy" ]
+ks_changes=[ "CHANGES.md", "build/${version}/CHANGES.md", "copy" ]
 kh_stuff=[ "${ext_kh}", "build/${version}/kalaheaders", "copy" ]
 
 [windows-gnu-sync]
@@ -31,6 +32,7 @@ ks_bin_deb=[ "build/temp/debug-windows-gnu/kalaserver-gnud.lib", "build/${versio
 ks_include=[ "include", "build/${version}/include", "copy" ]
 ks_license=[ "LICENSE.md", "build/${version}/LICENSE.md", "copy" ]
 ks_readme=[ "README.md", "build/${version}/README.md", "copy" ]
+ks_changes=[ "CHANGES.md", "build/${version}/CHANGES.md", "copy" ]
 kh_stuff=[ "${ext_kh}", "build/${version}/kalaheaders", "copy" ]
 
 [linux-sync]
@@ -44,4 +46,5 @@ ks_bin_deb=[ "build/temp/debug-linux/libkalaserverd.a", "build/${version}/libkal
 ks_include=[ "include", "build/${version}/include", "copy" ]
 ks_license=[ "LICENSE.md", "build/${version}/LICENSE.md", "copy" ]
 ks_readme=[ "README.md", "build/${version}/README.md", "copy" ]
+ks_changes=[ "CHANGES.md", "build/${version}/CHANGES.md", "copy" ]
 kh_stuff=[ "${ext_kh}", "build/${version}/kalaheaders", "copy" ]
