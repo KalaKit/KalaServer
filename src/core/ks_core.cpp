@@ -25,6 +25,8 @@
 #include "string_utils.hpp"
 
 #include "connection/ks_server.hpp"
+#include "connection/ks_client.hpp"
+#include "connection/ks_link.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -34,6 +36,8 @@ using KalaHeaders::KalaLog::DateFormat;
 using KalaHeaders::KalaString::TrimString;
 
 using KalaServer::Connection::Server;
+using KalaServer::Connection::Client;
+using KalaServer::Connection::Link;
 
 using std::string;
 using std::to_string;
@@ -195,7 +199,22 @@ namespace KalaServer::Core
 #endif
 	}
 
-	const string& KalaServerCore::GetIP() { return IP; }
+	const string& KalaServerCore::GetIP()
+	{
+		static const string empty{};
+
+		if (!isInitialized)
+		{
+			Log::Print(
+				"Failed to get IP because KalaServer was not initialized!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return empty;
+		}
+		
+		return IP;
+	}
 
 	bool KalaServerCore::IsValidIP(string_view targetValue)
 	{
@@ -488,23 +507,28 @@ namespace KalaServer::Core
 			return;
 		}
 
-		vector<Server*> copy = Server::GetRegistry().GetAllContent();
-		for (Server* s : copy) s->Destroy();
+		vector<Server*> serverCopy = Server::GetRegistry().GetAllContent();
+		for (Server* s : serverCopy) s->Destroy();
 
-		Log::Print(
-			"Finished shutting down KalaServer for IP '" + string(IP) + "'!",
-			"KS_CORE",
-			LogType::LOG_SUCCESS);
+		vector<Client*> clientCopy = Client::GetRegistry().GetAllContent();
+		for (Client* c : clientCopy) c->Destroy();
+
+		vector<Link*> linkCopy = Link::GetRegistry().GetAllContent();
+		for (Link* l : linkCopy) l->Destroy();
 
 		if (shutdownCallback) shutdownCallback();
 
 		readyToCheckInternetState = false;
 		isInitialized = false;
-		IP.clear();
 
 #if defined(KWIN_ANY)
 		WSACleanup();
 #endif
+
+		Log::Print(
+			"Finished shutting down KalaServer for IP '" + string(IP) + "'!",
+			"KS_CORE",
+			LogType::LOG_SUCCESS);
 
 		if (closeExecutableAfterShutdown) exit(0);
 	}

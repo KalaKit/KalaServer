@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "core_utils.hpp"
+
 #include "core/ks_registry.hpp"
 
 namespace KalaServer::Connection
@@ -23,15 +24,26 @@ namespace KalaServer::Connection
     using std::filesystem::path;
     using std::default_delete;
 
+    static constexpr u8 MIN_SERVER_NAME_LENGTH = 3;
+    static constexpr u8 MAX_SERVER_NAME_LENGTH = 10;
+
+	//Minimum port, 1-1023 requires admin/root
+	static constexpr u16 MIN_PORT_RANGE = 1;
+	//Maximum port, cannot go past 16-bit unsigned integer TCP and UDP port fields
+	static constexpr u16 MAX_PORT_RANGE = 65535;
+
     class LIB_API Server
     {
+    friend class Client;
+    friend class Link;
     friend struct default_delete<Server>;
     public:
         KNODISCARD
         static KalaServerRegistry<Server>& GetRegistry();
 
+        //Create a new server for accepting incoming UDP and TCP connections,
+        //isWebServer allows extra features
         static Server* Initialize(
-            bool isWebServer,
             string_view serverName,
             const path& serverRoot,
             u16 serverPort);
@@ -41,9 +53,7 @@ namespace KalaServer::Connection
         const vector<u32>& GetClientIDs() const;
         const vector<u32>& GetPacketIDs() const;
 
-        bool IsWebServer() const;
-
-        bool CanReceiveClients() const;
+        bool IsServerVisible() const;
         void SetServerVisibility(bool newValue);
 
         const string& GetServerName() const;
@@ -79,12 +89,13 @@ namespace KalaServer::Connection
     private:
         ~Server();
 
+        void RecreateWriterSocket(bool tcpSocket);
+
         u32 ID{};
         
         vector<u32> clientIDs{};
         vector<u32> packetIDs{};
 
-        bool isWebServer{};
         bool isVisible{};
 
         string serverName{};
@@ -95,5 +106,8 @@ namespace KalaServer::Connection
 
         vector<string> bannedIPs{};
         vector<string> blacklistedKeywords{};
+
+        uintptr_t tcpSocket{};
+        uintptr_t udpSocket{};
     };
 }

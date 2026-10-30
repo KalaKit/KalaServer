@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "core_utils.hpp"
+
 #include "core/ks_registry.hpp"
 
 namespace KalaServer::Connection
@@ -19,8 +20,13 @@ namespace KalaServer::Connection
     using std::string_view;
     using std::default_delete;
 
+    static constexpr u8 MIN_CLIENT_NAME_LENGTH = 3;
+    static constexpr u8 MAX_CLIENT_NAME_LENGTH = 10;
+
     class LIB_API Client
     {
+    friend class Server;
+    friend class Link;
     friend struct default_delete<Client>;
     public:
         KNODISCARD

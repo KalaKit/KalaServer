@@ -20,7 +20,7 @@ namespace KalaServer::Connection
 {
     class Server;
     class Client;
-	class Packet;
+	class Link;
 }
 
 namespace KalaServer::Core
@@ -48,7 +48,7 @@ namespace KalaServer::Core
 	{
     friend class KalaServer::Connection::Server;
     friend class KalaServer::Connection::Client;
-	friend class KalaServer::Connection::Packet;
+    friend class KalaServer::Connection::Link;
 	public:
 		//Get a runtime iteration safe list of all
 		//created object pointers of this registry

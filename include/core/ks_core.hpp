@@ -7,6 +7,7 @@
 
 #include <string>
 #include <filesystem>
+#include <vector>
 #include <functional>
 #include <source_location>
 
@@ -17,6 +18,7 @@ namespace KalaServer::Core
     using std::string;
     using std::string_view;
     using std::filesystem::path;
+    using std::vector;
     using std::function;
     using std::source_location;
 
@@ -44,6 +46,9 @@ namespace KalaServer::Core
         
         KNODISCARD
         static path GetExePath();
+
+        //Main once-per-frame update call, syncs server and client worker thread events with current stored data 
+        static void Update();
 
         static void SetExternalHandler(function<void(string, string, const source_location&)>&& newExternalHandler);
 
