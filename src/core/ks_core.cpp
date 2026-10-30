@@ -5,10 +5,12 @@
 
 #include "core/ks_core.hpp"
 
+#define WIN32_LEAN_AND_MEAN
+
 #if defined(KWIN_ANY)
-#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #else
 #include <fcntl.h>
 #include <arpa/inet.h>
@@ -20,6 +22,7 @@
 #include <chrono>
 
 #include "log_utils.hpp"
+#include "string_utils.hpp"
 
 #include "connection/ks_server.hpp"
 
@@ -27,6 +30,8 @@ using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaLog::TimeFormat;
 using KalaHeaders::KalaLog::DateFormat;
+
+using KalaHeaders::KalaString::TrimString;
 
 using KalaServer::Connection::Server;
 
@@ -40,6 +45,8 @@ using std::chrono::steady_clock;
 using std::chrono::milliseconds;
 
 #if defined(KWIN_ANY)
+using std::wstring;
+
 using ksocket = SOCKET;
 constexpr ksocket invalid_socket = INVALID_SOCKET;
 #define kclose(sock) closesocket(sock)
@@ -123,6 +130,69 @@ namespace KalaServer::Core
 			LogType::LOG_SUCCESS);
 
 		return true;
+	}
+
+	string KalaServerCore::ErrorToString(int error)
+	{
+		static string empty{};
+#if defined(KWIN_ANY)
+		auto to_short = [](const wstring& str)
+			{
+				if (str.empty()) return empty;
+
+				int size_needed = WideCharToMultiByte(
+					CP_UTF8,
+					0,
+					str.data(),
+					scast<int>(str.size()),
+					nullptr,
+					0,
+					nullptr,
+					nullptr);
+
+				if (size_needed <= 0) return empty;
+
+				string result(size_needed, 0);
+
+				if (WideCharToMultiByte(
+					CP_UTF8,
+					0,
+					str.data(),
+					scast<int>(str.size()),
+					result.data(),
+					size_needed,
+					nullptr,
+					nullptr) <= 0)
+				{
+					return empty;
+				}
+
+				return result;
+			};
+
+		LPWSTR buffer{};
+
+		FormatMessageW(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER
+			| FORMAT_MESSAGE_FROM_SYSTEM
+			| FORMAT_MESSAGE_IGNORE_INSERTS,
+			nullptr,
+			error,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPWSTR)&buffer,
+			0,
+			nullptr);
+
+		wstring wmsg = buffer ? buffer : L"Unknown error";
+
+		if (buffer) LocalFree(buffer);
+
+		string ts{};
+		string _ = TrimString(to_short(wmsg) + " [" + to_string(error) + "]", ts);
+		return ts;
+#else
+		return string(strerror(error)) + " [" + to_string(error) + "]";
+#endif
 	}
 
 	const string& KalaServerCore::GetIP() { return IP; }

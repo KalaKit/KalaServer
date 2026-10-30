@@ -9,7 +9,8 @@ dir_debug: "build/debug-"
 name_ks: "kalaserver"
 dir_ks: "../../build/0-0-1"
 comm_objcopy: "objcopy --remove-section .note.gnu.property"
-links_win_only: "msvcrt", "msvcprt", "ucrt", "vcruntime", "shell32", "user32"
+links_win: "Ws2_32", "Shell32", "Ole32"
+links_linux: "ssl", "crypto"
 
 #global
 compilerlauncher: "ccache"
@@ -26,24 +27,24 @@ customflags: "export-compile-commands", "export-vscode-sln"
 #profile debug-windows
 buildtype: "debug"
 buildpath: "${dir_debug}windows"
-links: "${dir_ks}/${name_ks}d.lib", "${links_win_only}"
+links: "${dir_ks}/${name_ks}d.lib", "${links_win}"
 
 #profile release-windows
 buildtype: "minsizerel"
 buildpath: "${dir_release}windows"
-links: "${dir_ks}/${name_ks}.lib", "${links_win_only}"
+links: "${dir_ks}/${name_ks}.lib", "${links_win}"
 
 #profile debug-linux
 buildtype: "debug"
 buildpath: "${dir_debug}linux"
-links: "${dir_ks}/lib${name_ks}d.a"
+links: "${dir_ks}/lib${name_ks}d.a", "${links_linux}"
 //strips stupid avx requirements that cachyos seems to add for no reason
 postbuildaction: "${comm_objcopy} ${dir_debug}linux/${name_bin}"
 
 #profile release-linux
 buildtype: "minsizerel"
 buildpath: "${dir_release}linux"
-links: "${dir_ks}/lib${name_ks}.a"
+links: "${dir_ks}/lib${name_ks}.a", "${links_linux}"
 //strips stupid avx requirements that cachyos seems to add for no reason
 postbuildaction: "${comm_objcopy} ${dir_release}linux/${name_bin}"
 postbuildaction: "strip --strip-unneeded ${dir_release}linux/${name_bin}"

@@ -30,6 +30,8 @@ namespace KalaServer::Core
         static bool IsInitialized();
         static bool Initialize(string_view newValue);
 
+        static string ErrorToString(int error);
+
         static const string& GetIP();
 
         static bool IsValidIP(string_view targetValue);
