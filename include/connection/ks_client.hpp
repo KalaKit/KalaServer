@@ -30,15 +30,12 @@ namespace KalaServer::Connection
         static Client* Initialize(string_view username);
 
         u32 GetID() const;
-
         u32 GetServerID() const;
 
         //Connect to local server by server ID
         void ConnectToServer(u32 serverID);
-        //Connect to remote or local server by IP and port
-        void ConnectToServer(
-            string_view serverIP,
-            u16 serverPort);
+        //Connect to remote or local server by port
+        void ConnectToServer(u16 serverPort);
         //Disconnect from currently connected server
         void DisconnectFromServer();
 
@@ -53,7 +50,6 @@ namespace KalaServer::Connection
         u32 ID{};
         u32 serverID{};
 
-        string serverIP{};
         u16 serverPort{};
 
         string username{};

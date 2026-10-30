@@ -54,7 +54,7 @@ namespace KalaServer::Connection
         const path& GetServerRoot() const;
 
         const vector<path>& GetWhitelistedRoutes() const;
-        void WhitelistRoute(const path& targetPath);
+        void AddWhitelistedRoute(const path& targetPath);
         void RemoveWhitelistedRoute(const path& targetPath);
 
         void ImportWhitelistedRoutes(const path& targetPath);

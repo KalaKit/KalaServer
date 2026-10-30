@@ -20,6 +20,10 @@ namespace KalaServer::Core
     using std::function;
     using std::source_location;
 
+    //wait this period until doing a full HasInternet check again,
+    //if within this range then always return as true
+    static constexpr u8 INTERNET_CHECK_WAIT_PERIOD_S = 10;
+
     class LIB_API KalaServerCore
     {
     public:

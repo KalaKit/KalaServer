@@ -10,11 +10,14 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <linux/limits.h>
 #include <unistd.h>
 #include <csignal>
 #endif
+
+#include <chrono>
 
 #include "log_utils.hpp"
 
@@ -32,8 +35,22 @@ using std::to_string;
 using std::filesystem::path;
 using std::function;
 using std::source_location;
+using std::chrono::duration_cast;
+using std::chrono::steady_clock;
+using std::chrono::milliseconds;
+
+#if defined(KWIN_ANY)
+using ksocket = SOCKET;
+constexpr ksocket invalid_socket = INVALID_SOCKET;
+#define kclose(sock) closesocket(sock)
+#else
+using ksocket = int;
+constexpr ksocket invalid_socket = -1;
+#define kclose(sock) close(sock)
+#endif
 
 static bool isInitialized{};
+static bool readyToCheckInternetState{};
 static string IP{};
 
 static u32 globalID{};
@@ -70,6 +87,7 @@ namespace KalaServer::Core
 		}
 
 #if defined(KWIN_ANY)
+		WSADATA wsaData{};
 		u32 errorCode = WSAStartup(MAKEWORD(2, 2), &wsaData);
 		if (errorCode != 0)
 		{
@@ -78,6 +96,8 @@ namespace KalaServer::Core
 				"Failed to call WSASTARTUP! Error code: " + KalaServerCore::ErrorToString(errorCode));
 		}
 #endif
+
+		readyToCheckInternetState = true;
 
 		if (!HasInternet())
 		{
@@ -127,7 +147,161 @@ namespace KalaServer::Core
 
 	bool KalaServerCore::HasInternet()
 	{
-		
+		if (!readyToCheckInternetState)
+		{
+			Log::Print(
+				"Failed to check for internet access because KalaServer has not yet been initalized!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return false;
+		}
+
+		static bool cachedResult{};
+		static u64 lastCheckedTime{};
+
+		u64 now = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		if (now - lastCheckedTime < INTERNET_CHECK_WAIT_PERIOD_S * 1000ULL) return cachedResult;
+
+#if defined (KWIN_ANY)
+		ksocket sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (sock == INVALID_SOCKET)
+		{
+			string err = ErrorToString(WSAGetLastError());
+
+			Log::Print(
+				"Failed to check internet state for IP '" + string(IP) + "' because socket creation failed! Reason: " + err,
+				"KS_CORE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		u_long mode = 1;
+		if (ioctlsocket(sock, FIONBIO, &mode) == SOCKET_ERROR)
+		{
+			string err = ErrorToString(WSAGetLastError());
+
+			Log::Print(
+				"Failed to enable nonblocking socket mode! Reason: " + err,
+				"KS_CORE",
+				LogType::LOG_ERROR,
+				2);
+
+			kclose(sock);
+			return false;
+		}
+#else
+		ksocket sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (sock < 0)
+		{
+			Log::Print(
+				"Failed to check internet state for IP '" + string(IP) + "' because socket creation failed!",
+				"KS_CORE",
+				LogType::LOG_ERROR,
+				2);
+
+			return false;
+		}
+
+		int flags = fcntl(sock, F_GETFL, 0);
+
+		if (flags == -1
+			|| fcntl(sock, F_SETFL, flags | O_NONBLOCK) == -1)
+		{
+			Log::Print(
+				"Failed to enable nonblocking socket mode!",
+				"KS_CORE",
+				LogType::LOG_ERROR,
+				2);
+
+			kclose(sock);
+			return false;
+		}
+#endif
+
+		sockaddr_in addr{};
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(53);
+		if (inet_pton(AF_INET, "1.1.1.1", &addr.sin_addr) != 1)
+		{
+			kclose(sock);
+			return false;
+		}
+
+		int result = connect(sock, (sockaddr*)&addr, sizeof(addr));
+
+#if defined(KWIN_ANY)
+		bool inProgress = 
+			result == SOCKET_ERROR
+			&& WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+		bool inProgress = 
+			result == -1
+			&& errno == EINPROGRESS;
+#endif
+
+		cachedResult = result == 0;
+
+		if (!cachedResult
+			&& inProgress)
+		{
+			fd_set writeSet{};
+			FD_ZERO(&writeSet);
+			FD_SET(sock, &writeSet);
+
+			timeval timeout{};
+			timeout.tv_sec = 1;
+
+#if defined(KWIN_ANY)
+			int ready = select(
+				0,
+				nullptr,
+				&writeSet,
+				nullptr,
+				&timeout);
+#else
+			int ready = select(
+				sock + 1,
+				nullptr,
+				&writeSet,
+				nullptr,
+				&timeout);
+#endif
+			
+			if (ready > 0)
+			{
+				int socketError{};
+
+#if defined(KWIN_ANY)
+				int errorSize = sizeof(socketError);
+				if (getsockopt(
+					sock,
+					SOL_SOCKET,
+					SO_ERROR,
+					(char*)&socketError,
+					&errorSize) == 0)
+#else
+				socklen_t errorSize = sizeof(socketError);
+				if (getsockopt(
+					sock,
+					SOL_SOCKET,
+					SO_ERROR,
+					&socketError,
+					&errorSize) == 0)
+#endif
+				{
+					cachedResult = socketError == 0;
+				}
+			}
+		}
+
+		kclose(sock);
+
+		lastCheckedTime = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+
+		return cachedResult;
 	}
 
 	u32 KalaServerCore::GetGlobalID() { return globalID; }
@@ -254,6 +428,7 @@ namespace KalaServer::Core
 
 		if (shutdownCallback) shutdownCallback();
 
+		readyToCheckInternetState = false;
 		isInitialized = false;
 		IP.clear();
 

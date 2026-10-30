@@ -69,6 +69,7 @@ namespace KalaServer::Connection
 
         u32 GetID() const;
         u32 GetSenderID() const;
+        
         SenderType GetSenderType() const;
 
         const string& GetReceiverIP() const;
