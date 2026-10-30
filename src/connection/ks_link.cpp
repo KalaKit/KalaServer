@@ -300,7 +300,7 @@ namespace KalaServer::Connection
             }
 
 #if defined(KWIN_ANY)
-            int error == WSAGetLastError();
+            int error = WSAGetLastError();
             bool wouldBlock = error == WSAEWOULDBLOCK;
 #else
             int error = errno;
