@@ -9,9 +9,12 @@
 #include <memory>
 
 #include "core_utils.hpp"
+#include "core/ks_registry.hpp"
 
 namespace KalaServer::Connection
 {
+    using KalaServer::Core::KalaServerRegistry;
+
     using std::string;
     using std::string_view;
     using std::default_delete;
@@ -20,6 +23,9 @@ namespace KalaServer::Connection
     {
     friend struct default_delete<Client>;
     public:
+        KNODISCARD
+        static KalaServerRegistry<Client>& GetRegistry();
+
         //Create a new client with a username for identification
         static Client* Initialize(string_view username);
 

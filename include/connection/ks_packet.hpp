@@ -10,9 +10,12 @@
 #include <memory>
 
 #include "core_utils.hpp"
+#include "core/ks_registry.hpp"
 
 namespace KalaServer::Connection
 {
+    using KalaServer::Core::KalaServerRegistry;
+
     using std::string;
     using std::vector;
     using std::default_delete;
@@ -45,6 +48,9 @@ namespace KalaServer::Connection
     {
     friend struct default_delete<Packet>;
     public:
+        KNODISCARD
+        static KalaServerRegistry<Packet>& GetRegistry();
+
         //A packet dies after it was sent or after its response was received,
         //it cannot be destroyed manually,
         //the client always gets destroyed if a packet is sent

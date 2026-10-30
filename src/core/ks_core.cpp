@@ -7,7 +7,10 @@
 
 #if defined(KWIN_ANY)
 #include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
+#include <arpa/inet.h>
 #include <linux/limits.h>
 #include <unistd.h>
 #include <csignal>
@@ -15,10 +18,14 @@
 
 #include "log_utils.hpp"
 
+#include "connection/ks_server.hpp"
+
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaLog::TimeFormat;
 using KalaHeaders::KalaLog::DateFormat;
+
+using KalaServer::Connection::Server;
 
 using std::string;
 using std::to_string;
@@ -26,12 +33,103 @@ using std::filesystem::path;
 using std::function;
 using std::source_location;
 
+static bool isInitialized{};
+static string IP{};
+
 static u32 globalID{};
 static path exePath{};
 static function<void(string, string, const source_location&)> externalHandler{};
 
+static function<void()> shutdownCallback{};
+
 namespace KalaServer::Core
 {
+	bool KalaServerCore::IsInitialized() { return isInitialized; }
+	bool KalaServerCore::Initialize(string_view newIP)
+	{
+		if (isInitialized)
+		{
+			Log::Print(
+				"Failed to initialize KalaServer via IP '" 
+				+ string(newIP) + "' because it is already initialized!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return false;
+		}
+
+		if (!IsValidIP(newIP))
+		{
+			Log::Print(
+				"Failed to initialize KalaServer via IP '" 
+				+ string(newIP) + "' because the IP is not valid!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return false;
+		}
+
+#if defined(KWIN_ANY)
+		u32 errorCode = WSAStartup(MAKEWORD(2, 2), &wsaData);
+		if (errorCode != 0)
+		{
+			ForceClose(
+				"KalaServer init error",
+				"Failed to call WSASTARTUP! Error code: " + KalaServerCore::ErrorToString(errorCode));
+		}
+#endif
+
+		if (!HasInternet())
+		{
+#if defined(KWIN_ANY)
+		WSACleanup();
+#endif
+
+			Log::Print(
+				"Failed to initialize KalaServer via IP '" 
+				+ string(newIP) + "' because a working internet connection couldn't be confirmed!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return false;
+		}
+
+		IP = newIP;
+		isInitialized = true;
+
+		Log::Print(
+			"Initialized KalaServer via IP '" + string(newIP) + "'!",
+			"KS_CORE",
+			LogType::LOG_SUCCESS);
+
+		return true;
+	}
+
+	const string& KalaServerCore::GetIP() { return IP; }
+
+	bool KalaServerCore::IsValidIP(string_view targetValue)
+	{
+		if (targetValue.empty()
+			|| targetValue.find('\0') != string::npos)
+		{
+			return false;
+		}
+
+		string thisIP{targetValue};
+
+		in_addr ipv4{};
+		in6_addr ipv6{};
+
+		return 
+			inet_pton(AF_INET, thisIP.c_str(), &ipv4) == 1
+			|| inet_pton(AF_INET6, thisIP.c_str(), &ipv6) == 1;
+	}
+
+	bool KalaServerCore::HasInternet()
+	{
+		
+	}
+
 	u32 KalaServerCore::GetGlobalID() { return globalID; }
 	void KalaServerCore::SetGlobalID(u32 newID) { globalID = newID; }
 
@@ -93,6 +191,10 @@ namespace KalaServer::Core
         string_view reason,
         const source_location& location)
     {
+#if defined(KWIN_ANY)
+		if (isInitialized) WSACleanup();
+#endif
+
 		if (externalHandler) externalHandler(string(title), string(reason), location);
 		else
 		{
@@ -127,4 +229,38 @@ namespace KalaServer::Core
 
         _Exit(1);
     }
+
+	void SetShutdownCallback(function<void()> newShutdownCallback) { shutdownCallback = newShutdownCallback; }
+
+	void KalaServerCore::Shutdown(bool closeExecutableAfterShutdown)
+	{
+		if (!isInitialized)
+		{
+			Log::Print(
+				"Failed to shut down KalaServer because it has not been initialized!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return;
+		}
+
+		vector<Server*> copy = Server::GetRegistry().GetAllContent();
+		for (Server* s : copy) s->Destroy();
+
+		Log::Print(
+			"Finished shutting down KalaServer for IP '" + string(IP) + "'!",
+			"KS_CORE",
+			LogType::LOG_SUCCESS);
+
+		if (shutdownCallback) shutdownCallback();
+
+		isInitialized = false;
+		IP.clear();
+
+#if defined(KWIN_ANY)
+		WSACleanup();
+#endif
+
+		if (closeExecutableAfterShutdown) exit(0);
+	}
 }

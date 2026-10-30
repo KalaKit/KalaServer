@@ -11,9 +11,12 @@
 #include <memory>
 
 #include "core_utils.hpp"
+#include "core/ks_registry.hpp"
 
 namespace KalaServer::Connection
 {
+    using KalaServer::Core::KalaServerRegistry;
+
     using std::string;
     using std::string_view;
     using std::vector;
@@ -24,6 +27,9 @@ namespace KalaServer::Connection
     {
     friend struct default_delete<Server>;
     public:
+        KNODISCARD
+        static KalaServerRegistry<Server>& GetRegistry();
+
         static Server* Initialize(
             bool isWebServer,
             string_view serverName,
@@ -42,8 +48,6 @@ namespace KalaServer::Connection
 
         const string& GetServerName() const;
         void SetServerName(string_view newValue);
-
-        string GetServerIP() const;
 
         u16 GetServerPort() const;
 
@@ -84,8 +88,6 @@ namespace KalaServer::Connection
         bool isVisible{};
 
         string serverName{};
-        string serverIP{};
-
         u16 serverPort{};
 
         path serverRoot{};

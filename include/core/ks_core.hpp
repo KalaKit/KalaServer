@@ -23,6 +23,15 @@ namespace KalaServer::Core
     class LIB_API KalaServerCore
     {
     public:
+        static bool IsInitialized();
+        static bool Initialize(string_view newValue);
+
+        static const string& GetIP();
+
+        static bool IsValidIP(string_view targetValue);
+
+        static bool HasInternet();
+
 		KNODISCARD
 		static u32 GetGlobalID();
 		static void SetGlobalID(u32 newID);
@@ -37,5 +46,14 @@ namespace KalaServer::Core
             string_view title,
             string_view reason,
             const source_location& location = source_location::current());
+
+        //Assign a shutdown callback to decide what happens besides just KalaServer shutdown when Shutdown is called
+        static void SetShutdownCallback(function<void()> shutdownCallback);
+
+        //Gracefully shut down KalaServer and all its servers and clients,
+        //set closeExecutableAfterShutdown if you also want to close the executable once KalaServer shutdown is complete,
+        //assign a function via SetShutdownCallback to decide what happens after KalaServer resources are cleaned
+        //and before KalaServer closes the executable if closeExecutableAfterShutdown is true
+        static void Shutdown(bool closeExecutableAfterShutdown = false);
     };
 }
