@@ -86,7 +86,8 @@ namespace KalaServer::Core
 			return false;
 		}
 
-		if (!IsValidIP(newIP))
+		if (!IsIPv4(newIP)
+			&& !IsIPv6(newIP))
 		{
 			Log::Print(
 				"Failed to initialize KalaServer via IP '" 
@@ -216,7 +217,7 @@ namespace KalaServer::Core
 		return IP;
 	}
 
-	bool KalaServerCore::IsValidIP(string_view targetValue)
+	bool KalaServerCore::IsIPv4(string_view targetValue)
 	{
 		if (targetValue.empty()
 			|| targetValue.find('\0') != string::npos)
@@ -227,11 +228,22 @@ namespace KalaServer::Core
 		string thisIP{targetValue};
 
 		in_addr ipv4{};
+
+		return inet_pton(AF_INET, thisIP.c_str(), &ipv4) == 1;
+	}
+	bool KalaServerCore::IsIPv6(string_view targetValue)
+	{
+		if (targetValue.empty()
+			|| targetValue.find('\0') != string::npos)
+		{
+			return false;
+		}
+
+		string thisIP{targetValue};
+
 		in6_addr ipv6{};
 
-		return 
-			inet_pton(AF_INET, thisIP.c_str(), &ipv4) == 1
-			|| inet_pton(AF_INET6, thisIP.c_str(), &ipv6) == 1;
+		return inet_pton(AF_INET6, thisIP.c_str(), &ipv6) == 1;
 	}
 
 	bool KalaServerCore::HasInternet()

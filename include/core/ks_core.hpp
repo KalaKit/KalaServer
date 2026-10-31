@@ -36,7 +36,8 @@ namespace KalaServer::Core
 
         static const string& GetIP();
 
-        static bool IsValidIP(string_view targetValue);
+        static bool IsIPv4(string_view targetValue);
+        static bool IsIPv6(string_view targetValue);
 
         static bool HasInternet();
 

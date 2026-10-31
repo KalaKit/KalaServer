@@ -119,5 +119,8 @@ namespace KalaServer::Connection
         u8 timeout = 2;
 
         TransportProtocol transportProtocol{};
+
+        uintptr_t tcpSocket{};
+        uintptr_t udpSocket{};
     };
 }
