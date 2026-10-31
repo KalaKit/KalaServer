@@ -6,11 +6,17 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <memory>
 
 #include "core_utils.hpp"
 
 #include "core/ks_registry.hpp"
+
+namespace KalaServer::Core
+{
+    class KalaServerCore;
+}
 
 namespace KalaServer::Connection
 {
@@ -18,6 +24,7 @@ namespace KalaServer::Connection
 
     using std::string;
     using std::string_view;
+    using std::vector;
     using std::default_delete;
 
     static constexpr u8 MIN_CLIENT_NAME_LENGTH = 3;
@@ -25,6 +32,7 @@ namespace KalaServer::Connection
 
     class LIB_API Client
     {
+    friend class KalaServer::Core::KalaServerCore;
     friend class Server;
     friend class Link;
     friend struct default_delete<Client>;
@@ -37,6 +45,10 @@ namespace KalaServer::Connection
 
         u32 GetID() const;
         u32 GetServerID() const;
+        const vector<u32>& GetLinkIDs() const;
+
+        bool IsVisible() const;
+        void SetVisibility(bool newValue);
 
         //Connect to local server by server ID
         void ConnectToServer(u32 serverID);
@@ -55,6 +67,9 @@ namespace KalaServer::Connection
 
         u32 ID{};
         u32 serverID{};
+        vector<u32> linkIDs{};
+
+        bool isVisible{};
 
         u16 serverPort{};
 

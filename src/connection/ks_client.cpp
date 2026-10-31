@@ -124,6 +124,34 @@ namespace KalaServer::Connection
 
     u32 Client::GetID() const { return ID; }
     u32 Client::GetServerID() const { return serverID; }
+    const vector<u32>& Client::GetLinkIDs() const { return linkIDs; }
+
+    bool Client::IsVisible() const { return isVisible; }
+    void Client::SetVisibility(bool newValue)
+    {
+        if (newValue
+            && isVisible)
+        {
+            Log::Print(
+                "Failed to set client '" + username + "' visible because it already was visible!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+        if (!newValue
+            && !isVisible)
+        {
+            Log::Print(
+                "Failed to set client '" + username + "' invisible because it already was invisible!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+
+        isVisible = newValue;
+    }
 
     void Client::ConnectToServer(u32 serverID)
     {

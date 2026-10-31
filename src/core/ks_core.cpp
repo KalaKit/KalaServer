@@ -456,6 +456,75 @@ namespace KalaServer::Core
 		return exePath;
 	}
 
+	void KalaServerCore::Update()
+	{
+		if (!isInitialized)
+		{
+			Log::Print(
+				"Failed to update KalaServer because it was not initialized!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return;
+		}
+
+		const vector<Server*> servers = Server::GetRegistry().GetAllContent();
+		const vector<Client*> clients = Client::GetRegistry().GetAllContent();
+
+		if (servers.empty()
+			&& clients.empty())
+		{
+			Log::Print(
+				"Failed to update KalaServer because there are no servers or clients!",
+				"KS_CORE",
+				LogType::LOG_WARNING);
+
+			return;
+		}
+
+		for (const Server* s : servers)
+		{
+			if (!s->isVisible) continue;
+			
+			for (const u32 lid : s->linkIDs)
+			{
+				Link* l{};
+				string err = Link::GetRegistry().GetContent(lid, l);
+
+				if (!err.empty())
+				{
+					ForceClose(
+						"KalaServer Core error",
+						"Failed to update KalaServer because server '" 
+						+ to_string(s->ID) + "' link '" + to_string(lid) + "' was invalid!");
+				}
+
+				l->Update();
+			}
+		}
+
+		for (const Client* c : clients)
+		{
+			if (!c->isVisible) continue;
+
+			for (const u32 lid : c->linkIDs)
+			{
+				Link* l{};
+				string err = Link::GetRegistry().GetContent(lid, l);
+
+				if (!err.empty())
+				{
+					ForceClose(
+						"KalaServer Core error",
+						"Failed to update KalaServer because client '" 
+						+ to_string(c->ID) + "' link '" + to_string(lid) + "' was invalid!");
+				}
+
+				l->Update();
+			}
+		}
+	}
+
 	void KalaServerCore::SetExternalHandler(function<void(string, string, const source_location&)>&& newExternalHandler)
 	{ 
 		externalHandler = std::move(newExternalHandler);

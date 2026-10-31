@@ -523,8 +523,24 @@ namespace KalaServer::Connection
             "KS_LINK",
             LogType::LOG_SUCCESS);
 
-        if (responseType == ResponseType::RT_IgnoreResponse)
+        if (responseType == ResponseType::RT_IgnoreResponse
+            || ((server
+            && !server->isVisible)
+            || (client
+            && !client->isVisible)))
         {
+            if ((server
+                && !server->isVisible)
+                || (client
+                && !client->isVisible))
+            {
+                Log::Print(
+                    "Response for sender '" + to_string(senderID) + "' was discarded from receiver '" 
+                    + string(receiverIP) + "' via port '" + to_string(receiverPort) + "' because the sender was set as invisible.",
+                    "KS_LINK",
+                    LogType::LOG_INFO);
+            }
+
             kclose(targetSocket);
             return;
         }
@@ -619,7 +635,7 @@ namespace KalaServer::Connection
         kclose(targetSocket);
 
         Log::Print(
-            "Response has been received from receiver '" 
+            "Response for sender '" + to_string(senderID) + "' has been received from receiver '" 
             + string(receiverIP) + "' via port '" + to_string(receiverPort) + "'!",
             "KS_LINK",
             LogType::LOG_SUCCESS);
@@ -698,6 +714,11 @@ namespace KalaServer::Connection
         function<void(vector<u8>)> responseCallback)
     {
 
+    }
+
+    void Link::Update()
+    {
+        
     }
 
     void Link::Destroy()

@@ -14,6 +14,11 @@
 
 #include "core/ks_registry.hpp"
 
+namespace KalaServer::Core
+{
+    class KalaServerCore;
+}
+
 namespace KalaServer::Connection
 {
     using KalaServer::Core::KalaServerRegistry;
@@ -34,6 +39,7 @@ namespace KalaServer::Connection
 
     class LIB_API Server
     {
+    friend class KalaServer::Core::KalaServerCore;
     friend class Client;
     friend class Link;
     friend struct default_delete<Server>;
@@ -51,10 +57,10 @@ namespace KalaServer::Connection
         u32 GetID() const;
 
         const vector<u32>& GetClientIDs() const;
-        const vector<u32>& GetPacketIDs() const;
+        const vector<u32>& GetLinkIDs() const;
 
-        bool IsServerVisible() const;
-        void SetServerVisibility(bool newValue);
+        bool IsVisible() const;
+        void SetVisibility(bool newValue);
 
         const string& GetServerName() const;
         void SetServerName(string_view newValue);
@@ -94,7 +100,7 @@ namespace KalaServer::Connection
         u32 ID{};
         
         vector<u32> clientIDs{};
-        vector<u32> packetIDs{};
+        vector<u32> linkIDs{};
 
         bool isVisible{};
 

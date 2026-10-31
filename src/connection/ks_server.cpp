@@ -168,10 +168,10 @@ namespace KalaServer::Connection
     u32 Server::GetID() const { return ID; }
 
     const vector<u32>& Server::GetClientIDs() const { return clientIDs; }
-    const vector<u32>& Server::GetPacketIDs() const { return packetIDs; }
+    const vector<u32>& Server::GetLinkIDs() const { return linkIDs; }
 
-    bool Server::IsServerVisible() const { return isVisible; }
-    void Server::SetServerVisibility(bool newValue)
+    bool Server::IsVisible() const { return isVisible; }
+    void Server::SetVisibility(bool newValue)
     {
         if (newValue
             && isVisible)

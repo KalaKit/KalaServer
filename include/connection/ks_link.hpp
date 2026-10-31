@@ -14,6 +14,11 @@
 
 #include "core/ks_registry.hpp"
 
+namespace KalaServer::Core
+{
+    class KalaServerCore;
+}
+
 namespace KalaServer::Connection
 {
     using KalaServer::Core::KalaServerRegistry;
@@ -56,6 +61,7 @@ namespace KalaServer::Connection
 
     class LIB_API Link
     {
+    friend class KalaServer::Core::KalaServerCore;
     friend class Server;
     friend class Client;
     friend struct default_delete<Link>;
@@ -108,6 +114,8 @@ namespace KalaServer::Connection
         void Destroy();
     private:
         ~Link();
+
+        void Update();
 
         u32 ID{};
         u32 senderID{};
