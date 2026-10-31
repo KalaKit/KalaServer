@@ -36,12 +36,15 @@ using KalaServer::Core::KalaServerRegistry;
 using KalaServer::Connection::Server;
 
 using std::to_string;
+using std::vector;
 using std::filesystem::exists;
 using std::filesystem::is_directory;
-using std::unique_ptr;
-using std::make_unique;
+using std::mutex;
+using std::atomic;
 using std::thread;
 using std::scoped_lock;
+using std::unique_ptr;
+using std::make_unique;
 
 #if defined(KWIN_ANY)
 using ksocket = SOCKET;
@@ -53,13 +56,21 @@ constexpr ksocket invalid_socket = -1;
 #define kclose(targetSocket) close(targetSocket)
 #endif
 
+struct ThreadData
+{
+    u32 serverID{};
+    thread thisThread{};
+};
+
 static KalaServerRegistry<Server> registry{};
 
-static thread tcpListenerThread{};
-static thread udpListenerThread{};
+static atomic<bool> isShuttingDown{};
 
-static void TCPListenerThread(Server* server);
-static void UDPListenerThread(Server* server);
+static mutex threadDataMutex{};
+static vector<ThreadData> threadData{};
+
+static void _TCPThread(Server* server);
+static void _UDPThread(Server* server);
 
 namespace KalaServer::Connection
 {
@@ -292,15 +303,45 @@ namespace KalaServer::Connection
 
     }
 
+    void Server::CloseRemainingThreads()
+    {
+        isShuttingDown.store(true);
+
+        vector<ThreadData> remainingThreads{};
+
+        {
+            scoped_lock lock(threadDataMutex);
+            remainingThreads = std::move(threadData);
+        }
+
+        for (ThreadData& t : remainingThreads)
+        {
+            if (t.thisThread.joinable()) t.thisThread.join();
+        }
+    }
+
     void Server::Destroy()
     {
         isVisible = false;
 
-        kclose(tcpSocket);
-        kclose(udpSocket);
+        vector<thread> targetThreads{};
 
-        tcpListenerThread.join();
-        udpListenerThread.join();
+        {
+            scoped_lock lock(threadDataMutex);
+            
+            for (size_t i = threadData.size(); i > 0; --i)
+            {
+                if (threadData[i - 1].serverID != ID) continue;
+
+                targetThreads.push_back(std::move(threadData[i - 1].thisThread));
+                threadData.erase(threadData.begin() + (i - 1));
+            }
+        }
+
+        for (thread& t : targetThreads)
+        {
+            if (t.joinable()) t.join();
+        }
 
         for (const u32 lid : GetLinkIDs())
         {
@@ -336,11 +377,11 @@ namespace KalaServer::Connection
     }
 }
 
-void TCPListenerThread(Server* server)
+void _TCPThread(Server* server)
 {
 
 }
-void UDPListenerThread(Server* server)
+void _UDPThread(Server* server)
 {
 
 }

@@ -9,7 +9,6 @@
 #include <vector>
 #include <functional>
 #include <atomic>
-#include <thread>
 #include <memory>
 
 #include "core_utils.hpp"
@@ -30,7 +29,6 @@ namespace KalaServer::Connection
     using std::vector;
     using std::function;
     using std::atomic;
-    using std::thread;
     using std::default_delete;
 
     enum class SenderType : u8
@@ -65,12 +63,29 @@ namespace KalaServer::Connection
 
     class LIB_API Link
     {
+    friend void _SendPacket(
+        const bool isSingleShot,
+        const u32 linkID,
+        const u32 senderID,
+        const SenderType senderType,
+        const string& receiverIP,
+        const u16 receiverPort,
+        const u8 timeout,
+        const TransportProtocol transportProtocol,
+        const PacketConnectionMode packetConnectionMode,
+        const ResponseType responseType,
+        const vector<u8>& payload,
+        const function<void(vector<u8>)>& initialResponseCallback,
+        const function<void(vector<u8>)>& listenerResponseCallback);
     friend class KalaServer::Core::KalaServerCore;
     friend class Server;
     friend struct default_delete<Link>;
     public:
         KNODISCARD
         static KalaServerRegistry<Link>& GetRegistry();
+
+        //Returns count of active connections not tied to any link
+        static u32 GetActiveHeadlessConnectionCount();
 
         //Create a socket and send a single packet via the
         //transport protocol type that then gets closed once it is finished,
@@ -86,7 +101,7 @@ namespace KalaServer::Connection
             TransportProtocol transportProtocol,
             ResponseType responseType,
             const vector<u8>& payload,
-            function<void(vector<u8>)> responseCallback);
+            const function<void(vector<u8>)>& responseCallback);
 
         //Create a new link that connects this server or client and the target ip.
         //Pick the transport protocol to determine which kind of packets are sent.
@@ -103,6 +118,9 @@ namespace KalaServer::Connection
 
         u32 GetSenderID() const;
         SenderType GetSenderType() const;
+
+        //Returns count of active connections tied to this link
+        u32 GetActiveConnectionCount() const;
 
         const string& GetReceiverIP() const;
         u16 GetReceiverPort() const;
@@ -123,11 +141,11 @@ namespace KalaServer::Connection
         //Assign a listener response callback to decide what happens when
         //the listener socket for this packet connection mode receives a message.
         void SendPacket(
-            PacketConnectionMode packetConnectionMode,
-            ResponseType responseType,
+            const PacketConnectionMode packetConnectionMode,
+            const ResponseType responseType,
             const vector<u8>& payload = {},
-            function<void(vector<u8>)> initialResponseCallback = {},
-            function<void(vector<u8>)> listenerResponseCallback = {});
+            const function<void(vector<u8>)>& initialResponseCallback = {},
+            const function<void(vector<u8>)>& listenerResponseCallback = {});
 
         //Close the link
         void Destroy();
@@ -136,9 +154,13 @@ namespace KalaServer::Connection
 
         void Update();
 
+        static void CloseRemainingThreads();
+
         u32 ID{};
         u32 senderID{};
         SenderType senderType{};
+
+        atomic<u32> activeConnections{};
 
         string receiverIP{};
         u16 receiverPort{};
@@ -146,14 +168,5 @@ namespace KalaServer::Connection
         u8 timeout = 5;
 
         TransportProtocol transportProtocol{};
-
-        atomic<uintptr_t> senderTCPSocket{};
-        atomic<uintptr_t> senderUDPSocket{};
-
-        atomic<uintptr_t> listenerTCPSocket{};
-        atomic<uintptr_t> listenerUDPSocket{};
-
-        thread tcpThread{};
-        thread udpThread{};
     };
 }

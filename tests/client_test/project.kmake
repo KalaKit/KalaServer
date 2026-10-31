@@ -3,7 +3,7 @@
 #version 2.0
 
 #references
-name_bin: "website_test"
+name_bin: "client_test"
 dir_release: "build/release-"
 dir_debug: "build/debug-"
 name_ks: "kalaserver"

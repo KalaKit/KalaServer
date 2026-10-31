@@ -15,6 +15,8 @@
 #include <unistd.h>
 #endif
 
+#include <thread>
+
 #include "log_utils.hpp"
 
 #include "core/ks_core.hpp"
@@ -40,6 +42,10 @@ using std::string_view;
 using std::to_string;
 using std::vector;
 using std::function;
+using std::mutex;
+using std::atomic;
+using std::thread;
+using std::scoped_lock;
 using std::unique_ptr;
 using std::make_unique;
 
@@ -53,6 +59,12 @@ constexpr ksocket invalid_socket = -1;
 #define kclose(targetSocket) close(targetSocket)
 #endif
 
+struct ThreadData
+{
+    u32 linkID{};
+    thread thisThread{};
+};
+
 static constexpr u32 MAX_TCP_PAYLOAD_SIZE = UINT16_MAX;
 
 //max ipv4 packet 65535 -20 for ipv4 header, -8 for udp header
@@ -62,23 +74,33 @@ static constexpr u32 MAX_UDP_PAYLOAD_SIZE_IPV6 = 65527;
 
 static KalaServerRegistry<Link> registry{};
 
-static void SendPacket_Internal(
-    bool isSingleShot,
-    u32 senderID,
-    SenderType senderType,
-    string_view receiverIP,
-    u16 receiverPort,
-    u8 timeout,
-    TransportProtocol transportProtocol,
-    PacketConnectionMode packetConnectionMode,
-    ResponseType responseType,
+static atomic<bool> isShuttingDown{};
+
+static mutex threadDataMutex{};
+static vector<ThreadData> threadData{};
+
+static atomic<u32> activeHeadlessConnections{0};
+
+static void _SendPacket(
+    const bool isSingleShot,
+    const u32 linkID,
+    const u32 senderID,
+    const SenderType senderType,
+    const string& receiverIP,
+    const u16 receiverPort,
+    const u8 timeout,
+    const TransportProtocol transportProtocol,
+    const PacketConnectionMode packetConnectionMode,
+    const ResponseType responseType,
     const vector<u8>& payload,
-    function<void(vector<u8>)> initialResponseCallback,
-    function<void(vector<u8>)> listenerResponseCallback);
+    const function<void(vector<u8>)>& initialResponseCallback,
+    const function<void(vector<u8>)>& listenerResponseCallback);
 
 namespace KalaServer::Connection
 {
     KalaServerRegistry<Link>& Link::GetRegistry() { return registry; }
+
+    u32 Link::GetActiveHeadlessConnectionCount() { return activeHeadlessConnections.load(); }
 
     void Link::SendPacket(
         u32 senderID,
@@ -89,13 +111,14 @@ namespace KalaServer::Connection
         TransportProtocol transportProtocol,
         ResponseType responseType,
         const vector<u8>& payload,
-        function<void(vector<u8>)> responseCallback)
+        const function<void(vector<u8>)>& responseCallback)
     {
-        SendPacket_Internal(
+        _SendPacket(
             true,
+            0,
             senderID,
             senderType,
-            receiverIP,
+            string(receiverIP),
             receiverPort,
             timeout,
             transportProtocol,
@@ -160,6 +183,8 @@ namespace KalaServer::Connection
     u32 Link::GetSenderID() const { return senderID; }
     SenderType Link::GetSenderType() const { return senderType; }
 
+    u32 Link::GetActiveConnectionCount() const { return activeConnections.load(); }
+
     const string& Link::GetReceiverIP() const { return receiverIP; }
     u16 Link::GetReceiverPort() const { return receiverPort; }
 
@@ -169,14 +194,15 @@ namespace KalaServer::Connection
     TransportProtocol Link::GetTransportProtocol() const { return transportProtocol; }
 
     void Link::SendPacket(
-        PacketConnectionMode packetConnectionMode, 
-        ResponseType responseType, 
+        const PacketConnectionMode packetConnectionMode, 
+        const ResponseType responseType, 
         const vector<u8>& payload,
-        function<void(vector<u8>)> initialResponseCallback,
-        function<void(vector<u8>)> listenerResponseCallback)
+        const function<void(vector<u8>)>& initialResponseCallback,
+        const function<void(vector<u8>)>& listenerResponseCallback)
     {
-        SendPacket_Internal(
+        _SendPacket(
             false,
+            ID,
             senderID,
             senderType,
             receiverIP,
@@ -195,10 +221,43 @@ namespace KalaServer::Connection
 
     }
 
+    void Link::CloseRemainingThreads()
+    {
+        isShuttingDown.store(true);
+
+        vector<ThreadData> remainingThreads{};
+
+        {
+            scoped_lock lock(threadDataMutex);
+            remainingThreads = std::move(threadData);
+        }
+
+        for (ThreadData& t : remainingThreads)
+        {
+            if (t.thisThread.joinable()) t.thisThread.join();
+        }
+    }
+
     void Link::Destroy()
     {
-        if (tcpThread.joinable()) tcpThread.join();
-        if (udpThread.joinable()) udpThread.join();
+        vector<thread> targetThreads{};
+
+        {
+            scoped_lock lock(threadDataMutex);
+            
+            for (size_t i = threadData.size(); i > 0; --i)
+            {
+                if (threadData[i - 1].linkID != ID) continue;
+
+                targetThreads.push_back(std::move(threadData[i - 1].thisThread));
+                threadData.erase(threadData.begin() + (i - 1));
+            }
+        }
+
+        for (thread& t : targetThreads)
+        {
+            if (t.joinable()) t.join();
+        }
 
 		string err = registry.DestroyContent(ID);
 		if (!err.empty())
@@ -218,42 +277,47 @@ namespace KalaServer::Connection
     }
 }
 
-void SendPacket_Internal(
-    bool isSingleShot,
-    u32 senderID,
-    SenderType senderType,
-    string_view receiverIP,
-    u16 receiverPort,
-    u8 timeout,
-    TransportProtocol transportProtocol,
-    PacketConnectionMode packetConnectionMode,
-    ResponseType responseType,
+void _SendPacket(
+    const bool isSingleShot,
+    const u32 linkID,
+    const u32 senderID,
+    const SenderType senderType,
+    const string& receiverIP,
+    const u16 receiverPort,
+    const u8 timeout,
+    const TransportProtocol transportProtocol,
+    const PacketConnectionMode packetConnectionMode,
+    const ResponseType responseType,
     const vector<u8>& payload,
-    function<void(vector<u8>)> initialResponseCallback,
-    function<void(vector<u8>)> listenerResponseCallback)
+    const function<void(vector<u8>)>& initialResponseCallback,
+    const function<void(vector<u8>)>& listenerResponseCallback)
 {
-    auto on_complete_event = [
-        isSingleShot,
-        packetConnectionMode](ksocket socket) -> void
-        {
-            if (!isSingleShot 
-                && packetConnectionMode != PacketConnectionMode::PCM_DisconnectAfterSend)
-            {
-                return;
-            }
-
-            kclose(socket);
-        };
-
     //
     // SETUP
     //
 
-    Server* server{};
-
     string receiverStr = 
         "reciever '" + string(receiverIP) 
         + "' at port '" + to_string(receiverPort) + "'";
+
+    Link* link{};
+
+    if (linkID != 0)
+    {
+        string err = Link::GetRegistry().GetContent(linkID, link);
+        if (!err.empty())
+        {
+            Log::Print(
+                "Failed to send packet to " + receiverStr +
+                " because the link was invalid! Reason: " + err,
+                "KS_LINK",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+    }
+
+    Server* server{};
 
     if (senderType == SenderType::S_SERVER)
     {
@@ -299,239 +363,501 @@ void SendPacket_Internal(
         return;
     }
 
-    const bool isIPv4 = KalaServerCore::IsIPv4(receiverIP); 
+    const bool isIPv4 = KalaServerCore::IsIPv4(receiverIP);
 
-    //
-    // PREPARE TARGET SOCKET
-    //
-
-    auto create_socket = [
-        receiverIP, 
-        transportProtocol]() -> ksocket
+    auto worker_thread = [
+        isIPv4,
+        linkID,
+        senderID,
+        senderStr,
+        receiverStr,
+        timeout,
+        receiverIP,
+        receiverPort,
+        transportProtocol,
+        packetConnectionMode,
+        responseType,
+        payload,
+        initialResponseCallback,
+        listenerResponseCallback]() -> void
         {
-            int domain = KalaServerCore::IsIPv4(receiverIP)
-                ? AF_INET
-                : AF_INET6;
+            auto get_server = [senderID]() -> Server*
+                {
+                    Server* s{};
+                    string _ = Server::GetRegistry().GetContent(senderID, s);
+                    return s;
+                };
 
-            int type = transportProtocol == TransportProtocol::TP_TCP
-                ? SOCK_STREAM
-                : SOCK_DGRAM;
+            auto get_link = [linkID]() -> Link*
+                {
+                    Link* l{};
+                    string _ = Link::GetRegistry().GetContent(linkID, l);
+                    return l;
+                };
 
-            int protocol = transportProtocol == TransportProtocol::TP_TCP
-                ? IPPROTO_TCP
-                : IPPROTO_UDP;
-            
-            return socket(domain, type, protocol);
-        };
+            Server* server = get_server();
+            Link* link = get_link();
 
-    ksocket targetSocket = create_socket();
-    if (targetSocket == invalid_socket)
-    {
+            //for verifying if server is still valid during the lifetime of this thread
+            const bool hadServer = server;
+            //for verifying if the link is still valid during the lifetime of this thread
+            const bool hadLink = link;
+            //for verifying if the client is still valid during the lifetime of this thread
+            const bool hadClient = Client::IsInitialized();
+
+            //
+            // PREPARE TARGET SOCKET
+            //
+
+            auto create_socket = [
+                receiverIP, 
+                transportProtocol]() -> ksocket
+                {
+                    int domain = KalaServerCore::IsIPv4(receiverIP)
+                        ? AF_INET
+                        : AF_INET6;
+
+                    int type = transportProtocol == TransportProtocol::TP_TCP
+                        ? SOCK_STREAM
+                        : SOCK_DGRAM;
+
+                    int protocol = transportProtocol == TransportProtocol::TP_TCP
+                        ? IPPROTO_TCP
+                        : IPPROTO_UDP;
+                    
+                    return socket(domain, type, protocol);
+                };
+
+            ksocket targetSocket = create_socket();
+            if (targetSocket == invalid_socket)
+            {
 #if defined(KWIN_ANY)
-        string err = KalaServerCore::ErrorToString(WSAGetLastError());
+                string err = KalaServerCore::ErrorToString(WSAGetLastError());
 #else
-        string err = KalaServerCore::ErrorToString(errno);
+                string err = KalaServerCore::ErrorToString(errno);
 #endif
 
-        KalaServerCore::ForceClose(
-            "KalaServer Link error",
-            "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-            + " because socket creation failed! Reason: " + err);
-    }
+                //always force close
+                KalaServerCore::ForceClose(
+                    "KalaServer Link error",
+                    "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                    + " because socket creation failed! Reason: " + err);
+            }
 
 #if defined (KWIN_ANY)
-    u_long mode = 1;
-    if (ioctlsocket(targetSocket, FIONBIO, &mode) == SOCKET_ERROR)
-    {
-        string err = KalaServerCore::ErrorToString(WSAGetLastError());
+            u_long mode = 1;
+            if (ioctlsocket(targetSocket, FIONBIO, &mode) == SOCKET_ERROR)
+            {
+                string err = KalaServerCore::ErrorToString(WSAGetLastError());
 
-        KalaServerCore::ForceClose(
-            "KalaServer Link error",
-            "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-            + " because nonblocking socket mode couldn't be enabled! Reason: " + err);
-    }
+                //always force close
+                KalaServerCore::ForceClose(
+                    "KalaServer Link error",
+                    "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                    + " because nonblocking socket mode couldn't be enabled! Reason: " + err);
+            }
 #else
-    int flags = fcntl(targetSocket, F_GETFL, 0);
+            int flags = fcntl(targetSocket, F_GETFL, 0);
 
-    if (flags == -1
-        || fcntl(targetSocket, F_SETFL, flags | O_NONBLOCK) == -1)
-    {
-        string err = KalaServerCore::ErrorToString(errno);
+            if (flags == -1
+                || fcntl(targetSocket, F_SETFL, flags | O_NONBLOCK) == -1)
+            {
+                string err = KalaServerCore::ErrorToString(errno);
 
-        KalaServerCore::ForceClose(
-            "KalaServer Link error",
-            "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-            + " because nonblocking socket mode couldn't be enabled! Reason: " + err);
-    }
+                //always force close
+                KalaServerCore::ForceClose(
+                    "KalaServer Link error",
+                    "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                    + " because nonblocking socket mode couldn't be enabled! Reason: " + err);
+            }
 #endif
 
-    //
-    // CONNECT TO RECEIVER
-    //
+            //
+            // CONNECT TO RECEIVER
+            //
 
-    sockaddr_storage addr{};
+            sockaddr_storage addr{};
 #if defined(KWIN_ANY)
-    int addrLen{};
+            int addrLen{};
 #else
-    socklen_t addrLen{};
+            socklen_t addrLen{};
 #endif
 
-    if (isIPv4)
-    {
-        sockaddr_in ipv4{};
-        ipv4.sin_family = AF_INET;
-        ipv4.sin_port = htons(receiverPort);
-        if (inet_pton(AF_INET, string(receiverIP).c_str(), &ipv4.sin_addr) != 1)
-        {
-            Log::Print(
-                "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                + " because ipv4 inet_ptons failed!",
-                "KS_LINK",
-                LogType::LOG_ERROR,
-                2);
+            if (isIPv4)
+            {
+                sockaddr_in ipv4{};
+                ipv4.sin_family = AF_INET;
+                ipv4.sin_port = htons(receiverPort);
+                if (inet_pton(AF_INET, string(receiverIP).c_str(), &ipv4.sin_addr) != 1)
+                {
+                    Log::Print(
+                        "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                        + " because ipv4 inet_ptons failed!",
+                        "KS_LINK",
+                        LogType::LOG_ERROR,
+                        2);
 
-            kclose(targetSocket);
-            return;
-        }
+                    //always exit thread
+                    kclose(targetSocket);
+                    return;
+                }
 
-        memcpy(&addr, &ipv4, sizeof(ipv4));
-        addrLen = sizeof(ipv4);
-    }
-    else
-    {
-        sockaddr_in6 ipv6{};
-        ipv6.sin6_family = AF_INET6;
-        ipv6.sin6_port = htons(receiverPort);
-        if (inet_pton(AF_INET6, string(receiverIP).c_str(), &ipv6.sin6_addr) != 1)
-        {
-            Log::Print(
-                "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                + " because ipv6 inet_ptons failed!",
-                "KS_LINK",
-                LogType::LOG_ERROR,
-                2);
+                memcpy(&addr, &ipv4, sizeof(ipv4));
+                addrLen = sizeof(ipv4);
+            }
+            else
+            {
+                sockaddr_in6 ipv6{};
+                ipv6.sin6_family = AF_INET6;
+                ipv6.sin6_port = htons(receiverPort);
+                if (inet_pton(AF_INET6, string(receiverIP).c_str(), &ipv6.sin6_addr) != 1)
+                {
+                    Log::Print(
+                        "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                        + " because ipv6 inet_ptons failed!",
+                        "KS_LINK",
+                        LogType::LOG_ERROR,
+                        2);
 
-            kclose(targetSocket);
-            return;
-        }
+                    //always exit thread
+                    kclose(targetSocket);
+                    return;
+                }
 
-        memcpy(&addr, &ipv6, sizeof(ipv6));
-        addrLen = sizeof(ipv6);
-    }
+                memcpy(&addr, &ipv6, sizeof(ipv6));
+                addrLen = sizeof(ipv6);
+            }
 
-    if (transportProtocol == TransportProtocol::TP_TCP)
-    {
-        int result = connect(
-            targetSocket, 
-            rcast<const sockaddr*>(&addr), 
-            addrLen);
+            if (transportProtocol == TransportProtocol::TP_TCP)
+            {
+                int result = connect(
+                    targetSocket, 
+                    rcast<const sockaddr*>(&addr), 
+                    addrLen);
 
 #if defined(KWIN_ANY)
-        bool inProgress = 
-            result == SOCKET_ERROR
-            && WSAGetLastError() == WSAEWOULDBLOCK;
+                bool inProgress = 
+                    result == SOCKET_ERROR
+                    && WSAGetLastError() == WSAEWOULDBLOCK;
 #else
-        bool inProgress = 
-            result == -1
-            && errno == EINPROGRESS;
+                bool inProgress = 
+                    result == -1
+                    && errno == EINPROGRESS;
 #endif
 
-        bool connected = result == 0;
+                bool connected = result == 0;
 
-        if (!connected
-            && inProgress)
-        {
-            fd_set writeSet{};
-            FD_ZERO(&writeSet);
-            FD_SET(targetSocket, &writeSet);
+                if (!connected
+                    && inProgress)
+                {
+                    fd_set writeSet{};
+                    FD_ZERO(&writeSet);
+                    FD_SET(targetSocket, &writeSet);
 
-            timeval timeoutVal{};
-            timeoutVal.tv_sec = timeout;
+                    timeval timeoutVal{};
+                    timeoutVal.tv_sec = timeout;
+
+#if defined(KWIN_ANY)
+                    int ready = select(
+                        0,
+                        nullptr,
+                        &writeSet,
+                        nullptr,
+                        &timeoutVal);
+#else
+                    int ready = select(
+                        targetSocket + 1,
+                        nullptr,
+                        &writeSet,
+                        nullptr,
+                        &timeoutVal);
+#endif
+                    
+                    if (ready > 0)
+                    {
+                        int socketError{};
+
+#if defined(KWIN_ANY)
+                        int errorSize = sizeof(socketError);
+                        if (getsockopt(
+                            targetSocket,
+                            SOL_SOCKET,
+                            SO_ERROR,
+                            (char*)&socketError,
+                            &errorSize) == 0)
+#else
+                        socklen_t errorSize = sizeof(socketError);
+                        if (getsockopt(
+                            targetSocket,
+                            SOL_SOCKET,
+                            SO_ERROR,
+                            &socketError,
+                            &errorSize) == 0)
+#endif
+                        {
+                            connected = socketError == 0;
+                        }
+                    }
+                }
+
+                if (!connected)
+                {
+                    Log::Print(
+                        "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                        + " because the connection could not be established!",
+                        "KS_LINK",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    //always exit thread
+                    kclose(targetSocket);
+                    return;
+                }
+            }
+
+            //
+            // SEND MESSAGE
+            //
+
+            if (transportProtocol == TransportProtocol::TP_TCP)
+            {
+                size_t totalSent{};
+
+                while (totalSent < payload.size())
+                {
+                    int sent = send(
+                        targetSocket,
+                        rcast<const char*>(payload.data() + totalSent),
+                        scast<int>(payload.size() - totalSent),
+                        0);
+
+                    if (sent > 0)
+                    {
+                        totalSent += sent;
+                        continue;
+                    }
+
+                    if (sent == 0)
+                    {
+                        Log::Print(
+                            "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                            + " because TCP socket transmission returned zero bytes!",
+                            "KS_LINK",
+                            LogType::LOG_ERROR,
+                            2);
+
+                        kclose(targetSocket);
+                        return;
+                    }
+
+#if defined(KWIN_ANY)
+                    int error = WSAGetLastError();
+                    bool wouldBlock = error == WSAEWOULDBLOCK;
+#else
+                    int error = errno;
+                    bool wouldBlock = error == EWOULDBLOCK || error == EAGAIN;
+#endif
+
+                    if (wouldBlock)
+                    {
+                        fd_set writeSet{};
+                        FD_ZERO(&writeSet);
+                        FD_SET(targetSocket, &writeSet);
+
+                        timeval timeoutVal{};
+                        timeoutVal.tv_sec = timeout;
+
+#if defined(KWIN_ANY)
+                        int ready = select(
+                            0,
+                            nullptr,
+                            &writeSet,
+                            nullptr,
+                            &timeoutVal);
+#else
+                        int ready = select(
+                            targetSocket + 1,
+                            nullptr,
+                            &writeSet,
+                            nullptr,
+                            &timeoutVal);
+#endif
+                        
+                        if (ready <= 0)
+                        {
+                            Log::Print(
+                                "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                                + " because TCP socket transmission timed out or select failed!",
+                                "KS_LINK",
+                                LogType::LOG_ERROR,
+                                2);
+
+                            kclose(targetSocket);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Log::Print(
+                            "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                            + " because TCP socket transmission failed!",
+                            "KS_LINK",
+                            LogType::LOG_ERROR,
+                            2);
+
+                        kclose(targetSocket);
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                if (payload.size() > (isIPv4 ? MAX_UDP_PAYLOAD_SIZE_IPV4 : MAX_UDP_PAYLOAD_SIZE_IPV6))
+                {
+                    Log::Print(
+                        "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                        + " because UDP payload exceeds maximum UDP payload send size!",
+                        "KS_LINK",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    kclose(targetSocket);
+                    return;
+                }
+
+                while (true)
+                {
+                    int sent = sendto(
+                        targetSocket,
+                        rcast<const char*>(payload.data()),
+                        scast<int>(payload.size()),
+                        0,
+                        rcast<const sockaddr*>(&addr),
+                        addrLen);
+
+                    if (sent >= 0) break;
+
+#if defined(KWIN_ANY)
+                    int error = WSAGetLastError();
+                    bool wouldBlock = error == WSAEWOULDBLOCK;
+#else
+                    int error = errno;
+                    bool wouldBlock = error == EWOULDBLOCK || error == EAGAIN;
+#endif
+
+                    if (wouldBlock)
+                    {
+                        fd_set writeSet{};
+                        FD_ZERO(&writeSet);
+                        FD_SET(targetSocket, &writeSet);
+
+                        timeval timeoutVal{};
+                        timeoutVal.tv_sec = timeout;
+
+#if defined(KWIN_ANY)
+                        int ready = select(
+                            0,
+                            nullptr,
+                            &writeSet,
+                            nullptr,
+                            &timeoutVal);
+#else
+                        int ready = select(
+                            targetSocket + 1,
+                            nullptr,
+                            &writeSet,
+                            nullptr,
+                            &timeoutVal);
+#endif
+                        
+                        if (ready <= 0)
+                        {
+                            Log::Print(
+                                "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                                + " because UDP socket transmission timed out or select failed!",
+                                "KS_LINK",
+                                LogType::LOG_ERROR,
+                                2);
+
+                            kclose(targetSocket);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Log::Print(
+                            "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
+                            + " because UDP socket transmission failed!",
+                            "KS_LINK",
+                            LogType::LOG_ERROR,
+                            2);
+
+                        kclose(targetSocket);
+                        return;
+                    }
+                }
+            }
+
+            //
+            // GET BACK RESPONSE
+            //
+
+            Log::Print(
+                "Packet has been sent from " + string(senderStr) + " to " + string(receiverStr) + "!",
+                "KS_LINK",
+                LogType::LOG_SUCCESS);
+
+            if (responseType == ResponseType::RT_IgnoreResponse
+                || ((server
+                && !server->IsVisible())
+                || (!server
+                && !Client::IsVisible())))
+            {
+                if ((server
+                    && !server->IsVisible())
+                    || (!server
+                    && !Client::IsVisible()))
+                {
+                    Log::Print(
+                        "Response for " + string(senderStr) + " was discarded from " 
+                        + string(receiverStr) + " because the sender was set as invisible.",
+                        "KS_LINK",
+                        LogType::LOG_INFO);
+                }
+
+                kclose(targetSocket);
+                return;
+            }
+
+            fd_set readSet{};
+            FD_ZERO(&readSet);
+            FD_SET(targetSocket, &readSet);
+
+            timeval responseTimeout{};
+            responseTimeout.tv_sec = timeout;
 
 #if defined(KWIN_ANY)
             int ready = select(
                 0,
+                &readSet,
                 nullptr,
-                &writeSet,
                 nullptr,
-                &timeoutVal);
+                &responseTimeout);
 #else
             int ready = select(
                 targetSocket + 1,
+                &readSet,
                 nullptr,
-                &writeSet,
                 nullptr,
-                &timeoutVal);
+                &responseTimeout);
 #endif
-            
-            if (ready > 0)
-            {
-                int socketError{};
 
-#if defined(KWIN_ANY)
-                int errorSize = sizeof(socketError);
-                if (getsockopt(
-                    targetSocket,
-                    SOL_SOCKET,
-                    SO_ERROR,
-                    (char*)&socketError,
-                    &errorSize) == 0)
-#else
-                socklen_t errorSize = sizeof(socketError);
-                if (getsockopt(
-                    targetSocket,
-                    SOL_SOCKET,
-                    SO_ERROR,
-                    &socketError,
-                    &errorSize) == 0)
-#endif
-                {
-                    connected = socketError == 0;
-                }
-            }
-        }
-
-        if (!connected)
-        {
-            Log::Print(
-                "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                + " because the connection could not be established!",
-                "KS_LINK",
-                LogType::LOG_ERROR,
-                2);
-
-            kclose(targetSocket);
-            return;
-        }
-    }
-
-    //
-    // SEND MESSAGE
-    //
-
-    if (transportProtocol == TransportProtocol::TP_TCP)
-    {
-        size_t totalSent{};
-
-        while (totalSent < payload.size())
-        {
-            int sent = send(
-                targetSocket,
-                rcast<const char*>(payload.data() + totalSent),
-                scast<int>(payload.size() - totalSent),
-                0);
-
-            if (sent > 0)
-            {
-                totalSent += sent;
-                continue;
-            }
-
-            if (sent == 0)
+            if (ready <= 0)
             {
                 Log::Print(
-                    "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                    + " because TCP socket transmission returned zero bytes!",
+                    "Failed receive response for " + string(senderStr) 
+                    + " from " + string(receiverStr) + " "
+                    "because the response timed out or select failed!",
                     "KS_LINK",
                     LogType::LOG_ERROR,
                     2);
@@ -540,57 +866,47 @@ void SendPacket_Internal(
                 return;
             }
 
-#if defined(KWIN_ANY)
-            int error = WSAGetLastError();
-            bool wouldBlock = error == WSAEWOULDBLOCK;
-#else
-            int error = errno;
-            bool wouldBlock = error == EWOULDBLOCK || error == EAGAIN;
-#endif
+            vector<u8> response{};
+            int received{};
 
-            if (wouldBlock)
+            if (transportProtocol == TransportProtocol::TP_TCP)
             {
-                fd_set writeSet{};
-                FD_ZERO(&writeSet);
-                FD_SET(targetSocket, &writeSet);
+                response.resize(MAX_TCP_PAYLOAD_SIZE);
 
-                timeval timeoutVal{};
-                timeoutVal.tv_sec = timeout;
-
-#if defined(KWIN_ANY)
-                int ready = select(
-                    0,
-                    nullptr,
-                    &writeSet,
-                    nullptr,
-                    &timeoutVal);
-#else
-                int ready = select(
-                    targetSocket + 1,
-                    nullptr,
-                    &writeSet,
-                    nullptr,
-                    &timeoutVal);
-#endif
-                
-                if (ready <= 0)
-                {
-                    Log::Print(
-                        "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                        + " because TCP socket transmission timed out or select failed!",
-                        "KS_LINK",
-                        LogType::LOG_ERROR,
-                        2);
-
-                    kclose(targetSocket);
-                    return;
-                }
+                received = recv(
+                    targetSocket,
+                    rcast<char*>(response.data()),
+                    scast<int>(response.size()),
+                    0);
             }
             else
             {
+                response.resize(isIPv4 ? MAX_UDP_PAYLOAD_SIZE_IPV4 : MAX_UDP_PAYLOAD_SIZE_IPV6);
+
+                sockaddr_storage senderAddr{};
+
+#if defined(KWIN_ANY)
+                int senderLen = sizeof(senderAddr);
+#else
+                socklen_t senderLen = sizeof(senderAddr);
+#endif
+
+                received = recvfrom(
+                    targetSocket,
+                    rcast<char*>(response.data()),
+                    scast<int>(response.size()),
+                    0,
+                    rcast<sockaddr*>(&senderAddr),
+                    &senderLen);
+            }
+
+            if (received < 0
+                || (received == 0
+                && transportProtocol == TransportProtocol::TP_TCP))
+            {
                 Log::Print(
-                    "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                    + " because TCP socket transmission failed!",
+                    "Failed receive response for " + string(senderStr) 
+                    + " from " + string(receiverStr) + " because receiving data failed!",
                     "KS_LINK",
                     LogType::LOG_ERROR,
                     2);
@@ -598,221 +914,26 @@ void SendPacket_Internal(
                 kclose(targetSocket);
                 return;
             }
-        }
-    }
-    else
-    {
-        if (payload.size() > (isIPv4 ? MAX_UDP_PAYLOAD_SIZE_IPV4 : MAX_UDP_PAYLOAD_SIZE_IPV6))
-        {
-            Log::Print(
-                "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                + " because UDP payload exceeds maximum UDP payload send size!",
-                "KS_LINK",
-                LogType::LOG_ERROR,
-                2);
 
             kclose(targetSocket);
-            return;
-        }
 
-        while (true)
-        {
-            int sent = sendto(
-                targetSocket,
-                rcast<const char*>(payload.data()),
-                scast<int>(payload.size()),
-                0,
-                rcast<const sockaddr*>(&addr),
-                addrLen);
-
-            if (sent >= 0) break;
-
-#if defined(KWIN_ANY)
-            int error = WSAGetLastError();
-            bool wouldBlock = error == WSAEWOULDBLOCK;
-#else
-            int error = errno;
-            bool wouldBlock = error == EWOULDBLOCK || error == EAGAIN;
-#endif
-
-            if (wouldBlock)
-            {
-                fd_set writeSet{};
-                FD_ZERO(&writeSet);
-                FD_SET(targetSocket, &writeSet);
-
-                timeval timeoutVal{};
-                timeoutVal.tv_sec = timeout;
-
-#if defined(KWIN_ANY)
-                int ready = select(
-                    0,
-                    nullptr,
-                    &writeSet,
-                    nullptr,
-                    &timeoutVal);
-#else
-                int ready = select(
-                    targetSocket + 1,
-                    nullptr,
-                    &writeSet,
-                    nullptr,
-                    &timeoutVal);
-#endif
-                
-                if (ready <= 0)
-                {
-                    Log::Print(
-                        "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                        + " because UDP socket transmission timed out or select failed!",
-                        "KS_LINK",
-                        LogType::LOG_ERROR,
-                        2);
-
-                    kclose(targetSocket);
-                    return;
-                }
-            }
-            else
-            {
-                Log::Print(
-                    "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
-                    + " because UDP socket transmission failed!",
-                    "KS_LINK",
-                    LogType::LOG_ERROR,
-                    2);
-
-                kclose(targetSocket);
-                return;
-            }
-        }
-    }
-
-    //
-    // GET BACK RESPONSE
-    //
-
-    Log::Print(
-        "Packet has been sent from " + string(senderStr) + " to " + string(receiverStr) + "!",
-        "KS_LINK",
-        LogType::LOG_SUCCESS);
-
-    if (responseType == ResponseType::RT_IgnoreResponse
-        || ((server
-        && !server->IsVisible())
-        || (!server
-        && !Client::IsVisible())))
-    {
-        if ((server
-            && !server->IsVisible())
-            || (!server
-            && !Client::IsVisible()))
-        {
             Log::Print(
-                "Response for " + string(senderStr) + " was discarded from " 
-                + string(receiverStr) + " because the sender was set as invisible.",
+                "Response for " + string(senderStr) + " has been received from " + string(receiverStr) + "!",
                 "KS_LINK",
-                LogType::LOG_INFO);
-        }
+                LogType::LOG_SUCCESS);
 
-        kclose(targetSocket);
-        return;
-    }
+            response.resize(received);
 
-    fd_set readSet{};
-    FD_ZERO(&readSet);
-    FD_SET(targetSocket, &readSet);
+            if (initialResponseCallback) initialResponseCallback(std::move(response));
+        };
 
-    timeval responseTimeout{};
-    responseTimeout.tv_sec = timeout;
-
-#if defined(KWIN_ANY)
-    int ready = select(
-        0,
-        &readSet,
-        nullptr,
-        nullptr,
-        &responseTimeout);
-#else
-    int ready = select(
-        targetSocket + 1,
-        &readSet,
-        nullptr,
-        nullptr,
-        &responseTimeout);
-#endif
-
-    if (ready <= 0)
     {
-        Log::Print(
-            "Failed receive response for " + string(senderStr) 
-            + " from " + string(receiverStr) + " "
-            "because the response timed out or select failed!",
-            "KS_LINK",
-            LogType::LOG_ERROR,
-            2);
+        scoped_lock lock(threadDataMutex);
 
-        kclose(targetSocket);
-        return;
+        threadData.push_back(
+            {
+                .linkID = 0,
+                .thisThread = thread(worker_thread)
+            });
     }
-
-    vector<u8> response{};
-    int received{};
-
-    if (transportProtocol == TransportProtocol::TP_TCP)
-    {
-        response.resize(MAX_TCP_PAYLOAD_SIZE);
-
-        received = recv(
-            targetSocket,
-            rcast<char*>(response.data()),
-            scast<int>(response.size()),
-            0);
-    }
-    else
-    {
-        response.resize(isIPv4 ? MAX_UDP_PAYLOAD_SIZE_IPV4 : MAX_UDP_PAYLOAD_SIZE_IPV6);
-
-        sockaddr_storage senderAddr{};
-
-#if defined(KWIN_ANY)
-        int senderLen = sizeof(senderAddr);
-#else
-        socklen_t senderLen = sizeof(senderAddr);
-#endif
-
-        received = recvfrom(
-            targetSocket,
-            rcast<char*>(response.data()),
-            scast<int>(response.size()),
-            0,
-            rcast<sockaddr*>(&senderAddr),
-            &senderLen);
-    }
-
-    if (received < 0
-        || (received == 0
-        && transportProtocol == TransportProtocol::TP_TCP))
-    {
-        Log::Print(
-            "Failed receive response for " + string(senderStr) 
-            + " from " + string(receiverStr) + " because receiving data failed!",
-            "KS_LINK",
-            LogType::LOG_ERROR,
-            2);
-
-        kclose(targetSocket);
-        return;
-    }
-
-    kclose(targetSocket);
-
-    Log::Print(
-        "Response for " + string(senderStr) + " has been received from " + string(receiverStr) + "!",
-        "KS_LINK",
-        LogType::LOG_SUCCESS);
-
-    response.resize(received);
-
-    if (initialResponseCallback) initialResponseCallback(std::move(response));
 }

@@ -5,6 +5,8 @@
 
 #include <string>
 #include <vector>
+#include <thread>
+#include <chrono>
 
 #include "log_utils.hpp"
 #include "string_utils.hpp"
@@ -29,6 +31,8 @@ using std::string;
 using std::string_view;
 using std::to_string;
 using std::vector;
+using std::this_thread::sleep_for;
+using std::chrono::seconds;
 
 struct TestData
 {
@@ -93,7 +97,7 @@ static void TCPTest()
         TransportProtocol::TP_TCP,
         ResponseType::RT_AcceptResponse,
         GeneratePayloadFromString(tcpData.request_string),
-        [&tcpData](vector<u8> payload) 
+        [tcpData](vector<u8> payload) 
         { 
             PrintResponse(
                 tcpData.targetIP, 
@@ -132,7 +136,7 @@ static void UDPTest()
         TransportProtocol::TP_UDP,
         ResponseType::RT_AcceptResponse,
         udpData.request_payload,
-        [&udpData](vector<u8> payload) 
+        [udpData](vector<u8> payload) 
         { 
             PrintResponse(
                 udpData.targetIP, 
@@ -150,6 +154,7 @@ int main()
 
     Log::Print("---------- start tcp ipv4 test ----------");
     TCPTest();
+    sleep_for(seconds(2));
     Log::Print("---------- start udp ipv4 test ----------");
     UDPTest();
     Log::Print("---------- all tests complete ----------");

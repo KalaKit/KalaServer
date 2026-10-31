@@ -53,8 +53,8 @@ namespace KalaServer::Connection
 
     class LIB_API Server
     {
-    friend void TCPThread(Server* server);
-    friend void UDPThread(Server* server);
+    friend void _TCPThread(Server* server);
+    friend void _UDPThread(Server* server);
     friend class KalaServer::Core::KalaServerCore;
     friend class Link;
     friend struct default_delete<Server>;
@@ -110,6 +110,8 @@ namespace KalaServer::Connection
         void TCPListenerThread();
         void UDPListenerThread();
 
+        static void CloseRemainingThreads();
+
         u32 ID{};
         
         mutex linkIDsMutex{};
@@ -128,8 +130,5 @@ namespace KalaServer::Connection
         vector<string> bannedIPs{};
         mutex blacklistedKeywordsMutex{};
         vector<string> blacklistedKeywords{};
-
-        atomic<uintptr_t> tcpSocket{};
-        atomic<uintptr_t> udpSocket{};
     };
 }

@@ -496,13 +496,15 @@ namespace KalaServer::Core
 			return;
 		}
 
-		vector<Server*> serverCopy = Server::GetRegistry().GetAllContent();
-		for (Server* s : serverCopy) s->Destroy();
-
-		if (Client::IsInitialized()) Client::Destroy();
-
 		vector<Link*> linkCopy = Link::GetRegistry().GetAllContent();
 		for (Link* l : linkCopy) l->Destroy();
+		Link::CloseRemainingThreads();
+
+		vector<Server*> serverCopy = Server::GetRegistry().GetAllContent();
+		for (Server* s : serverCopy) s->Destroy();
+		Server::CloseRemainingThreads();
+
+		if (Client::IsInitialized()) Client::Destroy();
 
 		if (shutdownCallback) shutdownCallback();
 
