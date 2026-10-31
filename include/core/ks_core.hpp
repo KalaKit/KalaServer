@@ -48,9 +48,6 @@ namespace KalaServer::Core
         KNODISCARD
         static path GetExePath();
 
-        //Main once-per-frame update call, syncs server and client worker thread events with current stored data 
-        static void Update();
-
         static void SetExternalHandler(function<void(string, string, const source_location&)>&& newExternalHandler);
 
         KNORETURN

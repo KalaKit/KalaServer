@@ -18,6 +18,7 @@
 #include "string_utils.hpp"
 
 #include "core/ks_core.hpp"
+#include "connection/ks_link.hpp"
 
 using KalaHeaders::KalaCore::ToVar;
 using KalaHeaders::KalaCore::FromVar;
@@ -31,106 +32,160 @@ using KalaServer::Core::KalaServerCore;
 using KalaServer::Core::KalaServerRegistry;
 using KalaServer::Connection::Client;
 
+using std::string;
 using std::to_string;
-using std::unique_ptr;
-using std::make_unique;
+using std::vector;
+using std::atomic;
+using std::mutex;
+using std::scoped_lock;
 
 #if defined(KWIN_ANY)
 using ksocket = SOCKET;
 constexpr ksocket invalid_socket = INVALID_SOCKET;
-#define kclose(sock) closesocket(sock)
+#define kclose(targetSocket) closesocket(targetSocket)
 #else
 using ksocket = int;
 constexpr ksocket invalid_socket = -1;
-#define kclose(sock) close(sock)
+#define kclose(targetSocket) close(targetSocket)
 #endif
 
-static KalaServerRegistry<Client> registry{};
+static bool isInitialized{};
+
+static mutex linkIDsMutex{};
+static vector<u32> linkIDs{};
+
+static atomic<bool> isVisible{};
+
+static string username{};
 
 namespace KalaServer::Connection
 {
-    KalaServerRegistry<Client>& Client::GetRegistry() { return registry; }
-
-    Client* Client::Initialize(string_view username)
+    bool Client::IsInitialized() { return isInitialized; }
+    void Client::Initialize(string_view newUsername)
     {
         if (!KalaServerCore::IsInitialized())
         {
             Log::Print(
-                "Failed to initialize client because KalaServer was not initialized!",
+                "Failed to initialize client because KalaServer has not been initialized!",
                 "KS_CLIENT",
                 LogType::LOG_WARNING);
 
-            return nullptr;
+            return;
         }
 
-        if (username.empty())
+        if (isInitialized)
+        {
+            Log::Print(
+                "Failed to initialize client because it has already been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+
+        if (newUsername.empty())
         {
             Log::Print(
                 "Failed to initialize client because the username was empty!",
                 "KS_CLIENT",
                 LogType::LOG_WARNING);
 
-            return nullptr;
+            return;
         }
-        if (!IsStringInRange(username, MIN_CLIENT_NAME_LENGTH, MAX_CLIENT_NAME_LENGTH))
+        if (!IsStringInRange(newUsername, MIN_CLIENT_NAME_LENGTH, MAX_CLIENT_NAME_LENGTH))
         {
             Log::Print(
                 "Failed to initialize client because the username length was out of range!",
                 "KS_CLIENT",
                 LogType::LOG_WARNING);
 
-            return nullptr;
+            return;
         }
 
-        for (const Client* c : registry.GetAllContent())
-        {
-            if (c->username == username)
-            {
-                Log::Print(
-                    "Failed to initialize client because the username '" + string(username) + "' is already in use!",
-                    "KS_CLIENT",
-                    LogType::LOG_WARNING);
+        username = newUsername;
 
-                return nullptr;
-            }
-        }
-
-		u32 newID = KalaServerCore::GetGlobalID() + 1;
-		KalaServerCore::SetGlobalID(newID);
-
-		unique_ptr<Client> newClient = make_unique<Client>();
-		Client* clientPtr = newClient.get();
-
-        clientPtr->ID = newID;
-        clientPtr->username = username;
-
-		string err = registry.AddContent(
-			newID, 
-			std::move(newClient));
-		if (!err.empty())
-		{
-			KalaServerCore::ForceClose(
-				"KalaServer Client error",
-				"Failed to initialize client! Reason: " + err);
-		}
+        isInitialized = true;
 
 		Log::Print(
-			"Created new client '" + to_string(newID) + "'!",
+			"Created new client '" + username + "'!",
 			"KS_CLIENT",
 			LogType::LOG_SUCCESS);
-
-		return clientPtr;
     }
 
-    u32 Client::GetID() const { return ID; }
-    u32 Client::GetServerID() const { return serverID; }
-    const vector<u32>& Client::GetLinkIDs() const { return linkIDs; }
+    vector<u32> Client::GetLinkIDs() 
+    {
+        if (!KalaServerCore::IsInitialized())
+        {
+            Log::Print(
+                "Failed to get client link IDs because KalaServer has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
 
-    bool Client::IsVisible() const { return isVisible; }
+            return {};
+        }
+
+        if (!isInitialized)
+        {
+            Log::Print(
+                "Failed to get client link IDs because it has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return {};
+        }
+
+        scoped_lock lock(linkIDsMutex);
+        return linkIDs;
+    }
+
+    bool Client::IsVisible()
+    {
+        if (!KalaServerCore::IsInitialized())
+        {
+            Log::Print(
+                "Failed to get client visibility state because KalaServer has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return {};
+        }
+
+        if (!isInitialized)
+        {
+            Log::Print(
+                "Failed to get client visibility state because it has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return false;
+        }
+
+        return isVisible.load();
+    }
     void Client::SetVisibility(bool newValue)
     {
+        if (!KalaServerCore::IsInitialized())
+        {
+            Log::Print(
+                "Failed to set client visibility state because KalaServer has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+
+        if (!isInitialized)
+        {
+            Log::Print(
+                "Failed to set client visibility state because it has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+
         if (newValue
-            && isVisible)
+            && isVisible.load())
         {
             Log::Print(
                 "Failed to set client '" + username + "' visible because it already was visible!",
@@ -140,7 +195,7 @@ namespace KalaServer::Connection
             return;
         }
         if (!newValue
-            && !isVisible)
+            && !isVisible.load())
         {
             Log::Print(
                 "Failed to set client '" + username + "' invisible because it already was invisible!",
@@ -150,43 +205,65 @@ namespace KalaServer::Connection
             return;
         }
 
-        isVisible = newValue;
+        isVisible.store(newValue);
+
+        Log::Print(
+            "Changed client '" + username + "' visibility to '" + (isVisible.load() ? "on" : "off") + "'.",
+            "KS_CLIENT",
+            LogType::LOG_SUCCESS);
     }
 
-    void Client::ConnectToServer(u32 serverID)
-    {
-
-    }
-    void Client::ConnectToServer(u16 serverPort)
-    {
-
-    }
-    void Client::DisconnectFromServer()
-    {
-
-    }
-
-    const string& Client::GetUsername() const { return username; }
-    void Client::SetUsername(string_view newValue)
-    {
-
-    }
+    const string& Client::GetUsername() { return username; }
 
     void Client::Destroy()
     {
-		string err = registry.DestroyContent(ID);
-		if (!err.empty())
-		{
-			KalaServerCore::ForceClose(
-				"KalaServer Client error",
-				"Failed to destroy client! Reason: " + err);
-		}
-    }
+        if (!KalaServerCore::IsInitialized())
+        {
+            Log::Print(
+                "Failed to destroy client because KalaServer has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
 
-    Client::~Client()
-    {
+            return;
+        }
+
+        if (!isInitialized)
+        {
+            Log::Print(
+                "Failed to destroy client because it has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+
+        isVisible = false;
+
+        for (const u32 lid : GetLinkIDs())
+        {
+            Link* l{};
+
+            string err = Link::GetRegistry().GetContent(lid, l);
+            if (!err.empty())
+            {
+                KalaServerCore::ForceClose(
+                    "KalaServer Client error",
+                    "Failed to destroy client '" + username 
+                    + "' because its link '" + to_string(lid) + "' was invalid!");
+            }
+
+            l->Destroy();
+        }
+
+        {
+            scoped_lock lock(linkIDsMutex);
+            linkIDs.clear();
+        }
+
+        isInitialized = false;
+
 		Log::Print(
-			"Destroying client '" + to_string(ID) + "'.",
+			"Destroying client '" + username + "'.",
 			"KS_CLIENT",
 			LogType::LOG_INFO);
     }

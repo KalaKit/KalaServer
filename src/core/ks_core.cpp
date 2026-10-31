@@ -22,7 +22,6 @@
 #include <chrono>
 
 #include "log_utils.hpp"
-#include "string_utils.hpp"
 
 #include "connection/ks_server.hpp"
 #include "connection/ks_client.hpp"
@@ -32,8 +31,6 @@ using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaLog::TimeFormat;
 using KalaHeaders::KalaLog::DateFormat;
-
-using KalaHeaders::KalaString::TrimString;
 
 using KalaServer::Connection::Server;
 using KalaServer::Connection::Client;
@@ -53,11 +50,11 @@ using std::wstring;
 
 using ksocket = SOCKET;
 constexpr ksocket invalid_socket = INVALID_SOCKET;
-#define kclose(sock) closesocket(sock)
+#define kclose(targetSocket) closesocket(targetSocket)
 #else
 using ksocket = int;
 constexpr ksocket invalid_socket = -1;
-#define kclose(sock) close(sock)
+#define kclose(targetSocket) close(targetSocket)
 #endif
 
 static bool isInitialized{};
@@ -207,7 +204,7 @@ namespace KalaServer::Core
 		if (!isInitialized)
 		{
 			Log::Print(
-				"Failed to get IP because KalaServer was not initialized!",
+				"Failed to get IP because KalaServer has not been initialized!",
 				"KS_CORE",
 				LogType::LOG_WARNING);
 
@@ -264,62 +261,42 @@ namespace KalaServer::Core
 		u64 now = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 		if (now - lastCheckedTime < INTERNET_CHECK_WAIT_PERIOD_S * 1000ULL) return cachedResult;
 
-#if defined (KWIN_ANY)
-		ksocket sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (sock == INVALID_SOCKET)
-		{
-			string err = ErrorToString(WSAGetLastError());
-
-			Log::Print(
-				"Failed to check internet state for IP '" + string(IP) + "' because socket creation failed! Reason: " + err,
-				"KS_CORE",
-				LogType::LOG_ERROR,
-				2);
-
-			return false;
-		}
-
-		u_long mode = 1;
-		if (ioctlsocket(sock, FIONBIO, &mode) == SOCKET_ERROR)
-		{
-			string err = ErrorToString(WSAGetLastError());
-
-			Log::Print(
-				"Failed to enable nonblocking socket mode! Reason: " + err,
-				"KS_CORE",
-				LogType::LOG_ERROR,
-				2);
-
-			kclose(sock);
-			return false;
-		}
+    ksocket targetSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (targetSocket == invalid_socket)
+    {
+#if defined(KWIN_ANY)
+        string err = ErrorToString(WSAGetLastError());
 #else
-		ksocket sock = socket(AF_INET, SOCK_STREAM, 0);
-		if (sock < 0)
-		{
-			Log::Print(
-				"Failed to check internet state for IP '" + string(IP) + "' because socket creation failed!",
-				"KS_CORE",
-				LogType::LOG_ERROR,
-				2);
+        string err = ErrorToString(errno);
+#endif
 
-			return false;
-		}
+        ForceClose(
+            "KalaServer Core error",
+            "Failed to check internet status because nonblocking socket mode couldn't be enabled! Reason: " + err);
+    }
 
-		int flags = fcntl(sock, F_GETFL, 0);
+#if defined (KWIN_ANY)
+    u_long mode = 1;
+    if (ioctlsocket(targetSocket, FIONBIO, &mode) == SOCKET_ERROR)
+    {
+        string err = ErrorToString(WSAGetLastError());
 
-		if (flags == -1
-			|| fcntl(sock, F_SETFL, flags | O_NONBLOCK) == -1)
-		{
-			Log::Print(
-				"Failed to enable nonblocking socket mode!",
-				"KS_CORE",
-				LogType::LOG_ERROR,
-				2);
+        ForceClose(
+            "KalaServer Core error",
+            "Failed to check internet status because nonblocking socket mode couldn't be enabled! Reason: " + err);
+    }
+#else
+    int flags = fcntl(targetSocket, F_GETFL, 0);
 
-			kclose(sock);
-			return false;
-		}
+    if (flags == -1
+        || fcntl(targetSocket, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
+        string err = ErrorToString(errno);
+
+        ForceClose(
+            "KalaServer Core error",
+            "Failed to check internet status because nonblocking socket mode couldn't be enabled! Reason: " + err);
+    }
 #endif
 
 		sockaddr_in addr{};
@@ -327,11 +304,11 @@ namespace KalaServer::Core
 		addr.sin_port = htons(53);
 		if (inet_pton(AF_INET, "1.1.1.1", &addr.sin_addr) != 1)
 		{
-			kclose(sock);
+			kclose(targetSocket);
 			return false;
 		}
 
-		int result = connect(sock, (sockaddr*)&addr, sizeof(addr));
+		int result = connect(targetSocket, (sockaddr*)&addr, sizeof(addr));
 
 #if defined(KWIN_ANY)
 		bool inProgress = 
@@ -350,7 +327,7 @@ namespace KalaServer::Core
 		{
 			fd_set writeSet{};
 			FD_ZERO(&writeSet);
-			FD_SET(sock, &writeSet);
+			FD_SET(targetSocket, &writeSet);
 
 			timeval timeout{};
 			timeout.tv_sec = 1;
@@ -364,7 +341,7 @@ namespace KalaServer::Core
 				&timeout);
 #else
 			int ready = select(
-				sock + 1,
+				targetSocket + 1,
 				nullptr,
 				&writeSet,
 				nullptr,
@@ -378,7 +355,7 @@ namespace KalaServer::Core
 #if defined(KWIN_ANY)
 				int errorSize = sizeof(socketError);
 				if (getsockopt(
-					sock,
+					targetSocket,
 					SOL_SOCKET,
 					SO_ERROR,
 					(char*)&socketError,
@@ -386,7 +363,7 @@ namespace KalaServer::Core
 #else
 				socklen_t errorSize = sizeof(socketError);
 				if (getsockopt(
-					sock,
+					targetSocket,
 					SOL_SOCKET,
 					SO_ERROR,
 					&socketError,
@@ -398,7 +375,7 @@ namespace KalaServer::Core
 			}
 		}
 
-		kclose(sock);
+		kclose(targetSocket);
 
 		lastCheckedTime = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 
@@ -454,75 +431,6 @@ namespace KalaServer::Core
 		}
 
 		return exePath;
-	}
-
-	void KalaServerCore::Update()
-	{
-		if (!isInitialized)
-		{
-			Log::Print(
-				"Failed to update KalaServer because it was not initialized!",
-				"KS_CORE",
-				LogType::LOG_WARNING);
-
-			return;
-		}
-
-		const vector<Server*> servers = Server::GetRegistry().GetAllContent();
-		const vector<Client*> clients = Client::GetRegistry().GetAllContent();
-
-		if (servers.empty()
-			&& clients.empty())
-		{
-			Log::Print(
-				"Failed to update KalaServer because there are no servers or clients!",
-				"KS_CORE",
-				LogType::LOG_WARNING);
-
-			return;
-		}
-
-		for (const Server* s : servers)
-		{
-			if (!s->isVisible) continue;
-			
-			for (const u32 lid : s->linkIDs)
-			{
-				Link* l{};
-				string err = Link::GetRegistry().GetContent(lid, l);
-
-				if (!err.empty())
-				{
-					ForceClose(
-						"KalaServer Core error",
-						"Failed to update KalaServer because server '" 
-						+ to_string(s->ID) + "' link '" + to_string(lid) + "' was invalid!");
-				}
-
-				l->Update();
-			}
-		}
-
-		for (const Client* c : clients)
-		{
-			if (!c->isVisible) continue;
-
-			for (const u32 lid : c->linkIDs)
-			{
-				Link* l{};
-				string err = Link::GetRegistry().GetContent(lid, l);
-
-				if (!err.empty())
-				{
-					ForceClose(
-						"KalaServer Core error",
-						"Failed to update KalaServer because client '" 
-						+ to_string(c->ID) + "' link '" + to_string(lid) + "' was invalid!");
-				}
-
-				l->Update();
-			}
-		}
 	}
 
 	void KalaServerCore::SetExternalHandler(function<void(string, string, const source_location&)>&& newExternalHandler)
@@ -591,8 +499,7 @@ namespace KalaServer::Core
 		vector<Server*> serverCopy = Server::GetRegistry().GetAllContent();
 		for (Server* s : serverCopy) s->Destroy();
 
-		vector<Client*> clientCopy = Client::GetRegistry().GetAllContent();
-		for (Client* c : clientCopy) c->Destroy();
+		if (Client::IsInitialized()) Client::Destroy();
 
 		vector<Link*> linkCopy = Link::GetRegistry().GetAllContent();
 		for (Link* l : linkCopy) l->Destroy();

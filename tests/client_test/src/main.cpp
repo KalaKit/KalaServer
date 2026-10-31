@@ -66,11 +66,11 @@ static void PrintResponse(
         "\ntarget IP: " + string(targetIP) + "\n"
         "target port: " + to_string(targetPort) + "\n"
         "target payload:\n" + payloadString,
-        "server_test",
+        "CLIENT_TEST",
         LogType::LOG_INFO);
 }
 
-static void TCPTest(Client* client)
+static void TCPTest()
 {
     //ask for wikipedias homepage
     TestData tcpData =
@@ -85,7 +85,7 @@ static void TCPTest(Client* client)
     };
 
     Link::SendPacket(
-        client->GetID(),
+        0,
         SenderType::S_CLIENT,
         tcpData.targetIP,
         tcpData.targetPort,
@@ -103,7 +103,7 @@ static void TCPTest(Client* client)
         });
 }
 
-static void UDPTest(Client* client)
+static void UDPTest()
 {
     //ask for wikipedias ipv4 address from cloudflare
     TestData udpData =
@@ -124,7 +124,7 @@ static void UDPTest(Client* client)
     };
 
     Link::SendPacket(
-        client->GetID(),
+        0,
         SenderType::S_CLIENT,
         udpData.targetIP,
         udpData.targetPort,
@@ -145,12 +145,13 @@ static void UDPTest(Client* client)
 int main()
 {
     KalaServerCore::Initialize("192.168.1.1");
-    Client* client = Client::Initialize("user");
+    Client::Initialize("user");
+    Client::SetVisibility(true);
 
     Log::Print("---------- start tcp ipv4 test ----------");
-    TCPTest(client);
+    TCPTest();
     Log::Print("---------- start udp ipv4 test ----------");
-    UDPTest(client);
+    UDPTest();
     Log::Print("---------- all tests complete ----------");
 
     KalaServerCore::Shutdown();

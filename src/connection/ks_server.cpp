@@ -14,11 +14,15 @@
 #include <unistd.h>
 #endif
 
+#include <thread>
+
 #include "log_utils.hpp"
 #include "file_utils.hpp"
 #include "string_utils.hpp"
 
 #include "core/ks_core.hpp"
+#include "connection/ks_client.hpp"
+#include "connection/ks_link.hpp"
 
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
@@ -36,18 +40,26 @@ using std::filesystem::exists;
 using std::filesystem::is_directory;
 using std::unique_ptr;
 using std::make_unique;
+using std::thread;
+using std::scoped_lock;
 
 #if defined(KWIN_ANY)
 using ksocket = SOCKET;
 constexpr ksocket invalid_socket = INVALID_SOCKET;
-#define kclose(sock) closesocket(sock)
+#define kclose(targetSocket) closesocket(targetSocket)
 #else
 using ksocket = int;
 constexpr ksocket invalid_socket = -1;
-#define kclose(sock) close(sock)
+#define kclose(targetSocket) close(targetSocket)
 #endif
 
 static KalaServerRegistry<Server> registry{};
+
+static thread tcpListenerThread{};
+static thread udpListenerThread{};
+
+static void TCPListenerThread(Server* server);
+static void UDPListenerThread(Server* server);
 
 namespace KalaServer::Connection
 {
@@ -61,7 +73,7 @@ namespace KalaServer::Connection
         if (!KalaServerCore::IsInitialized())
         {
             Log::Print(
-                "Failed to initialize server because KalaServer was not initialized!",
+                "Failed to initialize server because KalaServer has not been initialized!",
                 "KS_SERVER",
                 LogType::LOG_WARNING);
 
@@ -167,47 +179,55 @@ namespace KalaServer::Connection
 
     u32 Server::GetID() const { return ID; }
 
-    const vector<u32>& Server::GetClientIDs() const { return clientIDs; }
-    const vector<u32>& Server::GetLinkIDs() const { return linkIDs; }
+    vector<u32> Server::GetLinkIDs()
+    {
+        scoped_lock lock(linkIDsMutex);
+        return linkIDs;
+    }
 
-    bool Server::IsVisible() const { return isVisible; }
+    bool Server::IsVisible() const { return isVisible.load(); }
     void Server::SetVisibility(bool newValue)
     {
         if (newValue
-            && isVisible)
+            && isVisible.load())
         {
             Log::Print(
-                "Failed to set server '" + serverName + "' visible because it already was visible!",
+                "Failed to set server '" + to_string(ID) + "' visible because it already was visible!",
                 "KS_SERVER",
                 LogType::LOG_WARNING);
 
             return;
         }
         if (!newValue
-            && !isVisible)
+            && !isVisible.load())
         {
             Log::Print(
-                "Failed to set server '" + serverName + "' invisible because it already was invisible!",
+                "Failed to set server '" + to_string(ID) + "' invisible because it already was invisible!",
                 "KS_SERVER",
                 LogType::LOG_WARNING);
 
             return;
         }
 
-        isVisible = newValue;
+        isVisible.store(newValue);
+
+        Log::Print(
+            "Changed server '" + to_string(ID) + "' visibility to '" + (isVisible.load() ? "on" : "off") + "'.",
+            "KS_SERVER",
+            LogType::LOG_SUCCESS);
     }
 
     const string& Server::GetServerName() const { return serverName; }
-    void Server::SetServerName(string_view newValue)
-    {
-
-    }
 
     u16 Server::GetServerPort() const { return serverPort; }
 
     const path& Server::GetServerRoot() const { return serverRoot; }
 
-    const vector<path>& Server::GetWhitelistedRoutes() const { return whitelistedRoutes; }
+    vector<path> Server::GetWhitelistedRoutes()
+    { 
+        scoped_lock lock(whitelistedRoutesMutex);
+        return whitelistedRoutes;
+    }
     void Server::AddWhitelistedRoute(const path& targetPath)
     {
 
@@ -226,7 +246,11 @@ namespace KalaServer::Connection
 
     }
 
-    const vector<string>& Server::GetBannedIPs() const { return bannedIPs; }
+    vector<string> Server::GetBannedIPs()
+    {
+        scoped_lock lock(bannedIPsMutex);
+        return bannedIPs;
+    }
     void Server::BanIP(string_view IP)
     {
 
@@ -245,7 +269,11 @@ namespace KalaServer::Connection
 
     }
 
-    const vector<string>& Server::GetBlacklistedKeywords() const { return blacklistedKeywords; }
+    vector<string> Server::GetBlacklistedKeywords()
+    { 
+        scoped_lock lock(blacklistedKeywordsMutex);
+        return blacklistedKeywords;
+    }
     void Server::AddBlacklistedKeyword(string_view newValue)
     {
 
@@ -266,6 +294,30 @@ namespace KalaServer::Connection
 
     void Server::Destroy()
     {
+        isVisible = false;
+
+        kclose(tcpSocket);
+        kclose(udpSocket);
+
+        tcpListenerThread.join();
+        udpListenerThread.join();
+
+        for (const u32 lid : GetLinkIDs())
+        {
+            Link* l{};
+
+            string err = Link::GetRegistry().GetContent(lid, l);
+            if (!err.empty())
+            {
+                KalaServerCore::ForceClose(
+                    "KalaServer Server error",
+                    "Failed to destroy server '" + to_string(ID) 
+                    + "' because its link '" + to_string(lid) + "' was invalid!");
+            }
+
+            l->Destroy();
+        }
+        
 		string err = registry.DestroyContent(ID);
 		if (!err.empty())
 		{
@@ -282,4 +334,13 @@ namespace KalaServer::Connection
 			"KS_SERVER",
 			LogType::LOG_INFO);
     }
+}
+
+void TCPListenerThread(Server* server)
+{
+
+}
+void UDPListenerThread(Server* server)
+{
+
 }

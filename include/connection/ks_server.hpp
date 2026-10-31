@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <atomic>
+#include <mutex>
 #include <memory>
 
 #include "core_utils.hpp"
@@ -27,6 +29,8 @@ namespace KalaServer::Connection
     using std::string_view;
     using std::vector;
     using std::filesystem::path;
+    using std::atomic;
+    using std::mutex;
     using std::default_delete;
 
     static constexpr u8 MIN_SERVER_NAME_LENGTH = 3;
@@ -37,10 +41,21 @@ namespace KalaServer::Connection
 	//Maximum port, cannot go past 16-bit unsigned integer TCP and UDP port fields
 	static constexpr u16 MAX_PORT_RANGE = 65535;
 
+    //Max amount of clients across all servers,
+    //adjust server-local maxClients parameter to change how many clients
+    //can connect to an individual server
+    static constexpr u32 MAX_CLIENTS = 10000;
+
+    //Max amount of packets for each client per second across all servers,
+    //adjust server-local maxClientPackets parameter to change how many packets each client
+    //can send to this server across both the udp and tcp listener ports
+    static constexpr u32 MAX_PACKETS_PER_CLIENT_S = 1000;
+
     class LIB_API Server
     {
+    friend void TCPThread(Server* server);
+    friend void UDPThread(Server* server);
     friend class KalaServer::Core::KalaServerCore;
-    friend class Client;
     friend class Link;
     friend struct default_delete<Server>;
     public:
@@ -56,34 +71,31 @@ namespace KalaServer::Connection
 
         u32 GetID() const;
 
-        const vector<u32>& GetClientIDs() const;
-        const vector<u32>& GetLinkIDs() const;
+        vector<u32> GetLinkIDs();
 
         bool IsVisible() const;
         void SetVisibility(bool newValue);
 
         const string& GetServerName() const;
-        void SetServerName(string_view newValue);
-
         u16 GetServerPort() const;
 
         const path& GetServerRoot() const;
 
-        const vector<path>& GetWhitelistedRoutes() const;
+        vector<path> GetWhitelistedRoutes();
         void AddWhitelistedRoute(const path& targetPath);
         void RemoveWhitelistedRoute(const path& targetPath);
 
         void ImportWhitelistedRoutes(const path& targetPath);
         void ExportWhitelistedRoutes(const path& targetPath);
 
-        const vector<string>& GetBannedIPs() const;
+        vector<string> GetBannedIPs();
         void BanIP(string_view IP);
         void UnbanIP(string_view IP);
 
         void ImportBannedIPs(const path& targetPath);
         void ExportBannedIPs(const path& targetPath);
 
-        const vector<string>& GetBlacklistedKeywords() const;
+        vector<string> GetBlacklistedKeywords();
         void AddBlacklistedKeyword(string_view newValue);
         void RemoveBlacklistedKeyword(string_view newValue);
 
@@ -95,25 +107,29 @@ namespace KalaServer::Connection
     private:
         ~Server();
 
-        void RecreateWriterSocket(bool tcpSocket);
+        void TCPListenerThread();
+        void UDPListenerThread();
 
         u32 ID{};
         
-        vector<u32> clientIDs{};
+        mutex linkIDsMutex{};
         vector<u32> linkIDs{};
 
-        bool isVisible{};
+        atomic<bool> isVisible{};
 
         string serverName{};
         u16 serverPort{};
 
         path serverRoot{};
+        mutex whitelistedRoutesMutex{};
         vector<path> whitelistedRoutes{};
 
+        mutex bannedIPsMutex{};
         vector<string> bannedIPs{};
+        mutex blacklistedKeywordsMutex{};
         vector<string> blacklistedKeywords{};
 
-        uintptr_t tcpSocket{};
-        uintptr_t udpSocket{};
+        atomic<uintptr_t> tcpSocket{};
+        atomic<uintptr_t> udpSocket{};
     };
 }

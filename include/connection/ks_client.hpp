@@ -7,7 +7,8 @@
 
 #include <string>
 #include <vector>
-#include <memory>
+#include <atomic>
+#include <mutex>
 
 #include "core_utils.hpp"
 
@@ -25,7 +26,8 @@ namespace KalaServer::Connection
     using std::string;
     using std::string_view;
     using std::vector;
-    using std::default_delete;
+    using std::atomic;
+    using std::mutex;
 
     static constexpr u8 MIN_CLIENT_NAME_LENGTH = 3;
     static constexpr u8 MAX_CLIENT_NAME_LENGTH = 10;
@@ -35,44 +37,19 @@ namespace KalaServer::Connection
     friend class KalaServer::Core::KalaServerCore;
     friend class Server;
     friend class Link;
-    friend struct default_delete<Client>;
     public:
-        KNODISCARD
-        static KalaServerRegistry<Client>& GetRegistry();
-
+        static bool IsInitialized();
         //Create a new client with a username for identification
-        static Client* Initialize(string_view username);
+        static void Initialize(string_view username);
 
-        u32 GetID() const;
-        u32 GetServerID() const;
-        const vector<u32>& GetLinkIDs() const;
+        static vector<u32> GetLinkIDs();
 
-        bool IsVisible() const;
-        void SetVisibility(bool newValue);
+        static bool IsVisible();
+        static void SetVisibility(bool newValue);
 
-        //Connect to local server by server ID
-        void ConnectToServer(u32 serverID);
-        //Connect to remote or local server by port
-        void ConnectToServer(u16 serverPort);
-        //Disconnect from currently connected server
-        void DisconnectFromServer();
-
-        const string& GetUsername() const;
-        void SetUsername(string_view newValue);
+        static const string& GetUsername();
 
         //Disconnects the client from its target server if connected to one
-        void Destroy();
-    private:
-        ~Client();
-
-        u32 ID{};
-        u32 serverID{};
-        vector<u32> linkIDs{};
-
-        bool isVisible{};
-
-        u16 serverPort{};
-
-        string username{};
+        static void Destroy();
     };
 }
