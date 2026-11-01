@@ -22,6 +22,7 @@
 #include <chrono>
 
 #include "log_utils.hpp"
+#include "string_utils.hpp"
 
 #include "connection/ks_server.hpp"
 #include "connection/ks_client.hpp"
@@ -31,6 +32,8 @@ using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaLog::TimeFormat;
 using KalaHeaders::KalaLog::DateFormat;
+
+using KalaHeaders::KalaString::TrimString;
 
 using KalaServer::Connection::Server;
 using KalaServer::Connection::Client;
