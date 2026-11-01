@@ -6,8 +6,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <thread>
-#include <chrono>
 
 #include "log_utils.hpp"
 #include "string_utils.hpp"
@@ -33,23 +31,37 @@ using std::string;
 using std::string_view;
 using std::to_string;
 using std::vector;
-using std::this_thread::sleep_for;
-using std::chrono::seconds;
 
-static vector<u8> GeneratePayloadFromString(string_view input)
+static bool IsTextPayload(const vector<u8>& payload)
 {
-    vector<u8> payload(input.begin(), input.end());
-    return payload;
+    if (payload.empty()) return false;
+
+    for (const u8 byte : payload)
+    {
+        if (byte == '\n'
+            || byte == '\r'
+            || byte == '\t')
+        {
+            continue;
+        }
+
+        if (byte < 32
+            || byte == 127)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static void PrintResponse(
     string_view targetIP,
     u16 targetPort,
-    bool decToHex,
     const vector<u8>& payload)
 {
     string payloadString{};
-    if (!decToHex) payloadString = string(payload.begin(), payload.end());
+    if (IsTextPayload(payload)) payloadString = string(payload.begin(), payload.end());
     else
     {
         for (const u8 d : payload)
@@ -77,8 +89,14 @@ static void SendMessage(
     const string& message_string = {},
     const vector<u8>& message_payload = {})
 {
+    auto generate_payload = [](string_view input) -> vector<u8>
+        {
+            vector<u8> payload(input.begin(), input.end());
+            return payload;
+        };
+
     vector<u8> targetPayload = !message_string.empty()
-        ? GeneratePayloadFromString(message_string)
+        ? generate_payload(message_string)
         : message_payload;
 
     Link::SendPacket(
@@ -98,8 +116,7 @@ static void SendMessage(
             { 
                 PrintResponse(
                     targetIP, 
-                    targetPort, 
-                    message_string.empty(),
+                    targetPort,
                     payload); 
             });
 }
