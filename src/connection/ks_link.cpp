@@ -381,30 +381,6 @@ void _SendPacket(
         initialResponseCallback,
         listenerResponseCallback]() -> void
         {
-            auto get_server = [senderID]() -> Server*
-                {
-                    Server* s{};
-                    string _ = Server::GetRegistry().GetContent(senderID, s);
-                    return s;
-                };
-
-            auto get_link = [linkID]() -> Link*
-                {
-                    Link* l{};
-                    string _ = Link::GetRegistry().GetContent(linkID, l);
-                    return l;
-                };
-
-            Server* server = get_server();
-            Link* link = get_link();
-
-            //for verifying if server is still valid during the lifetime of this thread
-            const bool hadServer = server;
-            //for verifying if the link is still valid during the lifetime of this thread
-            const bool hadLink = link;
-            //for verifying if the client is still valid during the lifetime of this thread
-            const bool hadClient = Client::IsInitialized();
-
             //
             // PREPARE TARGET SOCKET
             //
@@ -807,24 +783,81 @@ void _SendPacket(
                 "KS_LINK",
                 LogType::LOG_SUCCESS);
 
-            if (responseType == ResponseType::RT_IgnoreResponse
-                || ((server
-                && !server->IsVisible())
-                || (!server
-                && !Client::IsVisible())))
-            {
-                if ((server
-                    && !server->IsVisible())
-                    || (!server
-                    && !Client::IsVisible()))
-                {
-                    Log::Print(
-                        "Response for " + string(senderStr) + " was discarded from " 
-                        + string(receiverStr) + " because the sender was set as invisible.",
-                        "KS_LINK",
-                        LogType::LOG_INFO);
-                }
+            bool shouldExit{};
 
+            string err = Server::GetRegistry().LockRegistry([
+                &shouldExit,
+                responseType,
+                senderID,
+                senderStr,
+                receiverStr]()
+                {
+                    Server* server{};
+                    if (senderID != 0)
+                    {
+                        string _ = Server::GetRegistry().GetContent(senderID, server);
+                        if (!server)
+                        {
+                            Log::Print(
+                                "Response for " + string(senderStr) + " was discarded from " 
+                                + string(receiverStr) + " because the server was shut down.",
+                                "KS_LINK",
+                                LogType::LOG_WARNING);
+
+                            shouldExit = true;
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        if (!Client::IsInitialized())
+                        {
+                            Log::Print(
+                                "Response for " + string(senderStr) + " was discarded from " 
+                                + string(receiverStr) + " because the client was shut down.",
+                                "KS_LINK",
+                                LogType::LOG_WARNING);
+
+                            shouldExit = true;
+                            return;
+                        }
+                    }
+
+                    if (responseType == ResponseType::RT_IgnoreResponse
+                        || ((server
+                        && !server->IsVisible())
+                        || (!server
+                        && !Client::IsVisible())))
+                    {
+                        if ((server
+                            && !server->IsVisible())
+                            || (!server
+                            && !Client::IsVisible()))
+                        {
+                            Log::Print(
+                                "Response for " + string(senderStr) + " was discarded from " 
+                                + string(receiverStr) + " because the sender was set as invisible.",
+                                "KS_LINK",
+                                LogType::LOG_INFO);
+                        }
+
+                        shouldExit = true;
+                    }
+                });
+
+            if (!err.empty())
+            {
+                Log::Print(
+                    "Response for " + string(senderStr) + " couldn't be received! Reason: " + err,
+                    "KS_LINK",
+                    LogType::LOG_ERROR,
+                    2);
+
+                shouldExit = true;
+            }
+
+            if (shouldExit)
+            {
                 kclose(targetSocket);
                 return;
             }

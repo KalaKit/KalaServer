@@ -11,6 +11,7 @@
 #include "string_utils.hpp"
 
 #include "core/ks_core.hpp"
+#include "connection/ks_server.hpp"
 #include "connection/ks_client.hpp"
 #include "connection/ks_link.hpp"
 
@@ -20,6 +21,7 @@ using KalaHeaders::KalaLog::LogType;
 using KalaHeaders::KalaString::DecToHex;
 
 using KalaServer::Core::KalaServerCore;
+using KalaServer::Connection::Server;
 using KalaServer::Connection::Client;
 using KalaServer::Connection::SenderType;
 using KalaServer::Connection::TransportProtocol;
@@ -202,6 +204,7 @@ static void Clear()
 int main()
 {
     KalaServerCore::Initialize("192.168.1.102");
+
     Client::Initialize("user");
     Client::SetVisibility(true);
 
