@@ -42,10 +42,11 @@ using std::string_view;
 using std::to_string;
 using std::vector;
 using std::function;
-using std::mutex;
-using std::atomic;
+using std::shared_mutex;
 using std::thread;
+using std::shared_lock;
 using std::scoped_lock;
+using std::unique_lock;
 using std::unique_ptr;
 using std::make_unique;
 
@@ -74,12 +75,11 @@ static constexpr u32 MAX_UDP_PAYLOAD_SIZE_IPV6 = 65527;
 
 static KalaServerRegistry<Link> registry{};
 
-static atomic<bool> isShuttingDown{};
+static shared_mutex activeHeadlessSocketsMutex{};
+static vector<ksocket> activeHeadlessSockets{};
 
-static mutex threadDataMutex{};
+static shared_mutex threadDataMutex{};
 static vector<ThreadData> threadData{};
-
-static atomic<u32> activeHeadlessConnections{0};
 
 static void _SendPacket(
     const bool isSingleShot,
@@ -93,14 +93,17 @@ static void _SendPacket(
     const PacketConnectionMode packetConnectionMode,
     const ResponseType responseType,
     const vector<u8>& payload,
-    const function<void(vector<u8>)>& initialResponseCallback,
-    const function<void(vector<u8>)>& listenerResponseCallback);
+    const function<void(vector<u8>)>& responseCallback);
 
 namespace KalaServer::Connection
 {
     KalaServerRegistry<Link>& Link::GetRegistry() { return registry; }
 
-    u32 Link::GetActiveHeadlessConnectionCount() { return activeHeadlessConnections.load(); }
+    u32 Link::GetActiveHeadlessConnectionCount()
+    { 
+        shared_lock lock(activeHeadlessSocketsMutex);
+        return activeHeadlessSockets.size();
+    }
 
     void Link::SendPacket(
         u32 senderID,
@@ -125,8 +128,7 @@ namespace KalaServer::Connection
             PacketConnectionMode::PCM_DisconnectAfterSend,
             responseType,
             payload,
-            responseCallback,
-            {});
+            responseCallback);
     }
 
     Link* Link::Initialize(
@@ -140,6 +142,16 @@ namespace KalaServer::Connection
         {
             Log::Print(
                 "Failed to initialize link because KalaServer has not been initialized!",
+                "KS_LINK",
+                LogType::LOG_WARNING);
+
+            return nullptr;
+        }
+
+        if (KalaServerCore::IsShuttingDown())
+        {
+            Log::Print(
+                "Failed to initialize link because KalaServer is shutting down!",
                 "KS_LINK",
                 LogType::LOG_WARNING);
 
@@ -183,7 +195,11 @@ namespace KalaServer::Connection
     u32 Link::GetSenderID() const { return senderID; }
     SenderType Link::GetSenderType() const { return senderType; }
 
-    u32 Link::GetActiveConnectionCount() const { return activeConnections.load(); }
+    u32 Link::GetActiveConnectionCount() const
+    { 
+        shared_lock lock(activeSocketsMutex);
+        return activeSockets.size();
+    }
 
     const string& Link::GetReceiverIP() const { return receiverIP; }
     u16 Link::GetReceiverPort() const { return receiverPort; }
@@ -197,8 +213,7 @@ namespace KalaServer::Connection
         const PacketConnectionMode packetConnectionMode, 
         const ResponseType responseType, 
         const vector<u8>& payload,
-        const function<void(vector<u8>)>& initialResponseCallback,
-        const function<void(vector<u8>)>& listenerResponseCallback)
+        const function<void(vector<u8>)>& responseCallback)
     {
         _SendPacket(
             false,
@@ -212,18 +227,46 @@ namespace KalaServer::Connection
             packetConnectionMode,
             responseType,
             payload,
-            initialResponseCallback,
-            listenerResponseCallback);
+            responseCallback);
     }
 
-    void Link::Update()
+    void Link::Shutdown()
     {
+        {
+            unique_lock lock(activeHeadlessSocketsMutex);
 
-    }
+            for (ksocket socket : activeHeadlessSockets)
+            {
+#if defined(KWIN_ANY)
+                shutdown(socket, SD_BOTH);
+#else
+                shutdown(socket, SHUT_RDWR);
+#endif
+            }
+        }
 
-    void Link::CloseRemainingThreads()
-    {
-        isShuttingDown.store(true);
+        string err = registry.LockRegistry([]()
+            {
+                for (Link* l : registry.GetAllContent())
+                {
+                    unique_lock lock(l->activeSocketsMutex);
+                    for (ksocket socket : l->activeSockets)
+                    {
+#if defined(KWIN_ANY)
+                        shutdown(socket, SD_BOTH);
+#else
+                        shutdown(socket, SHUT_RDWR);
+#endif
+                    }
+                }
+            });
+
+        if (!err.empty())
+        {
+            KalaServerCore::ForceClose(
+                "KalaServer Link error",
+                "Failed to shut down! Reason: " + err);
+        }
 
         vector<ThreadData> remainingThreads{};
 
@@ -235,6 +278,15 @@ namespace KalaServer::Connection
         for (ThreadData& t : remainingThreads)
         {
             if (t.thisThread.joinable()) t.thisThread.join();
+        }
+
+        err = registry.DestroyAllContent();
+
+        if (!err.empty())
+        {
+            KalaServerCore::ForceClose(
+                "KalaServer Link error",
+                "Failed to shut down! Reason: " + err);
         }
     }
 
@@ -289,8 +341,7 @@ void _SendPacket(
     const PacketConnectionMode packetConnectionMode,
     const ResponseType responseType,
     const vector<u8>& payload,
-    const function<void(vector<u8>)>& initialResponseCallback,
-    const function<void(vector<u8>)>& listenerResponseCallback)
+    const function<void(vector<u8>)>& responseCallback)
 {
     //
     // SETUP
@@ -378,8 +429,7 @@ void _SendPacket(
         packetConnectionMode,
         responseType,
         payload,
-        initialResponseCallback,
-        listenerResponseCallback]() -> void
+        responseCallback]() -> void
         {
             //
             // PREPARE TARGET SOCKET
@@ -899,65 +949,101 @@ void _SendPacket(
                 return;
             }
 
-            vector<u8> response{};
-            int received{};
+            bool isAlive = true;
 
-            if (transportProtocol == TransportProtocol::TP_TCP)
+            while (isAlive)
             {
-                response.resize(MAX_TCP_PAYLOAD_SIZE);
+                vector<u8> response{};
+                int received{};
 
-                received = recv(
-                    targetSocket,
-                    rcast<char*>(response.data()),
-                    scast<int>(response.size()),
-                    0);
-            }
-            else
-            {
-                response.resize(isIPv4 ? MAX_UDP_PAYLOAD_SIZE_IPV4 : MAX_UDP_PAYLOAD_SIZE_IPV6);
+                if (transportProtocol == TransportProtocol::TP_TCP)
+                {
+                    response.resize(MAX_TCP_PAYLOAD_SIZE);
 
-                sockaddr_storage senderAddr{};
+                    received = recv(
+                        targetSocket,
+                        rcast<char*>(response.data()),
+                        scast<int>(response.size()),
+                        0);
+                }
+                else
+                {
+                    response.resize(isIPv4 
+                        ? MAX_UDP_PAYLOAD_SIZE_IPV4 
+                        : MAX_UDP_PAYLOAD_SIZE_IPV6);
+
+                    sockaddr_storage senderAddr{};
 
 #if defined(KWIN_ANY)
-                int senderLen = sizeof(senderAddr);
+                    int senderLen = sizeof(senderAddr);
 #else
-                socklen_t senderLen = sizeof(senderAddr);
+                    socklen_t senderLen = sizeof(senderAddr);
 #endif
 
-                received = recvfrom(
-                    targetSocket,
-                    rcast<char*>(response.data()),
-                    scast<int>(response.size()),
-                    0,
-                    rcast<sockaddr*>(&senderAddr),
-                    &senderLen);
-            }
+                    received = recvfrom(
+                        targetSocket,
+                        rcast<char*>(response.data()),
+                        scast<int>(response.size()),
+                        0,
+                        rcast<sockaddr*>(&senderAddr),
+                        &senderLen);
+                }
 
-            if (received < 0
-                || (received == 0
-                && transportProtocol == TransportProtocol::TP_TCP))
-            {
-                Log::Print(
-                    "Failed receive response for " + string(senderStr) 
-                    + " from " + string(receiverStr) + " because receiving data failed!",
-                    "KS_LINK",
-                    LogType::LOG_ERROR,
-                    2);
+                if (received <= 0)
+                {
+                    if (received < 0)
+                    {
+                        Log::Print(
+                            "Failed receive response for " + string(senderStr) 
+                            + " from " + string(receiverStr) + " because receiving data failed!",
+                            "KS_LINK",
+                            LogType::LOG_ERROR,
+                            2);
 
-                kclose(targetSocket);
-                return;
+                        break;
+                    }
+                    else if (received == 0
+                        && transportProtocol == TransportProtocol::TP_TCP)
+                    {
+                        Log::Print(
+                            "Closing connection between " + string(senderStr) 
+                            + " and " + string(receiverStr) + " because receiver has closed the connection.",
+                            "KS_LINK",
+                            LogType::LOG_INFO);
+
+                        break;
+                    }
+                }
+
+                if (KalaServerCore::IsShuttingDown()
+                    || packetConnectionMode != PacketConnectionMode::PCM_KeepAlive)
+                {
+                    if (KalaServerCore::IsShuttingDown())
+                    {
+                        Log::Print(
+                            "Closing connection between " + string(senderStr) 
+                            + " and " + string(receiverStr) + " because KalaServer is shutting down.",
+                            "KS_LINK",
+                            LogType::LOG_INFO);
+                    }
+                    if (packetConnectionMode != PacketConnectionMode::PCM_KeepAlive)
+                    {
+                        Log::Print(
+                            "Closing connection between " + string(senderStr) 
+                            + " and " + string(receiverStr) + " because the connection is not long lasting.",
+                            "KS_LINK",
+                            LogType::LOG_INFO);
+                    }
+
+                    isAlive = false;
+                }
+
+                response.resize(received);
+
+                if (responseCallback) responseCallback(std::move(response));
             }
 
             kclose(targetSocket);
-
-            Log::Print(
-                "Response for " + string(senderStr) + " has been received from " + string(receiverStr) + "!",
-                "KS_LINK",
-                LogType::LOG_SUCCESS);
-
-            response.resize(received);
-
-            if (initialResponseCallback) initialResponseCallback(std::move(response));
         };
 
     {

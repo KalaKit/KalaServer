@@ -40,9 +40,9 @@ using std::vector;
 using std::filesystem::exists;
 using std::filesystem::is_directory;
 using std::mutex;
-using std::atomic;
 using std::thread;
 using std::scoped_lock;
+using std::unique_lock;
 using std::unique_ptr;
 using std::make_unique;
 
@@ -64,8 +64,6 @@ struct ThreadData
 
 static KalaServerRegistry<Server> registry{};
 
-static atomic<bool> isShuttingDown{};
-
 static mutex threadDataMutex{};
 static vector<ThreadData> threadData{};
 
@@ -85,6 +83,16 @@ namespace KalaServer::Connection
         {
             Log::Print(
                 "Failed to initialize server because KalaServer has not been initialized!",
+                "KS_SERVER",
+                LogType::LOG_WARNING);
+
+            return nullptr;
+        }
+
+        if (KalaServerCore::IsShuttingDown())
+        {
+            Log::Print(
+                "Failed to initialize server because KalaServer is shutting down!",
                 "KS_SERVER",
                 LogType::LOG_WARNING);
 
@@ -303,9 +311,30 @@ namespace KalaServer::Connection
 
     }
 
-    void Server::CloseRemainingThreads()
+    void Server::Shutdown()
     {
-        isShuttingDown.store(true);
+        string err = registry.LockRegistry([]()
+            {
+                for (Server* s : registry.GetAllContent())
+                {
+                    unique_lock lock(s->activeSocketsMutex);
+                    for (ksocket socket : s->activeSockets)
+                    {
+#if defined(KWIN_ANY)
+                        shutdown(socket, SD_BOTH);
+#else
+                        shutdown(socket, SHUT_RDWR);
+#endif
+                    }
+                }
+            });
+
+        if (!err.empty())
+        {
+            KalaServerCore::ForceClose(
+                "KalaServer Server error",
+                "Failed to shut down! Reason: " + err);
+        }
 
         vector<ThreadData> remainingThreads{};
 
@@ -317,6 +346,15 @@ namespace KalaServer::Connection
         for (ThreadData& t : remainingThreads)
         {
             if (t.thisThread.joinable()) t.thisThread.join();
+        }
+
+        err = registry.DestroyAllContent();
+
+        if (!err.empty())
+        {
+            KalaServerCore::ForceClose(
+                "KalaServer Server error",
+                "Failed to shut down! Reason: " + err);
         }
     }
 

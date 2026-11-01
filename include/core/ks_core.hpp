@@ -59,6 +59,8 @@ namespace KalaServer::Core
         //Assign a shutdown callback to decide what happens besides just KalaServer shutdown when Shutdown is called
         static void SetShutdownCallback(function<void()> shutdownCallback);
 
+        static bool IsShuttingDown();
+
         //Gracefully shut down KalaServer and all its servers and clients,
         //set closeExecutableAfterShutdown if you also want to close the executable once KalaServer shutdown is complete,
         //assign a function via SetShutdownCallback to decide what happens after KalaServer resources are cleaned

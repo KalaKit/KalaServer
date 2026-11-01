@@ -31,6 +31,7 @@ namespace KalaServer::Connection
     using std::filesystem::path;
     using std::atomic;
     using std::mutex;
+    using std::shared_mutex;
     using std::default_delete;
 
     static constexpr u8 MIN_SERVER_NAME_LENGTH = 3;
@@ -107,15 +108,15 @@ namespace KalaServer::Connection
     private:
         ~Server();
 
-        void TCPListenerThread();
-        void UDPListenerThread();
-
-        static void CloseRemainingThreads();
+        static void Shutdown();
 
         u32 ID{};
         
         mutex linkIDsMutex{};
         vector<u32> linkIDs{};
+
+        shared_mutex activeSocketsMutex{};
+        vector<uintptr_t> activeSockets{};
 
         atomic<bool> isVisible{};
 

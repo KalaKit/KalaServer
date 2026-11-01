@@ -20,16 +20,12 @@
 #include "core/ks_core.hpp"
 #include "connection/ks_link.hpp"
 
-using KalaHeaders::KalaCore::ToVar;
-using KalaHeaders::KalaCore::FromVar;
-
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
 using KalaHeaders::KalaString::IsStringInRange;
 
 using KalaServer::Core::KalaServerCore;
-using KalaServer::Core::KalaServerRegistry;
 using KalaServer::Connection::Client;
 
 using std::string;
@@ -67,6 +63,16 @@ namespace KalaServer::Connection
         {
             Log::Print(
                 "Failed to initialize client because KalaServer has not been initialized!",
+                "KS_CLIENT",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+
+        if (KalaServerCore::IsShuttingDown())
+        {
+            Log::Print(
+                "Failed to initialize client because KalaServer is shutting down!",
                 "KS_CLIENT",
                 LogType::LOG_WARNING);
 

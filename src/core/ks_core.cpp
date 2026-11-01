@@ -47,6 +47,7 @@ using std::source_location;
 using std::chrono::duration_cast;
 using std::chrono::steady_clock;
 using std::chrono::milliseconds;
+using std::atomic;
 
 #if defined(KWIN_ANY)
 using std::wstring;
@@ -62,6 +63,9 @@ constexpr ksocket invalid_socket = -1;
 
 static bool isInitialized{};
 static bool readyToCheckInternetState{};
+
+static atomic<bool> isShuttingDown{};
+
 static string IP{};
 
 static u32 globalID{};
@@ -487,6 +491,8 @@ namespace KalaServer::Core
 
 	void SetShutdownCallback(function<void()> newShutdownCallback) { shutdownCallback = newShutdownCallback; }
 
+	bool KalaServerCore::IsShuttingDown() { return isShuttingDown.load(); }
+
 	void KalaServerCore::Shutdown(bool closeExecutableAfterShutdown)
 	{
 		if (!isInitialized)
@@ -499,14 +505,10 @@ namespace KalaServer::Core
 			return;
 		}
 
-		vector<Link*> linkCopy = Link::GetRegistry().GetAllContent();
-		for (Link* l : linkCopy) l->Destroy();
-		Link::CloseRemainingThreads();
+		isShuttingDown.store(true);
 
-		vector<Server*> serverCopy = Server::GetRegistry().GetAllContent();
-		for (Server* s : serverCopy) s->Destroy();
-		Server::CloseRemainingThreads();
-
+		Link::Shutdown();
+		Server::Shutdown();
 		if (Client::IsInitialized()) Client::Destroy();
 
 		if (shutdownCallback) shutdownCallback();
@@ -524,5 +526,7 @@ namespace KalaServer::Core
 			LogType::LOG_SUCCESS);
 
 		if (closeExecutableAfterShutdown) exit(0);
+
+		isShuttingDown.store(false);
 	}
 }
