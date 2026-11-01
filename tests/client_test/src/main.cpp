@@ -131,7 +131,7 @@ static void Command_Help()
         "tcpmode - switches to tcp mode where you can provide ip address, port and payload\n"
         "return - goes back from tcpmode to regular mode\n"
 
-        "test_python_server - attempts to connect to the local python server, run 'python test_server.py' before running this command\n"
+        "test_python_server - attempts to connect to the local python server, run 'python test_server.py' in another console before running this command\n"
         "test_wikipedia - sends a simple tcp homepage request to wikipedia\n"
         "test_cloudflare - sends a simple udp request for the wikipedia ipv4 address to cloudflare";
 
