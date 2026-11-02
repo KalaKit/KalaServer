@@ -32,8 +32,9 @@ using std::string;
 using std::to_string;
 using std::vector;
 using std::atomic;
-using std::mutex;
+using std::shared_mutex;
 using std::scoped_lock;
+using std::shared_lock;
 
 #if defined(KWIN_ANY)
 using ksocket = SOCKET;
@@ -45,18 +46,22 @@ constexpr ksocket invalid_socket = -1;
 #define kclose(targetSocket) close(targetSocket)
 #endif
 
+static shared_mutex userMutex{};
+
 static bool isInitialized{};
-
-static mutex linkIDsMutex{};
-static vector<u32> linkIDs{};
-
-static atomic<bool> isVisible{};
+static bool isVisible{};
 
 static string username{};
 
+static vector<u32> linkIDs{};
+
 namespace KalaServer::Connection
 {
-    bool Client::IsInitialized() { return isInitialized; }
+    bool Client::IsInitialized()
+    {
+        shared_lock lock(userMutex);
+        return isInitialized;
+    }
     void Client::Initialize(string_view newUsername)
     {
         if (!KalaServerCore::IsInitialized())
@@ -78,6 +83,8 @@ namespace KalaServer::Connection
 
             return;
         }
+
+        scoped_lock lock(userMutex);
 
         if (isInitialized)
         {
@@ -112,10 +119,10 @@ namespace KalaServer::Connection
 
         isInitialized = true;
 
-		Log::Print(
-			"Created new client '" + username + "'!",
-			"KS_CLIENT",
-			LogType::LOG_SUCCESS);
+        Log::Print(
+            "Created new client '" + username + "'!",
+            "KS_CLIENT",
+            LogType::LOG_SUCCESS);
     }
 
     vector<u32> Client::GetLinkIDs() 
@@ -130,6 +137,8 @@ namespace KalaServer::Connection
             return {};
         }
 
+        shared_lock lock(userMutex);
+
         if (!isInitialized)
         {
             Log::Print(
@@ -140,7 +149,6 @@ namespace KalaServer::Connection
             return {};
         }
 
-        scoped_lock lock(linkIDsMutex);
         return linkIDs;
     }
 
@@ -156,6 +164,8 @@ namespace KalaServer::Connection
             return {};
         }
 
+        shared_lock lock(userMutex);
+
         if (!isInitialized)
         {
             Log::Print(
@@ -166,7 +176,7 @@ namespace KalaServer::Connection
             return false;
         }
 
-        return isVisible.load();
+        return isVisible;
     }
     void Client::SetVisibility(bool newValue)
     {
@@ -180,6 +190,8 @@ namespace KalaServer::Connection
             return;
         }
 
+        scoped_lock lock(userMutex);
+
         if (!isInitialized)
         {
             Log::Print(
@@ -191,7 +203,7 @@ namespace KalaServer::Connection
         }
 
         if (newValue
-            && isVisible.load())
+            && isVisible)
         {
             Log::Print(
                 "Failed to set client '" + username + "' visible because it already was visible!",
@@ -201,7 +213,7 @@ namespace KalaServer::Connection
             return;
         }
         if (!newValue
-            && !isVisible.load())
+            && !isVisible)
         {
             Log::Print(
                 "Failed to set client '" + username + "' invisible because it already was invisible!",
@@ -211,15 +223,19 @@ namespace KalaServer::Connection
             return;
         }
 
-        isVisible.store(newValue);
+        isVisible = newValue;
 
         Log::Print(
-            "Changed client '" + username + "' visibility to '" + (isVisible.load() ? "on" : "off") + "'.",
+            "Changed client '" + username + "' visibility to '" + (isVisible ? "on" : "off") + "'.",
             "KS_CLIENT",
             LogType::LOG_SUCCESS);
     }
 
-    const string& Client::GetUsername() { return username; }
+    string Client::GetUsername()
+    {
+        shared_lock lock(userMutex);
+        return username;
+    }
 
     void Client::Destroy()
     {
@@ -233,19 +249,32 @@ namespace KalaServer::Connection
             return;
         }
 
-        if (!isInitialized)
-        {
-            Log::Print(
-                "Failed to destroy client because it has not been initialized!",
-                "KS_CLIENT",
-                LogType::LOG_WARNING);
+        string usernameCopy{};
+        vector<u32> linkIDsCopy{};
 
-            return;
+        {
+            scoped_lock lock(userMutex);
+
+            if (!isInitialized)
+            {
+                Log::Print(
+                    "Failed to destroy client because it has not been initialized!",
+                    "KS_CLIENT",
+                    LogType::LOG_WARNING);
+
+                return;
+            }
+
+            isInitialized = false;
+            isVisible = false;
+
+            usernameCopy = username;
+            linkIDsCopy = linkIDs;
+            
+            linkIDs.clear();
         }
 
-        isVisible = false;
-
-        for (const u32 lid : GetLinkIDs())
+        for (const u32 lid : linkIDsCopy)
         {
             Link* l{};
 
@@ -254,22 +283,15 @@ namespace KalaServer::Connection
             {
                 KalaServerCore::ForceClose(
                     "KalaServer Client error",
-                    "Failed to destroy client '" + username 
+                    "Failed to destroy client '" + usernameCopy 
                     + "' because its link '" + to_string(lid) + "' was invalid!");
             }
 
             l->Destroy();
         }
 
-        {
-            scoped_lock lock(linkIDsMutex);
-            linkIDs.clear();
-        }
-
-        isInitialized = false;
-
 		Log::Print(
-			"Destroying client '" + username + "'.",
+			"Destroying client '" + usernameCopy + "'.",
 			"KS_CLIENT",
 			LogType::LOG_INFO);
     }

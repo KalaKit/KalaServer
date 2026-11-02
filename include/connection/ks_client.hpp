@@ -47,7 +47,7 @@ namespace KalaServer::Connection
         static bool IsVisible();
         static void SetVisibility(bool newValue);
 
-        static const string& GetUsername();
+        static string GetUsername();
 
         //Disconnects the client from its target server if connected to one
         static void Destroy();
