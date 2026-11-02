@@ -8,13 +8,12 @@
 #include <string>
 #include <vector>
 #include <filesystem>
-#include <atomic>
-#include <mutex>
 #include <memory>
 
 #include "core_utils.hpp"
 
 #include "core/ks_registry.hpp"
+#include "connection/ks_link.hpp"
 
 namespace KalaServer::Core
 {
@@ -24,13 +23,14 @@ namespace KalaServer::Core
 namespace KalaServer::Connection
 {
     using KalaServer::Core::KalaServerRegistry;
+    using KalaServer::Connection::TransportProtocol;
+    using KalaServer::Connection::PacketConnectionMode;
+    using KalaServer::Connection::ResponseType;
 
     using std::string;
     using std::string_view;
     using std::vector;
     using std::filesystem::path;
-    using std::atomic;
-    using std::mutex;
     using std::shared_mutex;
     using std::default_delete;
 
@@ -54,8 +54,6 @@ namespace KalaServer::Connection
 
     class LIB_API Server
     {
-    friend void _TCPThread(Server* server);
-    friend void _UDPThread(Server* server);
     friend class KalaServer::Core::KalaServerCore;
     friend class Link;
     friend struct default_delete<Server>;
@@ -72,15 +70,13 @@ namespace KalaServer::Connection
 
         u32 GetID() const;
 
-        vector<u32> GetLinkIDs();
-
         bool IsVisible() const;
         void SetVisibility(bool newValue);
 
-        const string& GetServerName() const;
+        string GetServerName() const;
         u16 GetServerPort() const;
 
-        const path& GetServerRoot() const;
+        path GetServerRoot() const;
 
         vector<path> GetWhitelistedRoutes();
         void AddWhitelistedRoute(const path& targetPath);
@@ -110,26 +106,19 @@ namespace KalaServer::Connection
 
         static void Shutdown();
 
+        mutable shared_mutex serverMutex{};
+
         u32 ID{};
-        
-        mutex linkIDsMutex{};
-        vector<u32> linkIDs{};
 
-        shared_mutex activeSocketsMutex{};
-        vector<uintptr_t> activeSockets{};
-
-        atomic<bool> isVisible{};
+        bool isVisible{};
 
         string serverName{};
         u16 serverPort{};
 
         path serverRoot{};
-        mutex whitelistedRoutesMutex{};
         vector<path> whitelistedRoutes{};
 
-        mutex bannedIPsMutex{};
         vector<string> bannedIPs{};
-        mutex blacklistedKeywordsMutex{};
         vector<string> blacklistedKeywords{};
     };
 }

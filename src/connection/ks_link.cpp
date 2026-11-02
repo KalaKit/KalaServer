@@ -74,7 +74,7 @@ struct LinkData
     PacketConnectionMode packetConnectionMode{};
     ResponseType responseType{};
 
-    ksocket socket{};
+    ksocket socket = invalid_socket;
     thread thisThread{};
 
     vector<vector<u8>> responses{};
@@ -268,22 +268,31 @@ namespace KalaServer::Connection
 
     void Link::Shutdown()
     {
+        vector<thread> threads{};
+
         {
             scoped_lock lock(linkDataMutex);
 
+            threads.reserve(linkData.size());
+
             for (pair<u32, LinkData>& ld : linkData)
             {
+                if (ld.second.socket != invalid_socket)
+                {
 #if defined(KWIN_ANY)
-                shutdown(ld.second.socket, SD_BOTH);
+                    shutdown(ld.second.socket, SD_BOTH);
 #else
-                shutdown(ld.second.socket, SHUT_RDWR);
+                    shutdown(ld.second.socket, SHUT_RDWR);
 #endif
+                }
+
+                threads.push_back(std::move(ld.second.thisThread));
             }
         }
 
-        for (pair<u32, LinkData>& ld : linkData)
+        for (thread& t : threads)
         {
-            if (ld.second.thisThread.joinable()) ld.second.thisThread.join();
+            if (t.joinable()) t.join();
         }
 
         {
@@ -303,30 +312,45 @@ namespace KalaServer::Connection
 
     void Link::Destroy()
     {
-        vector<LinkData> targetData{};
+        vector<thread> threadsCopy{};
+
+        {
+            scoped_lock lock(linkDataMutex);
+
+            for (pair<u32, LinkData>& entry : linkData)
+            {
+                LinkData& ld = entry.second;
+
+                if (ld.linkID != ID) continue;
+
+                if (ld.socket != invalid_socket)
+                {
+#if defined(KWIN_ANY)
+                    shutdown(ld.socket, SD_BOTH);
+#else
+                    shutdown(ld.socket, SHUT_RDWR);
+#endif
+                }
+
+                threadsCopy.push_back(std::move(ld.thisThread));
+            }
+        }
+
+        for (thread& t : threadsCopy)
+        {
+            if (t.joinable()) t.join();
+        }
 
         {
             scoped_lock lock(linkDataMutex);
 
             for (size_t i = linkData.size(); i > 0; i--)
             {
-                if (linkData[i - 1].second.linkID != ID) continue;
-
-                LinkData& ld = linkData[i - 1].second;
-#if defined(KWIN_ANY)
-                shutdown(ld.socket, SD_BOTH);
-#else
-                shutdown(ld.socket, SHUT_RDWR);
-#endif
-
-                targetData.push_back(std::move(ld));
-                linkData.erase(linkData.begin() + (i - 1));
+                if (linkData[i - 1].second.linkID == ID)
+                {
+                    linkData.erase(linkData.begin() + (i - 1));
+                }
             }
-        }
-
-        for (LinkData& ld : targetData)
-        {
-            if (ld.thisThread.joinable()) ld.thisThread.join();
         }
     }
 
@@ -359,10 +383,6 @@ void _SendPacket(
         {
             const bool isIPv4 = KalaServerCore::IsIPv4(receiverIP);
 
-            //
-            // PREPARE TARGET SOCKET
-            //
-
             auto create_socket = [](
                 const string receiverIP,
                 const TransportProtocol transportProtocol) -> ksocket
@@ -383,6 +403,7 @@ void _SendPacket(
                 };
 
             ksocket targetSocket = create_socket(receiverIP, transportProtocol);
+
             if (targetSocket == invalid_socket)
             {
 #if defined(KWIN_ANY)
@@ -426,6 +447,37 @@ void _SendPacket(
             }
 #endif
 
+            if (KalaServerCore::IsShuttingDown())
+            {
+                {
+                    scoped_lock lock(linkDataMutex);
+                    for (pair<u32, LinkData>& ld : linkData)
+                    {
+                        if (ld.first == linkDataID)
+                        {
+                            if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                            break;
+                        }
+                    }
+
+                    kclose(targetSocket);
+                }
+
+                return;
+            }
+
+            {
+                scoped_lock lock(linkDataMutex);
+                for (pair<u32, LinkData>& ld : linkData)
+                {
+                    if (ld.first == linkDataID)
+                    {
+                        ld.second.socket = targetSocket;
+                        break;
+                    }
+                }
+            }
+
             //
             // CONNECT TO RECEIVER
             //
@@ -451,8 +503,20 @@ void _SendPacket(
                         LogType::LOG_ERROR,
                         2);
 
-                    //always exit thread
-                    kclose(targetSocket);
+                    {
+                        scoped_lock lock(linkDataMutex);
+                        for (pair<u32, LinkData>& ld : linkData)
+                        {
+                            if (ld.first == linkDataID)
+                            {
+                                if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                break;
+                            }
+                        }
+
+                        kclose(targetSocket);
+                    }
+
                     return;
                 }
 
@@ -473,8 +537,20 @@ void _SendPacket(
                         LogType::LOG_ERROR,
                         2);
 
-                    //always exit thread
-                    kclose(targetSocket);
+                    {
+                        scoped_lock lock(linkDataMutex);
+                        for (pair<u32, LinkData>& ld : linkData)
+                        {
+                            if (ld.first == linkDataID)
+                            {
+                                if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                break;
+                            }
+                        }
+
+                        kclose(targetSocket);
+                    }
+
                     return;
                 }
 
@@ -563,10 +639,41 @@ void _SendPacket(
                         LogType::LOG_ERROR,
                         2);
 
-                    //always exit thread
-                    kclose(targetSocket);
+                    {
+                        scoped_lock lock(linkDataMutex);
+                        for (pair<u32, LinkData>& ld : linkData)
+                        {
+                            if (ld.first == linkDataID)
+                            {
+                                if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                break;
+                            }
+                        }
+
+                        kclose(targetSocket);
+                    }
+
                     return;
                 }
+            }
+
+            if (KalaServerCore::IsShuttingDown())
+            {
+                {
+                    scoped_lock lock(linkDataMutex);
+                    for (pair<u32, LinkData>& ld : linkData)
+                    {
+                        if (ld.first == linkDataID)
+                        {
+                            if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                            break;
+                        }
+                    }
+
+                    kclose(targetSocket);
+                }
+
+                return;
             }
 
             //
@@ -600,7 +707,20 @@ void _SendPacket(
                             LogType::LOG_ERROR,
                             2);
 
-                        kclose(targetSocket);
+                        {
+                            scoped_lock lock(linkDataMutex);
+                            for (pair<u32, LinkData>& ld : linkData)
+                            {
+                                if (ld.first == linkDataID)
+                                {
+                                    if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                    break;
+                                }
+                            }
+
+                            kclose(targetSocket);
+                        }
+
                         return;
                     }
 
@@ -646,7 +766,20 @@ void _SendPacket(
                                 LogType::LOG_ERROR,
                                 2);
 
-                            kclose(targetSocket);
+                            {
+                                scoped_lock lock(linkDataMutex);
+                                for (pair<u32, LinkData>& ld : linkData)
+                                {
+                                    if (ld.first == linkDataID)
+                                    {
+                                        if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                        break;
+                                    }
+                                }
+
+                                kclose(targetSocket);
+                            }
+
                             return;
                         }
                     }
@@ -659,7 +792,20 @@ void _SendPacket(
                             LogType::LOG_ERROR,
                             2);
 
-                        kclose(targetSocket);
+                        {
+                            scoped_lock lock(linkDataMutex);
+                            for (pair<u32, LinkData>& ld : linkData)
+                            {
+                                if (ld.first == linkDataID)
+                                {
+                                    if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                    break;
+                                }
+                            }
+
+                            kclose(targetSocket);
+                        }
+
                         return;
                     }
                 }
@@ -675,7 +821,20 @@ void _SendPacket(
                         LogType::LOG_ERROR,
                         2);
 
-                    kclose(targetSocket);
+                    {
+                        scoped_lock lock(linkDataMutex);
+                        for (pair<u32, LinkData>& ld : linkData)
+                        {
+                            if (ld.first == linkDataID)
+                            {
+                                if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                break;
+                            }
+                        }
+
+                        kclose(targetSocket);
+                    }
+
                     return;
                 }
 
@@ -733,7 +892,20 @@ void _SendPacket(
                                 LogType::LOG_ERROR,
                                 2);
 
-                            kclose(targetSocket);
+                            {
+                                scoped_lock lock(linkDataMutex);
+                                for (pair<u32, LinkData>& ld : linkData)
+                                {
+                                    if (ld.first == linkDataID)
+                                    {
+                                        if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                        break;
+                                    }
+                                }
+
+                                kclose(targetSocket);
+                            }
+
                             return;
                         }
                     }
@@ -746,10 +918,42 @@ void _SendPacket(
                             LogType::LOG_ERROR,
                             2);
 
-                        kclose(targetSocket);
+                        {
+                            scoped_lock lock(linkDataMutex);
+                            for (pair<u32, LinkData>& ld : linkData)
+                            {
+                                if (ld.first == linkDataID)
+                                {
+                                    if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                                    break;
+                                }
+                            }
+
+                            kclose(targetSocket);
+                        }
+
                         return;
                     }
                 }
+            }
+
+            if (KalaServerCore::IsShuttingDown())
+            {
+                {
+                    scoped_lock lock(linkDataMutex);
+                    for (pair<u32, LinkData>& ld : linkData)
+                    {
+                        if (ld.first == linkDataID)
+                        {
+                            if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                            break;
+                        }
+                    }
+
+                    kclose(targetSocket);
+                }
+
+                return;
             }
 
             //
@@ -849,7 +1053,20 @@ void _SendPacket(
 
             if (shouldExit)
             {
-                kclose(targetSocket);
+                {
+                    scoped_lock lock(linkDataMutex);
+                    for (pair<u32, LinkData>& ld : linkData)
+                    {
+                        if (ld.first == linkDataID)
+                        {
+                            if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                            break;
+                        }
+                    }
+
+                    kclose(targetSocket);
+                }
+
                 return;
             }
 
@@ -886,7 +1103,20 @@ void _SendPacket(
                     LogType::LOG_ERROR,
                     2);
 
-                kclose(targetSocket);
+                {
+                    scoped_lock lock(linkDataMutex);
+                    for (pair<u32, LinkData>& ld : linkData)
+                    {
+                        if (ld.first == linkDataID)
+                        {
+                            if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                            break;
+                        }
+                    }
+
+                    kclose(targetSocket);
+                }
+
                 return;
             }
 
@@ -984,7 +1214,19 @@ void _SendPacket(
                 if (responseCallback) responseCallback(std::move(response));
             }
 
-            kclose(targetSocket);
+            {
+                scoped_lock lock(linkDataMutex);
+                for (pair<u32, LinkData>& ld : linkData)
+                {
+                    if (ld.first == linkDataID)
+                    {
+                        if (ld.second.socket != invalid_socket) ld.second.socket = invalid_socket;
+                        break;
+                    }
+                }
+
+                kclose(targetSocket);
+            }
         };
 
     {

@@ -34,13 +34,20 @@ using KalaHeaders::KalaString::IsStringInRange;
 using KalaServer::Core::KalaServerCore;
 using KalaServer::Core::KalaServerRegistry;
 using KalaServer::Connection::Server;
+using KalaServer::Connection::TransportProtocol;
+using KalaServer::Connection::PacketConnectionMode;
+using KalaServer::Connection::ResponseType;
 
+using std::string;
 using std::to_string;
 using std::vector;
+using std::pair;
 using std::filesystem::exists;
 using std::filesystem::is_directory;
-using std::mutex;
 using std::thread;
+using std::atomic;
+using std::shared_mutex;
+using std::shared_lock;
 using std::scoped_lock;
 using std::unique_ptr;
 using std::make_unique;
@@ -55,19 +62,31 @@ constexpr ksocket invalid_socket = -1;
 #define kclose(targetSocket) close(targetSocket)
 #endif
 
-struct ThreadData
+struct ServerData
 {
     u32 serverID{};
+
+    string clientIP{};
+    u16 clientPort{};
+
+    u8 timeout{};
+
+    TransportProtocol transportProtocol{};
+    PacketConnectionMode packetConnectionMode{};
+    ResponseType responseType{};
+
+    ksocket socket = invalid_socket;
     thread thisThread{};
+
+    vector<vector<u8>> responses{};
 };
 
 static KalaServerRegistry<Server> registry{};
 
-static mutex threadDataMutex{};
-static vector<ThreadData> threadData{};
+static atomic<u32> serverDataID{};
 
-static void _TCPThread(Server* server);
-static void _UDPThread(Server* server);
+static shared_mutex serverDataMutex{};
+static vector<pair<u32, ServerData>> serverData{};
 
 namespace KalaServer::Connection
 {
@@ -195,19 +214,23 @@ namespace KalaServer::Connection
 		return serverPtr;
     }
 
-    u32 Server::GetID() const { return ID; }
-
-    vector<u32> Server::GetLinkIDs()
+    u32 Server::GetID() const
     {
-        scoped_lock lock(linkIDsMutex);
-        return linkIDs;
+        shared_lock lock(serverMutex);
+        return ID;
     }
 
-    bool Server::IsVisible() const { return isVisible.load(); }
+    bool Server::IsVisible() const
+    {
+        shared_lock lock(serverMutex); 
+        return isVisible;
+    }
     void Server::SetVisibility(bool newValue)
     {
+        scoped_lock lock(serverMutex);
+
         if (newValue
-            && isVisible.load())
+            && isVisible)
         {
             Log::Print(
                 "Failed to set server '" + to_string(ID) + "' visible because it already was visible!",
@@ -217,7 +240,7 @@ namespace KalaServer::Connection
             return;
         }
         if (!newValue
-            && !isVisible.load())
+            && !isVisible)
         {
             Log::Print(
                 "Failed to set server '" + to_string(ID) + "' invisible because it already was invisible!",
@@ -227,104 +250,110 @@ namespace KalaServer::Connection
             return;
         }
 
-        isVisible.store(newValue);
+        isVisible = newValue;
 
         Log::Print(
-            "Changed server '" + to_string(ID) + "' visibility to '" + (isVisible.load() ? "on" : "off") + "'.",
+            "Changed server '" + to_string(ID) + "' visibility to '" + (isVisible ? "on" : "off") + "'.",
             "KS_SERVER",
             LogType::LOG_SUCCESS);
     }
 
-    const string& Server::GetServerName() const { return serverName; }
+    string Server::GetServerName() const
+    { 
+        return serverName;
+    }
 
-    u16 Server::GetServerPort() const { return serverPort; }
+    u16 Server::GetServerPort() const
+    {
+        shared_lock lock(serverMutex); 
+        return serverPort;
+    }
 
-    const path& Server::GetServerRoot() const { return serverRoot; }
+    path Server::GetServerRoot() const
+    {
+        shared_lock lock(serverMutex); 
+        return serverRoot;
+    }
 
     vector<path> Server::GetWhitelistedRoutes()
     { 
-        scoped_lock lock(whitelistedRoutesMutex);
+        scoped_lock lock(serverMutex);
         return whitelistedRoutes;
     }
     void Server::AddWhitelistedRoute(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
     void Server::RemoveWhitelistedRoute(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
 
     void Server::ImportWhitelistedRoutes(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
     void Server::ExportWhitelistedRoutes(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
 
     vector<string> Server::GetBannedIPs()
     {
-        scoped_lock lock(bannedIPsMutex);
+        shared_lock lock(serverMutex);
         return bannedIPs;
     }
     void Server::BanIP(string_view IP)
     {
-
+        scoped_lock lock(serverMutex);
     }
     void Server::UnbanIP(string_view IP)
     {
-
+        scoped_lock lock(serverMutex);
     }
 
     void Server::ImportBannedIPs(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
     void Server::ExportBannedIPs(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
 
     vector<string> Server::GetBlacklistedKeywords()
     { 
-        scoped_lock lock(blacklistedKeywordsMutex);
+        shared_lock lock(serverMutex);
         return blacklistedKeywords;
     }
     void Server::AddBlacklistedKeyword(string_view newValue)
     {
-
+        scoped_lock lock(serverMutex);
     }
     void Server::RemoveBlacklistedKeyword(string_view newValue)
     {
-
+        scoped_lock lock(serverMutex);
     }
 
     void Server::ImportBlacklistedKeywords(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
     void Server::ExportBlacklistedKeywords(const path& targetPath)
     {
-
+        scoped_lock lock(serverMutex);
     }
 
     void Server::Shutdown()
     {
+        vector<thread> threads{};
+
         string err = registry.LockRegistry([]()
             {
                 for (Server* s : registry.GetAllContent())
                 {
-                    scoped_lock lock(s->activeSocketsMutex);
-                    for (ksocket socket : s->activeSockets)
-                    {
-#if defined(KWIN_ANY)
-                        shutdown(socket, SD_BOTH);
-#else
-                        shutdown(socket, SHUT_RDWR);
-#endif
-                    }
+                    scoped_lock lock(s->serverMutex);
+                    s->isVisible = false;
                 }
             });
 
@@ -335,16 +364,34 @@ namespace KalaServer::Connection
                 "Failed to shut down! Reason: " + err);
         }
 
-        vector<ThreadData> remainingThreads{};
-
         {
-            scoped_lock lock(threadDataMutex);
-            remainingThreads = std::move(threadData);
+            scoped_lock lock(serverDataMutex);
+
+            threads.reserve(serverData.size());
+
+            for (pair<u32, ServerData>& sd : serverData)
+            {
+                if (sd.second.socket != invalid_socket)
+                {
+#if defined(KWIN_ANY)
+                    shutdown(sd.second.socket, SD_BOTH);
+#else
+                    shutdown(sd.second.socket, SHUT_RDWR);
+#endif
+                }
+
+                threads.push_back(std::move(sd.second.thisThread));
+            }
         }
 
-        for (ThreadData& t : remainingThreads)
+        for (thread& t : threads)
         {
-            if (t.thisThread.joinable()) t.thisThread.join();
+            if (t.joinable()) t.join();
+        }
+
+        {
+            scoped_lock lock(serverDataMutex);
+            serverData.clear();
         }
 
         err = registry.DestroyAllContent();
@@ -359,43 +406,52 @@ namespace KalaServer::Connection
 
     void Server::Destroy()
     {
-        isVisible = false;
-
-        vector<thread> targetThreads{};
+        vector<thread> threads{};
 
         {
-            scoped_lock lock(threadDataMutex);
-            
-            for (size_t i = threadData.size(); i > 0; --i)
-            {
-                if (threadData[i - 1].serverID != ID) continue;
+            scoped_lock lock(serverMutex);
+            isVisible = false;
+        }
 
-                targetThreads.push_back(std::move(threadData[i - 1].thisThread));
-                threadData.erase(threadData.begin() + (i - 1));
+        {
+            scoped_lock lock(serverDataMutex);
+
+            for (pair<u32, ServerData>& entry : serverData)
+            {
+                ServerData& sd = entry.second;
+
+                if (sd.serverID != ID) continue;
+
+                if (sd.socket != invalid_socket)
+                {
+#if defined(KWIN_ANY)
+                    shutdown(sd.socket, SD_BOTH);
+#else
+                    shutdown(sd.socket, SHUT_RDWR);
+#endif
+                }
+
+                threads.push_back(std::move(sd.thisThread));
             }
         }
 
-        for (thread& t : targetThreads)
+        for (thread& t : threads)
         {
             if (t.joinable()) t.join();
         }
 
-        for (const u32 lid : GetLinkIDs())
         {
-            Link* l{};
+            scoped_lock lock(serverDataMutex);
 
-            string err = Link::GetRegistry().GetContent(lid, l);
-            if (!err.empty())
+            for (size_t i = serverData.size(); i > 0; i--)
             {
-                KalaServerCore::ForceClose(
-                    "KalaServer Server error",
-                    "Failed to destroy server '" + to_string(ID) 
-                    + "' because its link '" + to_string(lid) + "' was invalid!");
+                if (serverData[i - 1].second.serverID == ID)
+                {
+                    serverData.erase(serverData.begin() + (i - 1));
+                }
             }
-
-            l->Destroy();
         }
-        
+
 		string err = registry.DestroyContent(ID);
 		if (!err.empty())
 		{
@@ -412,13 +468,4 @@ namespace KalaServer::Connection
 			"KS_SERVER",
 			LogType::LOG_INFO);
     }
-}
-
-void _TCPThread(Server* server)
-{
-
-}
-void _UDPThread(Server* server)
-{
-
 }
