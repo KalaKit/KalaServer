@@ -30,7 +30,6 @@ using KalaServer::Connection::Link;
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
-using KalaServer::Connection::SenderType;
 using KalaServer::Connection::TransportProtocol;
 using KalaServer::Connection::PacketConnectionMode;
 using KalaServer::Connection::ResponseType;
@@ -41,12 +40,13 @@ using std::string;
 using std::string_view;
 using std::to_string;
 using std::vector;
+using std::pair;
 using std::function;
+using std::atomic;
 using std::shared_mutex;
 using std::thread;
 using std::shared_lock;
 using std::scoped_lock;
-using std::unique_lock;
 using std::unique_ptr;
 using std::make_unique;
 
@@ -60,10 +60,24 @@ constexpr ksocket invalid_socket = -1;
 #define kclose(targetSocket) close(targetSocket)
 #endif
 
-struct ThreadData
+struct LinkData
 {
     u32 linkID{};
+    u32 senderID{};
+
+    string receiverIP{};
+    u16 receiverPort{};
+
+    u8 timeout{};
+
+    TransportProtocol transportProtocol{};
+    PacketConnectionMode packetConnectionMode{};
+    ResponseType responseType{};
+
+    ksocket socket{};
     thread thisThread{};
+
+    vector<vector<u8>> responses{};
 };
 
 static constexpr u32 MAX_TCP_PAYLOAD_SIZE = UINT16_MAX;
@@ -75,23 +89,13 @@ static constexpr u32 MAX_UDP_PAYLOAD_SIZE_IPV6 = 65527;
 
 static KalaServerRegistry<Link> registry{};
 
-static shared_mutex activeHeadlessSocketsMutex{};
-static vector<ksocket> activeHeadlessSockets{};
+static atomic<u32> linkDataID{};
 
-static shared_mutex threadDataMutex{};
-static vector<ThreadData> threadData{};
+static shared_mutex linkDataMutex{};
+static vector<pair<u32, LinkData>> linkData{};
 
 static void _SendPacket(
-    const bool isSingleShot,
-    const u32 linkID,
-    const u32 senderID,
-    const SenderType senderType,
-    const string& receiverIP,
-    const u16 receiverPort,
-    const u8 timeout,
-    const TransportProtocol transportProtocol,
-    const PacketConnectionMode packetConnectionMode,
-    const ResponseType responseType,
+    const u32 linkDataID,
     const vector<u8>& payload,
     const function<void(vector<u8>)>& responseCallback);
 
@@ -101,13 +105,19 @@ namespace KalaServer::Connection
 
     u32 Link::GetActiveHeadlessConnectionCount()
     { 
-        shared_lock lock(activeHeadlessSocketsMutex);
-        return activeHeadlessSockets.size();
+        shared_lock lock(linkDataMutex);
+        u32 headlessDataCount{};
+
+        for (const pair<u32, LinkData>& ld : linkData)
+        {
+            if (ld.second.linkID == 0) headlessDataCount++;
+        }
+
+        return headlessDataCount;
     }
 
     void Link::SendPacket(
         u32 senderID,
-        SenderType senderType,
         string_view receiverIP,
         u16 receiverPort,
         u8 timeout,
@@ -116,24 +126,34 @@ namespace KalaServer::Connection
         const vector<u8>& payload,
         const function<void(vector<u8>)>& responseCallback)
     {
+        u32 nextLinkDataID = linkDataID.fetch_add(1) + 1;
+
+        {
+            scoped_lock lock(linkDataMutex);
+            linkData.push_back(
+                {
+                    nextLinkDataID,
+                    LinkData{
+                        .linkID = 0,
+                        .senderID = senderID,
+                        .receiverIP = string(receiverIP),
+                        .receiverPort = receiverPort,
+                        .timeout = timeout,
+                        .transportProtocol = transportProtocol,
+                        .packetConnectionMode = PacketConnectionMode::PCM_DisconnectAfterSend,
+                        .responseType = responseType
+                    }
+                });
+        }
+
         _SendPacket(
-            true,
-            0,
-            senderID,
-            senderType,
-            string(receiverIP),
-            receiverPort,
-            timeout,
-            transportProtocol,
-            PacketConnectionMode::PCM_DisconnectAfterSend,
-            responseType,
+            nextLinkDataID,
             payload,
             responseCallback);
     }
 
     Link* Link::Initialize(
-        u32 senderID, 
-        SenderType senderType, 
+        u32 senderID,
         string_view receiverIP, 
         u16 receiverPort,
         TransportProtocol transportProtocol)
@@ -166,9 +186,10 @@ namespace KalaServer::Connection
 
         linkPtr->ID = newID;
         linkPtr->senderID = senderID;
-        linkPtr->senderType = senderType;
+
         linkPtr->receiverIP = receiverIP;
         linkPtr->receiverPort = receiverPort;
+
         linkPtr->transportProtocol = transportProtocol;
 
 		string err = registry.AddContent(
@@ -193,39 +214,54 @@ namespace KalaServer::Connection
     u32 Link::GetID() const { return ID; }
 
     u32 Link::GetSenderID() const { return senderID; }
-    SenderType Link::GetSenderType() const { return senderType; }
-
-    u32 Link::GetActiveConnectionCount() const
-    { 
-        shared_lock lock(activeSocketsMutex);
-        return activeSockets.size();
-    }
 
     const string& Link::GetReceiverIP() const { return receiverIP; }
     u16 Link::GetReceiverPort() const { return receiverPort; }
 
-    u8 Link::GetTimeout() const { return timeout; }
-    void Link::SetTimeout(u8 newValue) { timeout = newValue; }
-
     TransportProtocol Link::GetTransportProtocol() const { return transportProtocol; }
 
+    u32 Link::GetActiveConnectionCount() const
+    { 
+        shared_lock lock(linkDataMutex);
+        u32 linkDataCount{};
+
+        for (const pair<u32, LinkData>& ld : linkData)
+        {
+            if (ld.second.linkID == ID) linkDataCount++;
+        }
+
+        return linkDataCount;
+    }
+
     void Link::SendPacket(
+        const u8 timeout,
         const PacketConnectionMode packetConnectionMode, 
         const ResponseType responseType, 
         const vector<u8>& payload,
         const function<void(vector<u8>)>& responseCallback)
     {
+        u32 nextLinkDataID = linkDataID.fetch_add(1) + 1;
+
+        {
+            scoped_lock lock(linkDataMutex);
+            linkData.push_back(
+                {
+                    nextLinkDataID,
+                    LinkData{
+                        .linkID = ID,
+                        .senderID = senderID,
+                        .receiverIP = string(receiverIP),
+                        .receiverPort = receiverPort,
+                        .timeout = timeout,
+                        .transportProtocol = transportProtocol,
+                        .packetConnectionMode = packetConnectionMode,
+                        .responseType = responseType
+                    }
+                });
+        }
+
         _SendPacket(
-            false,
-            ID,
-            senderID,
-            senderType,
-            receiverIP,
-            receiverPort,
-            timeout,
-            transportProtocol,
-            packetConnectionMode,
-            responseType,
+            nextLinkDataID,
             payload,
             responseCallback);
     }
@@ -233,54 +269,29 @@ namespace KalaServer::Connection
     void Link::Shutdown()
     {
         {
-            unique_lock lock(activeHeadlessSocketsMutex);
+            scoped_lock lock(linkDataMutex);
 
-            for (ksocket socket : activeHeadlessSockets)
+            for (pair<u32, LinkData>& ld : linkData)
             {
 #if defined(KWIN_ANY)
-                shutdown(socket, SD_BOTH);
+                shutdown(ld.second.socket, SD_BOTH);
 #else
-                shutdown(socket, SHUT_RDWR);
+                shutdown(ld.second.socket, SHUT_RDWR);
 #endif
             }
         }
 
-        string err = registry.LockRegistry([]()
-            {
-                for (Link* l : registry.GetAllContent())
-                {
-                    unique_lock lock(l->activeSocketsMutex);
-                    for (ksocket socket : l->activeSockets)
-                    {
-#if defined(KWIN_ANY)
-                        shutdown(socket, SD_BOTH);
-#else
-                        shutdown(socket, SHUT_RDWR);
-#endif
-                    }
-                }
-            });
-
-        if (!err.empty())
+        for (pair<u32, LinkData>& ld : linkData)
         {
-            KalaServerCore::ForceClose(
-                "KalaServer Link error",
-                "Failed to shut down! Reason: " + err);
+            if (ld.second.thisThread.joinable()) ld.second.thisThread.join();
         }
 
-        vector<ThreadData> remainingThreads{};
-
         {
-            scoped_lock lock(threadDataMutex);
-            remainingThreads = std::move(threadData);
+            scoped_lock lock(linkDataMutex);
+            linkData.clear();
         }
 
-        for (ThreadData& t : remainingThreads)
-        {
-            if (t.thisThread.joinable()) t.thisThread.join();
-        }
-
-        err = registry.DestroyAllContent();
+        string err = registry.DestroyAllContent();
 
         if (!err.empty())
         {
@@ -292,32 +303,31 @@ namespace KalaServer::Connection
 
     void Link::Destroy()
     {
-        vector<thread> targetThreads{};
+        vector<LinkData> targetData{};
 
         {
-            scoped_lock lock(threadDataMutex);
-            
-            for (size_t i = threadData.size(); i > 0; --i)
-            {
-                if (threadData[i - 1].linkID != ID) continue;
+            scoped_lock lock(linkDataMutex);
 
-                targetThreads.push_back(std::move(threadData[i - 1].thisThread));
-                threadData.erase(threadData.begin() + (i - 1));
+            for (size_t i = linkData.size(); i > 0; i--)
+            {
+                if (linkData[i - 1].second.linkID != ID) continue;
+
+                LinkData& ld = linkData[i - 1].second;
+#if defined(KWIN_ANY)
+                shutdown(ld.socket, SD_BOTH);
+#else
+                shutdown(ld.socket, SHUT_RDWR);
+#endif
+
+                targetData.push_back(std::move(ld));
+                linkData.erase(linkData.begin() + (i - 1));
             }
         }
 
-        for (thread& t : targetThreads)
+        for (LinkData& ld : targetData)
         {
-            if (t.joinable()) t.join();
+            if (ld.thisThread.joinable()) ld.thisThread.join();
         }
-
-		string err = registry.DestroyContent(ID);
-		if (!err.empty())
-		{
-			KalaServerCore::ForceClose(
-				"KalaServer Link error",
-				"Failed to destroy link! Reason: " + err);
-		}
     }
 
     Link::~Link()
@@ -330,114 +340,32 @@ namespace KalaServer::Connection
 }
 
 void _SendPacket(
-    const bool isSingleShot,
-    const u32 linkID,
-    const u32 senderID,
-    const SenderType senderType,
-    const string& receiverIP,
-    const u16 receiverPort,
-    const u8 timeout,
-    const TransportProtocol transportProtocol,
-    const PacketConnectionMode packetConnectionMode,
-    const ResponseType responseType,
+    const u32 linkDataID,
     const vector<u8>& payload,
     const function<void(vector<u8>)>& responseCallback)
 {
-    //
-    // SETUP
-    //
-
-    string receiverStr = 
-        "reciever '" + string(receiverIP) 
-        + "' at port '" + to_string(receiverPort) + "'";
-
-    Link* link{};
-
-    if (linkID != 0)
-    {
-        string err = Link::GetRegistry().GetContent(linkID, link);
-        if (!err.empty())
-        {
-            Log::Print(
-                "Failed to send packet to " + receiverStr +
-                " because the link was invalid! Reason: " + err,
-                "KS_LINK",
-                LogType::LOG_WARNING);
-
-            return;
-        }
-    }
-
-    Server* server{};
-
-    if (senderType == SenderType::S_SERVER)
-    {
-        string err = Server::GetRegistry().GetContent(senderID, server);
-        if (!err.empty())
-        {
-            Log::Print(
-                "Failed to send packet via server '" + to_string(senderID) + "' to " + receiverStr +
-                " because the sender ID for server type was invalid! Reason: " + err,
-                "KS_LINK",
-                LogType::LOG_WARNING);
-
-            return;
-        }
-    }
-    else
-    {
-        if (!Client::IsInitialized())
-        {
-            Log::Print(
-                "Failed to send packet via client to " + receiverStr +
-                " because the client has not been initialized",
-                "KS_LINK",
-                LogType::LOG_WARNING);
-
-            return;
-        }
-    }
-
-    string senderStr = server 
-        ? "server '" + server->GetServerName() + " (" + to_string(server->GetID()) + ")'"
-        : "client '" + Client::GetUsername() + "'";
-
-    if (isSingleShot
-        && payload.empty())
-    {
-        Log::Print(
-            "Failed to send packet via " + senderStr + " to " + receiverStr 
-            + " because the payload was empty!",
-            "KS_LINK",
-            LogType::LOG_WARNING);
-
-        return;
-    }
-
-    const bool isIPv4 = KalaServerCore::IsIPv4(receiverIP);
-
     auto worker_thread = [
-        isIPv4,
-        linkID,
-        senderID,
-        senderStr,
-        receiverStr,
-        timeout,
-        receiverIP,
-        receiverPort,
-        transportProtocol,
-        packetConnectionMode,
-        responseType,
+        linkDataID,
         payload,
-        responseCallback]() -> void
+        responseCallback](
+        const string senderStr,
+        const string receiverStr,
+        const string receiverIP,
+        const u16 receiverPort,
+        const u8 timeout,
+        const TransportProtocol transportProtocol,
+        const PacketConnectionMode packetConnectionMode,
+        const ResponseType responseType) -> void
         {
+            const bool isIPv4 = KalaServerCore::IsIPv4(receiverIP);
+
             //
             // PREPARE TARGET SOCKET
             //
 
-            auto create_socket = [
-                receiverIP, 
-                transportProtocol]() -> ksocket
+            auto create_socket = [](
+                const string receiverIP,
+                const TransportProtocol transportProtocol) -> ksocket
                 {
                     int domain = KalaServerCore::IsIPv4(receiverIP)
                         ? AF_INET
@@ -454,7 +382,7 @@ void _SendPacket(
                     return socket(domain, type, protocol);
                 };
 
-            ksocket targetSocket = create_socket();
+            ksocket targetSocket = create_socket(receiverIP, transportProtocol);
             if (targetSocket == invalid_socket)
             {
 #if defined(KWIN_ANY)
@@ -835,6 +763,19 @@ void _SendPacket(
 
             bool shouldExit{};
 
+            u32 senderID{};
+            {
+                shared_lock lock(linkDataMutex);
+                for (const pair<u32, LinkData>& ld : linkData)
+                {
+                    if (ld.first == linkDataID)
+                    {
+                        senderID = ld.second.senderID;
+                        break;
+                    }
+                }
+            }
+
             string err = Server::GetRegistry().LockRegistry([
                 &shouldExit,
                 responseType,
@@ -1047,12 +988,92 @@ void _SendPacket(
         };
 
     {
-        scoped_lock lock(threadDataMutex);
+        scoped_lock lock(linkDataMutex);
 
-        threadData.push_back(
+        for (pair<u32, LinkData>& ld : linkData)
+        {
+            if (ld.first == linkDataID)
             {
-                .linkID = 0,
-                .thisThread = thread(worker_thread)
-            });
+                LinkData& data = ld.second;
+
+                const string receiverStr = 
+                    "reciever '" + string(data.receiverIP) 
+                    + "' at port '" + to_string(data.receiverPort) + "'";
+
+                Link* link{};
+
+                if (data.linkID != 0)
+                {
+                    string err = Link::GetRegistry().GetContent(data.linkID, link);
+                    if (!err.empty())
+                    {
+                        Log::Print(
+                            "Failed to send packet to " + receiverStr +
+                            " because the link was invalid! Reason: " + err,
+                            "KS_LINK",
+                            LogType::LOG_WARNING);
+
+                        return;
+                    }
+                }
+
+                Server* server{};
+
+                if (data.senderID != 0)
+                {
+                    string err = Server::GetRegistry().GetContent(data.senderID, server);
+                    if (!err.empty())
+                    {
+                        Log::Print(
+                            "Failed to send packet via server '" + to_string(data.senderID) + "' to " + receiverStr +
+                            " because the sender ID for server type was invalid! Reason: " + err,
+                            "KS_LINK",
+                            LogType::LOG_WARNING);
+
+                        return;
+                    }
+                }
+                else
+                {
+                    if (!Client::IsInitialized())
+                    {
+                        Log::Print(
+                            "Failed to send packet via client to " + receiverStr +
+                            " because the client has not been initialized",
+                            "KS_LINK",
+                            LogType::LOG_WARNING);
+
+                        return;
+                    }
+                }
+
+                const string senderStr = server 
+                    ? "server '" + server->GetServerName() + " (" + to_string(server->GetID()) + ")'"
+                    : "client '" + Client::GetUsername() + "'";
+
+                if (data.linkID == 0
+                    && payload.empty())
+                {
+                    Log::Print(
+                        "Failed to send packet via " + senderStr + " to " + receiverStr 
+                        + " because the payload was empty!",
+                        "KS_LINK",
+                        LogType::LOG_WARNING);
+
+                    return;
+                }
+
+                ld.second.thisThread = thread(
+                    std::move(worker_thread),
+                    senderStr,
+                    receiverStr,
+                    data.receiverIP,
+                    data.receiverPort,
+                    data.timeout,
+                    data.transportProtocol,
+                    data.packetConnectionMode,
+                    data.responseType);
+            }
+        }
     }
 }

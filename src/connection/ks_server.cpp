@@ -42,7 +42,6 @@ using std::filesystem::is_directory;
 using std::mutex;
 using std::thread;
 using std::scoped_lock;
-using std::unique_lock;
 using std::unique_ptr;
 using std::make_unique;
 
@@ -317,7 +316,7 @@ namespace KalaServer::Connection
             {
                 for (Server* s : registry.GetAllContent())
                 {
-                    unique_lock lock(s->activeSocketsMutex);
+                    scoped_lock lock(s->activeSocketsMutex);
                     for (ksocket socket : s->activeSockets)
                     {
 #if defined(KWIN_ANY)

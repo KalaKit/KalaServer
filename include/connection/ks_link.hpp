@@ -9,6 +9,7 @@
 #include <vector>
 #include <functional>
 #include <atomic>
+#include <thread>
 #include <memory>
 
 #include "core_utils.hpp"
@@ -30,13 +31,8 @@ namespace KalaServer::Connection
     using std::function;
     using std::atomic;
     using std::shared_mutex;
+    using std::thread;
     using std::default_delete;
-
-    enum class SenderType : u8
-    {
-        S_SERVER = 0,
-        S_CLIENT = 1
-    };
 
     enum class TransportProtocol : u8
     {
@@ -66,17 +62,8 @@ namespace KalaServer::Connection
     {
     friend void _SendPacket(
         const bool isSingleShot,
-        const u32 linkID,
-        const u32 senderID,
-        const SenderType senderType,
-        const string& receiverIP,
-        const u16 receiverPort,
-        const u8 timeout,
-        const TransportProtocol transportProtocol,
-        const PacketConnectionMode packetConnectionMode,
-        const ResponseType responseType,
-        const vector<u8>& payload,
-        const function<void(vector<u8>)>& responseCallback);
+        const u32 linkDataID,
+        const vector<u8>& payload);
     friend class KalaServer::Core::KalaServerCore;
     friend class Server;
     friend struct default_delete<Link>;
@@ -88,13 +75,12 @@ namespace KalaServer::Connection
         static u32 GetActiveHeadlessConnectionCount();
 
         //Create a socket and send a single packet via the
-        //transport protocol type that then gets closed once it is finished,
-        //timeout determines how long the packet waits in seconds before closing the socket.
+        //transport protocol type that then gets closed once it is finished.
+        //Timeout determines how long the packet waits in seconds before closing the socket.
         //Assign a response callback to decide what happens when
         //a response is received to the sent packet
         static void SendPacket(
             u32 senderID,
-            SenderType senderType,
             string_view receiverIP,
             u16 receiverPort,
             u8 timeout,
@@ -105,11 +91,10 @@ namespace KalaServer::Connection
 
         //Create a new link that connects this server or client and the target ip.
         //Pick the transport protocol to determine which kind of packets are sent.
-        //Keep sender ID as 0 and set sender type to client if client is the sender,
+        //Keep sender ID as 0 if client is the sender,
         //otherwise set sender ID to server ID via server->GetID
         static Link* Initialize(
             u32 senderID,
-            SenderType senderType,
             string_view receiverIP,
             u16 receiverPort,
             TransportProtocol transportProtocol);
@@ -117,27 +102,22 @@ namespace KalaServer::Connection
         u32 GetID() const;
 
         u32 GetSenderID() const;
-        SenderType GetSenderType() const;
-
-        //Returns count of active connections tied to this link
-        u32 GetActiveConnectionCount() const;
 
         const string& GetReceiverIP() const;
         u16 GetReceiverPort() const;
 
-        u8 GetTimeout() const;
-        void SetTimeout(u8 newValue);
-
         TransportProtocol GetTransportProtocol() const;
 
+        //Returns count of active connections tied to this link
+        u32 GetActiveConnectionCount() const;
+
         //Send a packet to the target of this link.
-        //Creates a new sender socket if one does not yet exist
-        //for this packet connection mode,
-        //creates a new listener socket for this packet connection mode
-        //if the packet connection mode is set to PCM_KeepAlive.
+        //Creates a new sender socket if one does not yet exist for this packet connection mode.
+        //Timeout determines how long the packet waits in seconds before closing the socket.
         //Assign a response callback to decide what happens when
         //the listener socket for this packet connection mode receives a message.
         void SendPacket(
+            const u8 timeout,
             const PacketConnectionMode packetConnectionMode,
             const ResponseType responseType,
             const vector<u8>& payload = {},
@@ -152,15 +132,9 @@ namespace KalaServer::Connection
 
         u32 ID{};
         u32 senderID{};
-        SenderType senderType{};
-
-        mutable shared_mutex activeSocketsMutex{};
-        vector<uintptr_t> activeSockets{};
 
         string receiverIP{};
         u16 receiverPort{};
-
-        u8 timeout = 5;
 
         TransportProtocol transportProtocol{};
     };

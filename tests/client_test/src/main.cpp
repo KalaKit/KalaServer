@@ -23,7 +23,6 @@ using KalaHeaders::KalaString::DecToHex;
 using KalaServer::Core::KalaServerCore;
 using KalaServer::Connection::Server;
 using KalaServer::Connection::Client;
-using KalaServer::Connection::SenderType;
 using KalaServer::Connection::TransportProtocol;
 using KalaServer::Connection::ResponseType;
 using KalaServer::Connection::Link;
@@ -83,9 +82,9 @@ static void PrintResponse(
 }
 
 static void SendMessage(
-    const string& targetIP,
-    const u16 targetPort,
-    const SenderType senderType,
+    const u32 senderID,
+    const string& receiverIP,
+    const u16 receiverPort,
     const TransportProtocol transportProtocol,
     const ResponseType responseType,
     const string& message_string = {},
@@ -102,23 +101,22 @@ static void SendMessage(
         : message_payload;
 
     Link::SendPacket(
-        0,
-        senderType,
-        targetIP,
-        targetPort,
+        senderID,
+        receiverIP,
+        receiverPort,
         5,
         transportProtocol,
         responseType,
         targetPayload,
             [
-            targetIP,
-            targetPort,
+            receiverIP,
+            receiverPort,
             message_string](
             vector<u8> payload) 
             { 
                 PrintResponse(
-                    targetIP, 
-                    targetPort,
+                    receiverIP, 
+                    receiverPort,
                     payload); 
             });
 }
@@ -146,9 +144,9 @@ static void Test_Python_Server()
     //before running this program to verify this works,
     //simple hello round-trip test with tcp
     SendMessage(
+        0,
         "127.0.0.1",
         8080,
-        SenderType::S_CLIENT,
         TransportProtocol::TP_TCP,
         ResponseType::RT_AcceptResponse,
         "hello");
@@ -159,9 +157,9 @@ static void Test_Wikipedia()
     //attempt to reach wikipedia homepage with tcp,
     //returns response from wikipedia
     SendMessage(
+        0,
         "185.15.59.226",
         80,
-        SenderType::S_CLIENT,
         TransportProtocol::TP_TCP,
         ResponseType::RT_AcceptResponse,
         "GET / HTTP/1.1\r\n"
@@ -174,9 +172,9 @@ static void Test_Cloudflare()
 {
     //ask for wikipedias ipv4 address from cloudflare
     SendMessage(
+        0,
         "1.1.1.1",
         53,
-        SenderType::S_CLIENT,
         TransportProtocol::TP_UDP,
         ResponseType::RT_AcceptResponse,
         "",
@@ -294,9 +292,9 @@ int main()
                 payload = input;
 
                 SendMessage(
+                    0,
                     ip,
                     port,
-                    SenderType::S_CLIENT,
                     TransportProtocol::TP_TCP,
                     ResponseType::RT_AcceptResponse,
                     payload);
