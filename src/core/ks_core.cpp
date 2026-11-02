@@ -204,6 +204,61 @@ namespace KalaServer::Core
 #endif
 	}
 
+	bool KalaServerCore::IsTextPayload(const vector<u8>& payload)
+	{
+		if (payload.empty()) return false;
+
+		for (const u8 byte : payload)
+		{
+			if (byte == '\n'
+				|| byte == '\r'
+				|| byte == '\t')
+			{
+				continue;
+			}
+
+			if (byte < 32
+				|| byte == 127)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	vector<u8> KalaServerCore::GenerateBinaryPayload(string_view input)
+	{
+		auto decode_escapes = [input]() -> string
+			{
+				string result;
+				result.reserve(input.size());
+
+				for (size_t i = 0; i < input.size(); ++i)
+				{
+					if (input[i] == '\\'
+						&& i + 1 < input.size())
+					{
+						switch (input[i + 1])
+						{
+							case 'r': result += '\r'; ++i; continue;
+							case 'n': result += '\n'; ++i; continue;
+							case 't': result += '\t'; ++i; continue;
+							case '0': result += '\0'; ++i; continue;
+							case '\\': result += '\\'; ++i; continue;
+						}
+					}
+
+					result += input[i];
+				}
+
+				return result;
+			};
+
+		string decoded = decode_escapes();
+		return vector<u8>(decoded.begin(), decoded.end());
+	}
+
 	const string& KalaServerCore::GetIP()
 	{
 		static const string empty{};

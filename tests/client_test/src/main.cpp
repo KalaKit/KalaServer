@@ -33,36 +33,16 @@ using std::string_view;
 using std::to_string;
 using std::vector;
 
-static bool IsTextPayload(const vector<u8>& payload)
-{
-    if (payload.empty()) return false;
-
-    for (const u8 byte : payload)
-    {
-        if (byte == '\n'
-            || byte == '\r'
-            || byte == '\t')
-        {
-            continue;
-        }
-
-        if (byte < 32
-            || byte == 127)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 static void PrintResponse(
     string_view targetIP,
     u16 targetPort,
     const vector<u8>& payload)
 {
     string payloadString{};
-    if (IsTextPayload(payload)) payloadString = string(payload.begin(), payload.end());
+    if (KalaServerCore::IsTextPayload(payload))
+    {
+        payloadString = string(payload.begin(), payload.end());
+    }
     else
     {
         for (const u8 d : payload)
@@ -90,40 +70,8 @@ static void SendMessage(
     const string& message_string = {},
     const vector<u8>& message_payload = {})
 {
-    auto generate_payload = [](string_view input) -> vector<u8>
-        {
-            auto decode_escapes = [input]() -> string
-                {
-                    string result;
-                    result.reserve(input.size());
-
-                    for (size_t i = 0; i < input.size(); ++i)
-                    {
-                        if (input[i] == '\\'
-                            && i + 1 < input.size())
-                        {
-                            switch (input[i + 1])
-                            {
-                                case 'r': result += '\r'; ++i; continue;
-                                case 'n': result += '\n'; ++i; continue;
-                                case 't': result += '\t'; ++i; continue;
-                                case '0': result += '\0'; ++i; continue;
-                                case '\\': result += '\\'; ++i; continue;
-                            }
-                        }
-
-                        result += input[i];
-                    }
-
-                    return result;
-                };
-
-            string decoded = decode_escapes();
-            return vector<u8>(decoded.begin(), decoded.end());
-        };
-
     vector<u8> targetPayload = !message_string.empty()
-        ? generate_payload(message_string)
+        ? KalaServerCore::GenerateBinaryPayload(message_string)
         : message_payload;
 
     Link::SendPacket(

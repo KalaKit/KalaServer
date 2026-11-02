@@ -34,6 +34,12 @@ namespace KalaServer::Core
 
         static string ErrorToString(int error);
 
+        //Returns true if the payload is not a binary-based packet
+        static bool IsTextPayload(const vector<u8>& payload);
+
+        //Accepts any string input and returns a payload compatible with binary-based packets
+        static vector<u8> GenerateBinaryPayload(string_view input);
+
         static const string& GetIP();
 
         static bool IsIPv4(string_view targetValue);
