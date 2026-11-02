@@ -30,6 +30,7 @@ using KalaServer::Connection::Link;
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
+using KalaServer::Connection::WHILE_LOOP_IDLE_WAIT_MS;
 using KalaServer::Connection::TransportProtocol;
 using KalaServer::Connection::PacketConnectionMode;
 using KalaServer::Connection::ResponseType;
@@ -904,43 +905,6 @@ void _SendPacket(
                 return;
             }
 
-            fd_set readSet{};
-            FD_ZERO(&readSet);
-            FD_SET(targetSocket, &readSet);
-
-            timeval responseTimeout{};
-            responseTimeout.tv_sec = timeout;
-
-#if defined(KWIN_ANY)
-            int ready = select(
-                0,
-                &readSet,
-                nullptr,
-                nullptr,
-                &responseTimeout);
-#else
-            int ready = select(
-                targetSocket + 1,
-                &readSet,
-                nullptr,
-                nullptr,
-                &responseTimeout);
-#endif
-
-            if (ready <= 0)
-            {
-                Log::Print(
-                    "Failed receive response for " + string(senderStr) 
-                    + " from " + string(receiverStr) + " "
-                    "because the response timed out or select failed!",
-                    "KS_LINK",
-                    LogType::LOG_ERROR,
-                    2);
-
-                close_socket(targetSocket);
-                return;
-            }
-
             auto has_become_invsibile = [](
                 const u32 linkDataID,
                 const string senderStr,
@@ -1036,6 +1000,74 @@ void _SendPacket(
                     break;
                 }
 
+                fd_set readSet{};
+                FD_ZERO(&readSet);
+                FD_SET(targetSocket, &readSet);
+
+                timeval responseTimeout{};
+                responseTimeout.tv_sec = WHILE_LOOP_IDLE_WAIT_MS / 1000;
+                responseTimeout.tv_usec = (WHILE_LOOP_IDLE_WAIT_MS % 1000) * 1000;
+
+#if defined(KWIN_ANY)
+                int ready = select(
+                    0,
+                    &readSet,
+                    nullptr,
+                    nullptr,
+                    &responseTimeout);
+#else
+                int ready = select(
+                    targetSocket + 1,
+                    &readSet,
+                    nullptr,
+                    nullptr,
+                    &responseTimeout);
+#endif
+
+                if (ready == 0)
+                {
+                    if (KalaServerCore::IsShuttingDown()
+                        || packetConnectionMode != PacketConnectionMode::PCM_KeepAlive)
+                    {
+                        if (KalaServerCore::IsShuttingDown())
+                        {
+                            Log::Print(
+                                "Closing connection between " + string(senderStr) 
+                                + " and " + string(receiverStr) + " because KalaServer is shutting down.",
+                                "KS_LINK",
+                                LogType::LOG_INFO);
+                        }
+                        else
+                        {
+                            Log::Print(
+                                "Closing connection between " + string(senderStr) 
+                                + " and " + string(receiverStr) + " because receiver did not send any data.",
+                                "KS_LINK",
+                                LogType::LOG_INFO);
+                        }
+
+                        isAlive = false;
+                        break;
+                    }
+                    else
+                    {
+                        //no incoming data, go back to start
+                        continue;
+                    }
+                }
+                if (ready < 0)
+                {
+                    Log::Print(
+                        "Failed receive response for " + string(senderStr) 
+                        + " from " + string(receiverStr) + " because select failed!",
+                        "KS_LINK",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    close_socket(targetSocket);
+                    return;
+                }
+
                 vector<u8> response{};
                 int received{};
 
@@ -1076,6 +1108,20 @@ void _SendPacket(
                 {
                     if (received < 0)
                     {
+#if defined(KWIN_ANY)
+                        int error = WSAGetLastError();
+                        bool wouldBlock = error == WSAEWOULDBLOCK;
+#else
+                        int error = errno;
+                        bool wouldBlock = error == EWOULDBLOCK || error == EAGAIN;
+#endif
+
+                        if (wouldBlock)
+                        {
+                            //try again, go back to start...
+                            continue;
+                        }
+
                         Log::Print(
                             "Failed receive response for " + string(senderStr) 
                             + " from " + string(receiverStr) + " because receiving data failed!",

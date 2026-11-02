@@ -34,6 +34,9 @@ namespace KalaServer::Connection
     using std::thread;
     using std::default_delete;
 
+    //How many milliseconds to wait at the start of each while loop to check for responses
+    static constexpr u16 WHILE_LOOP_IDLE_WAIT_MS = 500;
+
     enum class TransportProtocol : u8
     {
         TP_TCP = 0,
