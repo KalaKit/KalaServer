@@ -63,10 +63,6 @@ namespace KalaServer::Connection
 
     class LIB_API Link
     {
-    friend void _SendPacket(
-        const bool isSingleShot,
-        const u32 linkDataID,
-        const vector<u8>& payload);
     friend class KalaServer::Core::KalaServerCore;
     friend class Server;
     friend struct default_delete<Link>;

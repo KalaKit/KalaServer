@@ -62,11 +62,12 @@ namespace KalaServer::Connection
         static KalaServerRegistry<Server>& GetRegistry();
 
         //Create a new server for accepting incoming UDP and TCP connections,
-        //isWebServer allows extra features
+        //set messageCallback to decide what happens when a connected client sends a message
         static Server* Initialize(
             string_view serverName,
             const path& serverRoot,
-            u16 serverPort);
+            u16 serverPort,
+            const function<void(vector<u8>)>& messageCallback);
 
         u32 GetID() const;
 
@@ -120,5 +121,7 @@ namespace KalaServer::Connection
 
         vector<string> bannedIPs{};
         vector<string> blacklistedKeywords{};
+
+        function<void(vector<u8>)> messageCallback{};
     };
 }

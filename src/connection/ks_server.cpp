@@ -44,6 +44,7 @@ using std::vector;
 using std::pair;
 using std::filesystem::exists;
 using std::filesystem::is_directory;
+using std::function;
 using std::thread;
 using std::atomic;
 using std::shared_mutex;
@@ -88,6 +89,10 @@ static atomic<u32> serverDataID{};
 static shared_mutex serverDataMutex{};
 static vector<pair<u32, ServerData>> serverData{};
 
+static void _StartConnection(
+    const u32 serverDataID,
+    const function<void(vector<u8>)>& messageCallback);
+
 namespace KalaServer::Connection
 {
     KalaServerRegistry<Server>& Server::GetRegistry() { return registry; }
@@ -95,7 +100,8 @@ namespace KalaServer::Connection
     Server* Server::Initialize(
         string_view serverName, 
         const path& serverRoot, 
-        u16 serverPort)
+        u16 serverPort,
+        const function<void(vector<u8>)>& messageCallback)
     {
         if (!KalaServerCore::IsInitialized())
         {
@@ -138,18 +144,31 @@ namespace KalaServer::Connection
             return nullptr;
         }
 
-        for (const Server* s : registry.GetAllContent())
-        {
-            if (s->serverName == serverName)
+        bool continueInit = true;
+        string err = registry.LockRegistry([serverName, &continueInit]()
             {
-                Log::Print(
-                    "Failed to initialize server because the server name '" + string(serverName) + "' is already in use!",
-                    "KS_SERVER",
-                    LogType::LOG_WARNING);
+                for (const Server* s : registry.GetAllContent())
+                {
+                    if (s->serverName == serverName)
+                    {
+                        Log::Print(
+                            "Failed to initialize server because the server name '" + string(serverName) + "' is already in use!",
+                            "KS_SERVER",
+                            LogType::LOG_WARNING);
 
-                return nullptr;
-            }
-        }
+                        continueInit = false;
+                        return;
+                    }
+                } 
+            });
+		if (!err.empty())
+		{
+			KalaServerCore::ForceClose(
+				"KalaServer Server error",
+				"Failed to initialize server! Reason: " + err);
+		}
+
+        if (!continueInit) return nullptr;
 
         path cleanPath = GetCleanPath(serverRoot);
         if (!exists(cleanPath))
@@ -193,10 +212,11 @@ namespace KalaServer::Connection
 
         serverPtr->ID = newID;
         serverPtr->serverName = serverName;
-        serverPtr->serverPort = serverPort;
         serverPtr->serverRoot = serverRoot;
+        serverPtr->serverPort = serverPort;
+        serverPtr->messageCallback = messageCallback;
 
-		string err = registry.AddContent(
+		err = registry.AddContent(
 			newID, 
 			std::move(newServer));
 		if (!err.empty())
@@ -210,6 +230,24 @@ namespace KalaServer::Connection
 			"Created new server '" + to_string(newID) + "'!",
 			"KS_SERVER",
 			LogType::LOG_SUCCESS);
+
+        u32 nextServerDataID = serverDataID.fetch_add(1) + 1;
+        {
+            scoped_lock lock(serverDataMutex);
+            serverData.push_back(
+                {
+                    nextServerDataID,
+                    ServerData{
+                        .serverID = newID,
+                        .timeout = 5,
+                        .transportProtocol = TransportProtocol::TP_TCP
+                    }
+                });
+        }
+
+        _StartConnection(
+            nextServerDataID,
+            messageCallback);
 
 		return serverPtr;
     }
@@ -467,5 +505,186 @@ namespace KalaServer::Connection
 			"Destroying server '" + to_string(ID) + "'.",
 			"KS_SERVER",
 			LogType::LOG_INFO);
+    }
+}
+
+void _StartConnection(
+    const u32 serverDataID,
+    const function<void(vector<u8>)>& messageCallback)
+{
+    auto worker_thread = [
+        serverDataID,
+        messageCallback](
+        const string serverStr,
+        const u32 serverID,
+        const u8 timeout,
+        const TransportProtocol transportProtocol) -> void
+        {
+            ksocket targetSocket = invalid_socket;
+            u32 serverPort{};
+            
+            string err = registry.LockRegistry([serverID, &serverPort]()
+                {
+                    for (const Server* s : registry.GetAllContent())
+                    {
+                        if (s->GetID() != serverID) continue;
+
+                        serverPort = s->GetServerPort();
+                        break;
+                    } 
+                });
+
+            if (transportProtocol == TransportProtocol::TP_TCP)
+            {
+                sockaddr_in addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(serverPort);
+                addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+                targetSocket = socket(
+                    AF_INET,
+                    SOCK_STREAM,
+                    IPPROTO_TCP);
+
+                if (targetSocket == invalid_socket)
+                {
+#if defined(KWIN_ANY)
+                    string err = KalaServerCore::ErrorToString(WSAGetLastError());
+#else
+                    string err = KalaServerCore::ErrorToString(errno);
+#endif
+
+                    //always force close
+                    KalaServerCore::ForceClose(
+                        "KalaServer Server error",
+                        "Failed to start connection for " + string(serverStr) 
+                        + " because socket creation failed! Reason: " + err);
+                }
+
+                if (bind(
+                    targetSocket,
+                    rcast<sockaddr*>(&addr),
+                    sizeof(addr)) == -1)
+                {
+#if defined(KWIN_ANY)
+                    string err = KalaServerCore::ErrorToString(WSAGetLastError());
+#else
+                    string err = KalaServerCore::ErrorToString(errno);
+#endif
+
+                    KalaServerCore::ForceClose(
+                        "KalaServer Server error",
+                        "Failed to bind socket for " + serverStr + "! Reason: " + err);
+                }
+
+                if (listen(targetSocket, SOMAXCONN) == -1)
+                {
+#if defined(KWIN_ANY)
+                    string err = KalaServerCore::ErrorToString(WSAGetLastError());
+#else
+                    string err = KalaServerCore::ErrorToString(errno);
+#endif
+
+                    KalaServerCore::ForceClose(
+                        "KalaServer Server error",
+                        "Failed to start listening with socket for " + serverStr + "! Reason: " + err);
+                }
+            }
+
+            bool isAlive = true;
+
+            while (isAlive)
+            {
+                fd_set readSet{};
+                FD_ZERO(&readSet);
+                FD_SET(targetSocket, &readSet);
+
+                timeval tv{};
+                tv.tv_sec = 0;
+                tv.tv_usec = 500000;
+
+#if defined(KWIN_ANY)
+                int ready = select(
+                    0,
+                    &readSet,
+                    nullptr,
+                    nullptr,
+                    &tv);
+#else
+                int ready = select(
+                    targetSocket + 1,
+                    &readSet,
+                    nullptr,
+                    nullptr,
+                    &tv);
+#endif
+
+                if (ready == 0) continue;
+                if (ready < 0) break;
+
+                sockaddr_in clientAddr{};
+                socklen_t clientAddrLen = sizeof(clientAddr);
+
+                ksocket clientSocket = accept(
+                    targetSocket,
+                    rcast<sockaddr*>(&clientAddr),
+                    &clientAddrLen);
+
+                if (clientSocket == invalid_socket) continue;
+
+                char buffer[4096]{};
+
+                int received = recv(
+                    clientSocket,
+                    buffer,
+                    sizeof(buffer),
+                    0);
+
+                if (received > 0)
+                {
+                    Log::Print(
+                        "Received payload: " +
+                        string(buffer, scast<size_t>(received)),
+                        "KS_SERVER",
+                        LogType::LOG_INFO);
+                }
+
+                kclose(clientSocket);
+            }
+
+            kclose(targetSocket);
+        };
+
+    {
+        scoped_lock lock(serverDataMutex);
+
+        for (pair<u32, ServerData>& sd : serverData)
+        {
+            if (sd.first != serverDataID) continue;
+
+            ServerData& data = sd.second;
+
+            Server* server{};
+            string err = Server::GetRegistry().GetContent(data.serverID, server);
+            if (!err.empty())
+            {
+                KalaServerCore::ForceClose(
+                    "KalaServer Server error",
+                    "Failed to start listener because the server was invalid! Reason: " + err);
+            }
+
+            const string serverStr = 
+                "server '" + to_string(data.serverID) 
+                + "' at port '" + to_string(server->GetServerPort()) + "'";
+
+            data.thisThread = thread(
+                std::move(worker_thread),
+                serverStr,
+                data.serverID,
+                data.timeout,
+                data.transportProtocol);
+
+            break;
+        }
     }
 }
