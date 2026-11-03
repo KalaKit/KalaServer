@@ -100,7 +100,8 @@ namespace KalaServer::Connection
             u32 senderID,
             string_view receiverIP,
             u16 receiverPort,
-            TransportProtocol transportProtocol);
+            TransportProtocol transportProtocol,
+            const function<void(vector<u8>)>& responseCallback = {});
 
         u32 GetID() const;
 
@@ -123,8 +124,7 @@ namespace KalaServer::Connection
             const u8 timeout,
             const PacketConnectionMode packetConnectionMode,
             const ResponseType responseType,
-            const vector<u8>& payload = {},
-            const function<void(vector<u8>)>& responseCallback = {});
+            const vector<u8>& payload = {});
 
         //Close the link
         void Destroy();
@@ -140,5 +140,6 @@ namespace KalaServer::Connection
         u16 receiverPort{};
 
         TransportProtocol transportProtocol{};
+        function<void(vector<u8>)> responseCallback{};
     };
 }
