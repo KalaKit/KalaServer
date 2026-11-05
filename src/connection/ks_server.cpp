@@ -93,6 +93,10 @@ static void _StartConnection(
     const u32 serverDataID,
     const function<void(vector<u8>)>& messageCallback);
 
+static void _StartClient(
+    const u32 serverDataID,
+    const function<void(vector<u8>)>& messageCallback);
+
 namespace KalaServer::Connection
 {
     KalaServerRegistry<Server>& Server::GetRegistry() { return registry; }
@@ -509,20 +513,56 @@ namespace KalaServer::Connection
 }
 
 void _StartConnection(
-    const u32 serverDataID,
+    const u32 thisServerDataID,
     const function<void(vector<u8>)>& messageCallback)
 {
     auto worker_thread = [
-        serverDataID,
+        thisServerDataID,
         messageCallback](
         const string serverStr,
         const u32 serverID,
         const u8 timeout,
         const TransportProtocol transportProtocol) -> void
         {
-            ksocket targetSocket = invalid_socket;
+            ksocket serverSocket = invalid_socket;
             u32 serverPort{};
-            
+
+            const bool isIPv4 = KalaServerCore::IsIPv4(KalaServerCore::GetIP());
+
+            auto create_socket = [](
+                const string targetIP,
+                const TransportProtocol transportProtocol) -> ksocket
+                {
+                    int domain = KalaServerCore::IsIPv4(targetIP)
+                        ? AF_INET
+                        : AF_INET6;
+
+                    int type = transportProtocol == TransportProtocol::TP_TCP
+                        ? SOCK_STREAM
+                        : SOCK_DGRAM;
+
+                    int protocol = transportProtocol == TransportProtocol::TP_TCP
+                        ? IPPROTO_TCP
+                        : IPPROTO_UDP;
+                    
+                    return socket(domain, type, protocol);
+                };
+
+            auto close_socket = [thisServerDataID](ksocket& targetSocket) -> void
+                {
+                    scoped_lock lock(serverDataMutex);
+                    for (pair<u32, ServerData>& ld : serverData)
+                    {
+                        if (ld.first == thisServerDataID)
+                        {
+                            ld.second.socket = invalid_socket;
+                            break;
+                        }
+                    }
+
+                    kclose(targetSocket);
+                };
+
             string err = registry.LockRegistry([serverID, &serverPort]()
                 {
                     for (const Server* s : registry.GetAllContent())
@@ -541,12 +581,9 @@ void _StartConnection(
                 addr.sin_port = htons(serverPort);
                 addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-                targetSocket = socket(
-                    AF_INET,
-                    SOCK_STREAM,
-                    IPPROTO_TCP);
+                serverSocket = create_socket(KalaServerCore::GetIP(), transportProtocol);
 
-                if (targetSocket == invalid_socket)
+                if (serverSocket == invalid_socket)
                 {
 #if defined(KWIN_ANY)
                     string err = KalaServerCore::ErrorToString(WSAGetLastError());
@@ -562,7 +599,7 @@ void _StartConnection(
                 }
 
                 if (bind(
-                    targetSocket,
+                    serverSocket,
                     rcast<sockaddr*>(&addr),
                     sizeof(addr)) == -1)
                 {
@@ -577,7 +614,7 @@ void _StartConnection(
                         "Failed to bind socket for " + serverStr + "! Reason: " + err);
                 }
 
-                if (listen(targetSocket, SOMAXCONN) == -1)
+                if (listen(serverSocket, SOMAXCONN) == -1)
                 {
 #if defined(KWIN_ANY)
                     string err = KalaServerCore::ErrorToString(WSAGetLastError());
@@ -597,7 +634,7 @@ void _StartConnection(
             {
                 fd_set readSet{};
                 FD_ZERO(&readSet);
-                FD_SET(targetSocket, &readSet);
+                FD_SET(serverSocket, &readSet);
 
                 timeval tv{};
                 tv.tv_sec = 0;
@@ -612,7 +649,7 @@ void _StartConnection(
                     &tv);
 #else
                 int ready = select(
-                    targetSocket + 1,
+                    serverSocket + 1,
                     &readSet,
                     nullptr,
                     nullptr,
@@ -620,39 +657,100 @@ void _StartConnection(
 #endif
 
                 if (ready == 0) continue;
-                if (ready < 0) break;
+                if (ready < 0)
+                {
+#if defined(KWIN_ANY)
+                    string err = KalaServerCore::ErrorToString(WSAGetLastError());
+#else
+                    string err = KalaServerCore::ErrorToString(errno);
+#endif
+
+                    Log::Print(
+                        "Failed to select socket for " + serverStr + "! Reason: " + err,
+                        "KS_SERVER",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    break;
+                }
 
                 sockaddr_in clientAddr{};
                 socklen_t clientAddrLen = sizeof(clientAddr);
 
                 ksocket clientSocket = accept(
-                    targetSocket,
+                    serverSocket,
                     rcast<sockaddr*>(&clientAddr),
                     &clientAddrLen);
 
-                if (clientSocket == invalid_socket) continue;
-
-                char buffer[4096]{};
-
-                int received = recv(
-                    clientSocket,
-                    buffer,
-                    sizeof(buffer),
-                    0);
-
-                if (received > 0)
+                if (clientSocket == invalid_socket)
                 {
+#if defined(KWIN_ANY)
+                    string err = KalaServerCore::ErrorToString(WSAGetLastError());
+#else
+                    string err = KalaServerCore::ErrorToString(errno);
+#endif
+
                     Log::Print(
-                        "Received payload: " +
-                        string(buffer, scast<size_t>(received)),
+                        "Failed to accept client socket! Reason: " + err,
                         "KS_SERVER",
-                        LogType::LOG_INFO);
+                        LogType::LOG_ERROR,
+                        2);
+
+                    continue;
                 }
 
-                kclose(clientSocket);
+                char ipBuffer[INET_ADDRSTRLEN]{};
+
+                if (!inet_ntop(
+                    AF_INET,
+                    &clientAddr.sin_addr,
+                    ipBuffer,
+                    sizeof(ipBuffer)))
+                {
+#if defined(KWIN_ANY)
+                    string err = KalaServerCore::ErrorToString(WSAGetLastError());
+#else
+                    string err = KalaServerCore::ErrorToString(errno);
+#endif
+
+                    Log::Print(
+                        "Failed to convert incoming client IP address! Reason: " + err,
+                        "KS_SERVER",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    kclose(clientSocket);
+                    continue;
+                }
+
+                u32 nextServerDataID = serverDataID.fetch_add(1) + 1;
+                {
+                    scoped_lock lock(serverDataMutex);
+                    serverData.push_back(
+                        {
+                            nextServerDataID,
+                            ServerData{
+                                .serverID = serverID,
+                                .clientIP = ipBuffer,
+                                .clientPort = ntohs(clientAddr.sin_port),
+                                .timeout = 5,
+                                .transportProtocol = TransportProtocol::TP_TCP,
+                                .packetConnectionMode = PacketConnectionMode::PCM_KeepAlive,
+                                .responseType = ResponseType::RT_AcceptResponse,
+                                .socket = clientSocket
+                            }
+                        });
+                }
+
+                _StartClient(
+                    nextServerDataID,
+                    messageCallback);
+
+                //for later
+                //close_socket(serverSocket);
             }
 
-            kclose(targetSocket);
+            close_socket(serverSocket);
         };
 
     {
@@ -660,7 +758,7 @@ void _StartConnection(
 
         for (pair<u32, ServerData>& sd : serverData)
         {
-            if (sd.first != serverDataID) continue;
+            if (sd.first != thisServerDataID) continue;
 
             ServerData& data = sd.second;
 
@@ -683,6 +781,122 @@ void _StartConnection(
                 data.serverID,
                 data.timeout,
                 data.transportProtocol);
+
+            break;
+        }
+    }
+}
+
+void _StartClient(
+    const u32 thisServerDataID,
+    const function<void(vector<u8>)>& messageCallback)
+{
+    auto worker_thread = [
+        thisServerDataID,
+        messageCallback](
+        const string serverStr,
+        const u32 serverID,
+        const string clientIP,
+        const u16 clientPort,
+        const u8 timeout,
+        const TransportProtocol transportProtocol,
+        ksocket clientSocket) -> void
+        {
+            auto close_socket = [thisServerDataID](ksocket& targetSocket) -> void
+                {
+                    scoped_lock lock(serverDataMutex);
+                    for (pair<u32, ServerData>& ld : serverData)
+                    {
+                        if (ld.first == thisServerDataID)
+                        {
+                            ld.second.socket = invalid_socket;
+                            break;
+                        }
+                    }
+
+                    kclose(targetSocket);
+                };
+
+            bool isAlive = true;
+
+            while (isAlive)
+            {
+                char buffer[4096]{};
+
+                int received = recv(
+                    clientSocket,
+                    buffer,
+                    sizeof(buffer),
+                    0);
+
+                if (received > 0)
+                {
+                    Log::Print(
+                        "Received payload: " +
+                        string(buffer, scast<size_t>(received)),
+                        "KS_SERVER",
+                        LogType::LOG_INFO);
+
+                    if (messageCallback) messageCallback(
+                        vector<u8>(buffer, buffer + received));
+                }
+                else if (received == 0)
+                {
+                    Log::Print(
+                        "Closing connection between " + serverStr 
+                        + " and " + string(clientIP) + " because client has closed the connection.",
+                        "KS_SERVER",
+                        LogType::LOG_INFO);
+
+                    close_socket(clientSocket);
+                    return;
+                }
+                else
+                {
+                    Log::Print(
+                        "Closing connection between " + serverStr 
+                        + " and " + string(clientIP) + " because receiving data failed!",
+                        "KS_SERVER",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    close_socket(clientSocket);
+                    return;
+                }
+            }
+        };
+
+    {
+        scoped_lock lock(serverDataMutex);
+
+        for (pair<u32, ServerData>& sd : serverData)
+        {
+            if (sd.first != thisServerDataID) continue;
+
+            ServerData& data = sd.second;
+
+            Server* server{};
+            string err = Server::GetRegistry().GetContent(data.serverID, server);
+            if (!err.empty())
+            {
+                KalaServerCore::ForceClose(
+                    "KalaServer Server error",
+                    "Failed to start listener because the server was invalid! Reason: " + err);
+            }
+
+            const string serverStr = 
+                "server '" + to_string(data.serverID) 
+                + "' at port '" + to_string(server->GetServerPort()) + "'";
+
+            data.thisThread = thread(
+                std::move(worker_thread),
+                serverStr,
+                data.serverID,
+                data.clientIP,
+                data.clientPort,
+                data.timeout,
+                data.transportProtocol,
+                data.socket);
 
             break;
         }

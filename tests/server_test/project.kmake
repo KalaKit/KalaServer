@@ -9,6 +9,7 @@ dir_debug: "build/debug-"
 name_ks: "kalaserver"
 dir_ks: "../../build/0-0-1"
 comm_objcopy: "objcopy --remove-section .note.gnu.property"
+comm_setcap: "sudo setcap 'cap_net_bind_service=+eip'"
 links_win: "Ws2_32", "Shell32", "Ole32"
 links_linux: "ssl", "crypto"
 
@@ -40,6 +41,8 @@ buildpath: "${dir_debug}linux"
 links: "${dir_ks}/lib${name_ks}d.a", "${links_linux}"
 //strips stupid avx requirements that cachyos seems to add for no reason
 postbuildaction: "${comm_objcopy} ${dir_debug}linux/${name_bin}"
+//give permission to executable to use ports lower than 1024
+postbuildaction: "${comm_setcap} ${dir_release}linux/${name_bin}"
 
 #profile release-linux
 buildtype: "minsizerel"
@@ -48,4 +51,5 @@ links: "${dir_ks}/lib${name_ks}.a", "${links_linux}"
 //strips stupid avx requirements that cachyos seems to add for no reason
 postbuildaction: "${comm_objcopy} ${dir_release}linux/${name_bin}"
 postbuildaction: "strip --strip-unneeded ${dir_release}linux/${name_bin}"
-
+//give permission to executable to use ports lower than 1024
+postbuildaction: "${comm_setcap} ${dir_release}linux/${name_bin}"

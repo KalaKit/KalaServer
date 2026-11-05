@@ -30,7 +30,7 @@ namespace KalaServer::Connection
     using std::mutex;
 
     static constexpr u8 MIN_CLIENT_NAME_LENGTH = 3;
-    static constexpr u8 MAX_CLIENT_NAME_LENGTH = 10;
+    static constexpr u8 MAX_CLIENT_NAME_LENGTH = 20;
 
     class LIB_API Client
     {

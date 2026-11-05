@@ -35,7 +35,7 @@ namespace KalaServer::Connection
     using std::default_delete;
 
     static constexpr u8 MIN_SERVER_NAME_LENGTH = 3;
-    static constexpr u8 MAX_SERVER_NAME_LENGTH = 10;
+    static constexpr u8 MAX_SERVER_NAME_LENGTH = 20;
 
 	//Minimum port, 1-1023 requires admin/root
 	static constexpr u16 MIN_PORT_RANGE = 1;

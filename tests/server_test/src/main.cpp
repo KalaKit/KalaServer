@@ -79,9 +79,9 @@ int main()
     KalaServerCore::Initialize("192.168.1.102");
 
     Server* server = Server::Initialize(
-        "user",
+        "server_test",
         ".",
-        8080,
+        80,
         {});
 
     server->SetVisibility(true);
