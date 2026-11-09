@@ -37,10 +37,10 @@ using std::vector;
 using std::this_thread::sleep_for;
 using std::chrono::seconds;
 
-static void PrintResponse(
-    string_view targetIP,
+static vector<u8> HandleResponse(
+    string targetIP,
     u16 targetPort,
-    const vector<u8>& payload)
+    vector<u8> payload)
 {
     string payloadString{};
     if (KalaServerCore::IsTextPayload(payload))
@@ -57,12 +57,33 @@ static void PrintResponse(
         }
     }
 
+    if (!KalaServerCore::IsLikeHTTP(payload))
+    {
+        Log::Print(
+            "Target '" + string(targetIP) + "' via port '" + to_string(targetPort) + "'"
+            " did not send a valid payload because it did not resemble real HTTP!",
+            "SERVER_TEST",
+            LogType::LOG_WARNING);
+    }
+
     Log::Print(
-        "\ntarget IP: " + string(targetIP) + "\n"
-        "target port: " + to_string(targetPort) + "\n"
-        "target payload:\n" + payloadString,
-        "CLIENT_TEST",
+        "\nIP: " + string(targetIP) + "\n"
+        "port: " + to_string(targetPort) + "\n"
+        "payload:\n" + payloadString,
+        "SERVER_TEST",
         LogType::LOG_INFO);
+
+    const string responseBody = "this is a test, you connected successfully";
+
+    const string response = 
+        "HTTP/1.1 418 I'm a teapot\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "Content-Length: " + to_string(responseBody.size()) + "\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        + responseBody;
+
+    return vector<u8>(response.begin(), response.end());
 }
 
 static void Clear()
@@ -82,12 +103,13 @@ int main()
         "server_test",
         ".",
         80,
-        {});
+        HandleResponse);
 
     server->SetVisibility(true);
 
-    sleep_for(seconds(5));
-
+    //press Enter to exit
+    cin.get();
+    
     KalaServerCore::Shutdown();
 
     return 0;

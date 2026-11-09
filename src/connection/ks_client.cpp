@@ -105,7 +105,24 @@ namespace KalaServer::Connection
 
             return;
         }
-        if (!IsStringInRange(newUsername, MIN_CLIENT_NAME_LENGTH, MAX_CLIENT_NAME_LENGTH))
+
+        bool isStringInRange{};
+        string err = IsStringInRange(
+            newUsername, 
+            MIN_CLIENT_NAME_LENGTH, 
+            MAX_CLIENT_NAME_LENGTH,
+            isStringInRange);
+
+        if (!err.empty())
+        {
+            Log::Print(
+                "Failed to initialize client! Reason: " + err,
+                "KS_CLIENT", 
+                LogType::LOG_WARNING);
+
+            return;
+        }
+        if (!isStringInRange)
         {
             Log::Print(
                 "Failed to initialize client because the username length was out of range!",

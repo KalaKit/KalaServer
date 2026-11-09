@@ -34,6 +34,8 @@ using KalaHeaders::KalaLog::TimeFormat;
 using KalaHeaders::KalaLog::DateFormat;
 
 using KalaHeaders::KalaString::TrimString;
+using KalaHeaders::KalaString::DecToHex;
+using KalaHeaders::KalaString::IsNumber;
 
 using KalaServer::Connection::Server;
 using KalaServer::Connection::Client;
@@ -41,6 +43,7 @@ using KalaServer::Connection::Link;
 
 using std::string;
 using std::to_string;
+using std::array;
 using std::filesystem::path;
 using std::function;
 using std::source_location;
@@ -204,6 +207,64 @@ namespace KalaServer::Core
 #endif
 	}
 
+	bool KalaServerCore::IsLikeHTTP(const vector<u8>& inputData)
+	{
+		if (inputData.empty()) return false;
+
+		const string payload = GenerateTextPayload(inputData);
+		const size_t lineEnd = payload.find("\r\n");
+
+		if (lineEnd == string::npos) return false;
+
+		const string_view firstLine(payload.data(), lineEnd);
+
+		//response
+		if (firstLine.starts_with("HTTP/1."))
+		{
+			return firstLine.size() >= 12
+				&& (firstLine[7] == '0'
+				|| firstLine[7] == '1')
+				&& firstLine[8] == ' '
+				&& IsNumber(firstLine[9])
+				&& IsNumber(firstLine[10])
+				&& IsNumber(firstLine[11]);
+		}
+
+		//request
+		constexpr array<string_view, 9> methods =
+		{
+			"GET",
+			"POST",
+			"PUT",
+			"DELETE",
+			"HEAD",
+			"OPTIONS",
+			"PATCH",
+			"TRACE",
+			"CONNECT"
+		};
+
+		for (const string_view method : methods)
+		{
+			if (!firstLine.starts_with(method)) continue;
+			if (firstLine.size() <= method.size()) continue;
+			if (firstLine[method.size()] != ' ') continue;
+
+			const size_t versionPos = firstLine.rfind(" HTTP/1.");
+
+			if (versionPos != string_view::npos
+				&& versionPos > method.size() + 1
+				&& versionPos + 9 == firstLine.size()
+				&& (firstLine.back() == '0'
+				|| firstLine.back() == '1'))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	bool KalaServerCore::IsTextPayload(const vector<u8>& payload)
 	{
 		if (payload.empty()) return false;
@@ -257,6 +318,11 @@ namespace KalaServer::Core
 
 		string decoded = decode_escapes();
 		return vector<u8>(decoded.begin(), decoded.end());
+	}
+
+	string KalaServerCore::GenerateTextPayload(const vector<u8>& input)
+	{
+		return string(input.begin(), input.end());
 	}
 
 	const string& KalaServerCore::GetIP()

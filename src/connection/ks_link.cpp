@@ -978,7 +978,7 @@ void _SendPacket(
                         return;
                     }
 
-                    auto has_become_invsibile = [](
+                    auto has_become_invsible = [](
                         const u32 linkDataID,
                         const string senderStr,
                         const string receiverStr) -> bool
@@ -1064,7 +1064,7 @@ void _SendPacket(
                             break;
                         }
 
-                        if (has_become_invsibile(
+                        if (has_become_invsible(
                             linkDataID,
                             senderStr,
                             receiverStr))
@@ -1252,7 +1252,7 @@ void _SendPacket(
                             }
                         }
 
-                        if (has_become_invsibile(
+                        if (has_become_invsible(
                             linkDataID,
                             senderStr,
                             receiverStr))

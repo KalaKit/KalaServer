@@ -34,11 +34,17 @@ namespace KalaServer::Core
 
         static string ErrorToString(int error);
 
+        //Returns true if input data looks like a HTTP request, regardless if its string or binary
+        static bool IsLikeHTTP(const vector<u8>& inputData);
+
         //Returns true if the payload is not a binary-based packet
         static bool IsTextPayload(const vector<u8>& payload);
 
-        //Accepts any string input and returns a payload compatible with binary-based packets
+        //Accepts any string or binary input and returns a payload compatible with binary-based packets
         static vector<u8> GenerateBinaryPayload(string_view input);
+
+        //Accepts any string or binary input and returns string
+        static string GenerateTextPayload(const vector<u8>& input);
 
         static const string& GetIP();
 
