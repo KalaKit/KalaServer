@@ -6,8 +6,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <thread>
-#include <chrono>
 
 #include "log_utils.hpp"
 #include "string_utils.hpp"
@@ -24,18 +22,27 @@ using KalaHeaders::KalaString::DecToHex;
 
 using KalaServer::Core::KalaServerCore;
 using KalaServer::Connection::Server;
-using KalaServer::Connection::Client;
-using KalaServer::Connection::TransportProtocol;
-using KalaServer::Connection::ResponseType;
-using KalaServer::Connection::Link;
 
 using std::cin;
 using std::string;
 using std::string_view;
 using std::to_string;
 using std::vector;
-using std::this_thread::sleep_for;
-using std::chrono::seconds;
+using std::array;
+
+Server* server{};
+
+static constexpr array<string_view, 8> blacklistedKeywords = 
+{
+    "/.env",
+    "/env",
+    "/.aws",
+    "php",
+    "secret",
+    "/cgi",
+    "/.git",
+    "admin"
+};
 
 static vector<u8> HandleResponse(
     string targetIP,
@@ -66,6 +73,20 @@ static vector<u8> HandleResponse(
             LogType::LOG_WARNING);
     }
 
+    for (const string_view kw : blacklistedKeywords)
+    {
+        if (payloadString.find(kw) == string::npos) continue;
+
+        Log::Print(
+            "Target '" + string(targetIP) + "' via port '" + to_string(targetPort) + "'"
+            " was banned because it used blacklisted keyword '" + string(kw) + "'!",
+            "SERVER_TEST",
+            LogType::LOG_WARNING);
+
+        server->BanIP(targetIP);
+        return {};
+    }
+
     Log::Print(
         "\nIP: " + string(targetIP) + "\n"
         "port: " + to_string(targetPort) + "\n"
@@ -73,35 +94,27 @@ static vector<u8> HandleResponse(
         "SERVER_TEST",
         LogType::LOG_INFO);
 
-    const string responseBody = "this is a test, you connected successfully";
+    static constexpr string_view responseBody = "this is a test, you connected successfully";
 
-    const string response = 
+    static const string response = 
         "HTTP/1.1 418 I'm a teapot\r\n"
         "Content-Type: text/plain; charset=utf-8\r\n"
         "Content-Length: " + to_string(responseBody.size()) + "\r\n"
         "Connection: close\r\n"
         "\r\n"
-        + responseBody;
+        + string(responseBody);
 
-    return vector<u8>(response.begin(), response.end());
-}
+    static const vector<u8> responsePayload(response.begin(), response.end());
 
-static void Clear()
-{
-#if defined(KWIN_ANY)
-    system("cls");
-#else
-    system("clear");
-#endif
+    return responsePayload;
 }
 
 int main()
 {
     KalaServerCore::Initialize("192.168.1.102");
 
-    Server* server = Server::Initialize(
+    server = Server::Initialize(
         "server_test",
-        ".",
         80,
         HandleResponse);
 
@@ -109,7 +122,7 @@ int main()
 
     //press Enter to exit
     cin.get();
-    
+
     KalaServerCore::Shutdown();
 
     return 0;

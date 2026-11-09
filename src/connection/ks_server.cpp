@@ -24,6 +24,8 @@
 #include "connection/ks_client.hpp"
 #include "connection/ks_link.hpp"
 
+using KalaHeaders::KalaCore::ContainsValue;
+
 using KalaHeaders::KalaLog::Log;
 using KalaHeaders::KalaLog::LogType;
 
@@ -104,8 +106,7 @@ namespace KalaServer::Connection
     KalaServerRegistry<Server>& Server::GetRegistry() { return registry; }
 
     Server* Server::Initialize(
-        string_view serverName, 
-        const path& serverRoot, 
+        string_view serverName,
         u16 serverPort,
         const function<vector<u8>(string, u16, vector<u8>)>& messageCallback)
     {
@@ -194,28 +195,6 @@ namespace KalaServer::Connection
 
         if (!continueInit) return nullptr;
 
-        path cleanPath = GetCleanPath(serverRoot);
-        if (!exists(cleanPath))
-        {
-            Log::Print(
-                "Failed to initialize server for IP '" 
-                + string(KalaServerCore::GetIP()) + "' because the server root '" + serverRoot.string() + "' does not exist!",
-                "KS_SERVER",
-                LogType::LOG_WARNING);
-
-            return nullptr;
-        }
-        if (!is_directory(cleanPath))
-        {
-            Log::Print(
-                "Failed to initialize server for IP '" 
-                + string(KalaServerCore::GetIP()) + "' because the server root '" + serverRoot.string() + "' is not a directory!",
-                "KS_SERVER",
-                LogType::LOG_WARNING);
-
-            return nullptr;
-        }
-
         if (serverPort < MIN_PORT_RANGE
             || serverPort > MAX_PORT_RANGE)
         {
@@ -236,7 +215,6 @@ namespace KalaServer::Connection
 
         serverPtr->ID = newID;
         serverPtr->serverName = serverName;
-        serverPtr->serverRoot = serverRoot;
         serverPtr->serverPort = serverPort;
         serverPtr->messageCallback = messageCallback;
 
@@ -331,35 +309,6 @@ namespace KalaServer::Connection
         return serverPort;
     }
 
-    path Server::GetServerRoot() const
-    {
-        shared_lock lock(serverMutex); 
-        return serverRoot;
-    }
-
-    vector<path> Server::GetWhitelistedRoutes()
-    { 
-        scoped_lock lock(serverMutex);
-        return whitelistedRoutes;
-    }
-    void Server::AddWhitelistedRoute(const path& targetPath)
-    {
-        scoped_lock lock(serverMutex);
-    }
-    void Server::RemoveWhitelistedRoute(const path& targetPath)
-    {
-        scoped_lock lock(serverMutex);
-    }
-
-    void Server::ImportWhitelistedRoutes(const path& targetPath)
-    {
-        scoped_lock lock(serverMutex);
-    }
-    void Server::ExportWhitelistedRoutes(const path& targetPath)
-    {
-        scoped_lock lock(serverMutex);
-    }
-
     vector<string> Server::GetBannedIPs()
     {
         shared_lock lock(serverMutex);
@@ -368,10 +317,43 @@ namespace KalaServer::Connection
     void Server::BanIP(string_view IP)
     {
         scoped_lock lock(serverMutex);
+        if (ContainsValue(bannedIPs, IP))
+        {
+            Log::Print(
+                "Failed to ban IP '" + string(IP) + "' because it is already banned!",
+                "KS_SERVER",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+
+        bannedIPs.push_back(string(IP));
+
+        Log::Print(
+            "IP '" + string(IP) + "' has been banned!",
+            "KS_SERVER",
+            LogType::LOG_SUCCESS);
     }
     void Server::UnbanIP(string_view IP)
     {
         scoped_lock lock(serverMutex);
+
+        auto it = find(bannedIPs.begin(), bannedIPs.end(), IP);
+        if (it == bannedIPs.end())
+        {
+            Log::Print(
+                "Failed to unban IP '" + string(IP) + "' because it has not been banned!",
+                "KS_SERVER",
+                LogType::LOG_WARNING);
+
+            return;
+        }
+        bannedIPs.erase(it);
+
+        Log::Print(
+            "IP '" + string(IP) + "' has been unbanned!",
+            "KS_SERVER",
+            LogType::LOG_SUCCESS);
     }
 
     void Server::ImportBannedIPs(const path& targetPath)
@@ -379,29 +361,6 @@ namespace KalaServer::Connection
         scoped_lock lock(serverMutex);
     }
     void Server::ExportBannedIPs(const path& targetPath)
-    {
-        scoped_lock lock(serverMutex);
-    }
-
-    vector<string> Server::GetBlacklistedKeywords()
-    { 
-        shared_lock lock(serverMutex);
-        return blacklistedKeywords;
-    }
-    void Server::AddBlacklistedKeyword(string_view newValue)
-    {
-        scoped_lock lock(serverMutex);
-    }
-    void Server::RemoveBlacklistedKeyword(string_view newValue)
-    {
-        scoped_lock lock(serverMutex);
-    }
-
-    void Server::ImportBlacklistedKeywords(const path& targetPath)
-    {
-        scoped_lock lock(serverMutex);
-    }
-    void Server::ExportBlacklistedKeywords(const path& targetPath)
     {
         scoped_lock lock(serverMutex);
     }
@@ -706,37 +665,8 @@ void _StartConnection(
                     break;
                 }
 
-                Log::Print(
-                    "@@@@@ readiness: " 
-                    + to_string(ready) + ", socket: " 
-                    + to_string(serverSocket));
-
                 sockaddr_in clientAddr{};
                 socklen_t clientAddrLen = sizeof(clientAddr);
-
-                int accepting{};
-#if defined(KWIN_ANY)
-                int acceptingLen = sizeof(accepting);
-                int result = getsockopt(
-                    serverSocket,
-                    SOL_SOCKET,
-                    SO_ACCEPTCONN,
-                    rcast<char*>(&accepting),
-                    &acceptingLen);
-#else
-                socklen_t acceptingLen = sizeof(accepting);
-                int result = getsockopt(
-                    serverSocket,
-                    SOL_SOCKET,
-                    SO_ACCEPTCONN,
-                    &accepting,
-                    &acceptingLen);
-#endif
-
-                Log::Print(
-                    "@@@@@ listener result: " 
-                    + to_string(result) + ", accepting: "
-                    + to_string(accepting));
 
                 if (KalaServerCore::IsShuttingDown())
                 {
@@ -803,6 +733,74 @@ void _StartConnection(
                     continue;
                 }
 
+                u32 serverID{};
+                {
+                    shared_lock lock(serverDataMutex);
+                    for (const pair<u32, ServerData>& sd : serverData)
+                    {
+                        if (sd.first != thisServerDataID) continue;
+                        serverID = sd.second.serverID;
+                        break;
+                    }
+                }
+
+                if (serverID == 0)
+                {
+                    Log::Print(
+                        "Failed to check IP '" + string(ipBuffer) + "' status because " + serverStr + " is invalid!",
+                        "KS_SERVER",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    kclose(clientSocket);
+                    break;
+                }
+
+                bool isBanned{};
+                string err = registry.LockRegistry([
+                    serverID,
+                    ipBuffer,
+                    &isBanned]()
+                    {
+                        Server* server{};
+                        for (Server* s : registry.GetAllContent())
+                        {
+                            if (s->GetID() == serverID)
+                            {
+                                server = s;
+                                break;
+                            }
+                        }
+
+                        if (!server)
+                        {
+                            KalaServerCore::ForceClose(
+                                "KalaServer Server error",
+                                "Failed to check IP '" + string(ipBuffer) + "' ban status because server '" 
+                                + to_string(serverID) + "' was not found!");
+                        }
+
+                        isBanned = ContainsValue(server->GetBannedIPs(), ipBuffer);
+                    });
+
+                if (!err.empty())
+                {
+                    KalaServerCore::ForceClose(
+                        "KalaServer Server error",
+                        "Failed to check IP '" + string(ipBuffer) + "' ban status! Reason: " + err);
+                }
+
+                if (isBanned)
+                {
+                    Log::Print(
+                        "Banned IP '" + string(ipBuffer) + "' tried to reconnect to " + serverStr + ".",
+                        "KS_SERVER",
+                        LogType::LOG_WARNING);
+
+                    kclose(clientSocket);
+                    continue;
+                }
+
                 u32 nextServerDataID = serverDataID.fetch_add(1) + 1;
                 {
                     sockaddr_storage storage{};
@@ -831,9 +829,6 @@ void _StartConnection(
                     thisServerDataID,
                     nextServerDataID,
                     messageCallback);
-
-                //for later
-                //close_socket(serverSocket);
             }
 
             close_socket(serverSocket);
@@ -1036,6 +1031,72 @@ void _StartClient(
                         return false;
                     };
 
+                auto is_client_banned = [
+                    serverStr,
+                    originServerDataID,
+                    clientIP](bool& serverClosed) -> bool
+                    {
+                        bool isBanned{};
+
+                        u32 serverID{};
+                        {
+                            shared_lock lock(serverDataMutex);
+                            for (const pair<u32, ServerData>& sd : serverData)
+                            {
+                                if (sd.first != originServerDataID) continue;
+                                serverID = sd.second.serverID;
+                                break;
+                            }
+                        }
+
+                        if (serverID == 0)
+                        {
+                            Log::Print(
+                                "Failed to check IP '" + clientIP + "' status because " + serverStr + " is invalid!",
+                                "KS_SERVER",
+                                LogType::LOG_ERROR,
+                                2);
+
+                            serverClosed = true;
+                            return false;
+                        }
+
+                        string err = registry.LockRegistry([
+                            serverID,
+                            clientIP,
+                            &isBanned]()
+                            {
+                                Server* server{};
+                                for (Server* s : registry.GetAllContent())
+                                {
+                                    if (s->GetID() == serverID)
+                                    {
+                                        server = s;
+                                        break;
+                                    }
+                                }
+
+                                if (!server)
+                                {
+                                    KalaServerCore::ForceClose(
+                                        "KalaServer Server error",
+                                        "Failed to check IP '" + clientIP + "' ban status because server '" 
+                                        + to_string(serverID) + "' was not found!");
+                                }
+
+                                isBanned = ContainsValue(server->GetBannedIPs(), clientIP);
+                            });
+
+                        if (!err.empty())
+                        {
+                            KalaServerCore::ForceClose(
+                                "KalaServer Server error",
+                                "Failed to check IP '" + clientIP + "' ban status! Reason: " + err);
+                        }
+
+                        return isBanned;
+                    };
+
                 if (!is_server_alive())
                 {
                     Log::Print(
@@ -1044,6 +1105,25 @@ void _StartClient(
                         "KS_SERVER",
                         LogType::LOG_INFO);
 
+                    close_socket(clientSocket);
+                    return;
+                }
+
+                bool serverClosed{};
+                if (is_client_banned(serverClosed))
+                {
+                    Log::Print(
+                        "Closing connection between " + serverStr + " and " + clientStr 
+                        + " because client was banned.",
+                        "KS_SERVER",
+                        LogType::LOG_WARNING);
+
+                    close_socket(clientSocket);
+                    return;
+                }
+
+                if (serverClosed)
+                {
                     close_socket(clientSocket);
                     return;
                 }

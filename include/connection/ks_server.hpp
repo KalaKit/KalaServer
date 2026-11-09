@@ -42,16 +42,6 @@ namespace KalaServer::Connection
 	//Maximum port, cannot go past 16-bit unsigned integer TCP and UDP port fields
 	static constexpr u16 MAX_PORT_RANGE = 65535;
 
-    //Max amount of clients across all servers,
-    //adjust server-local maxClients parameter to change how many clients
-    //can connect to an individual server
-    static constexpr u32 MAX_CLIENTS = 10000;
-
-    //Max amount of packets for each client per second across all servers,
-    //adjust server-local maxClientPackets parameter to change how many packets each client
-    //can send to this server across both the udp and tcp listener ports
-    static constexpr u32 MAX_PACKETS_PER_CLIENT_S = 1000;
-
     class LIB_API Server
     {
     friend class KalaServer::Core::KalaServerCore;
@@ -66,7 +56,6 @@ namespace KalaServer::Connection
         //set messageCallback return value to decide how to respond to a client-sent message
         static Server* Initialize(
             string_view serverName,
-            const path& serverRoot,
             u16 serverPort,
             const function<vector<u8>(string, u16, vector<u8>)>& messageCallback = {});
 
@@ -78,28 +67,15 @@ namespace KalaServer::Connection
         string GetServerName() const;
         u16 GetServerPort() const;
 
-        path GetServerRoot() const;
-
-        vector<path> GetWhitelistedRoutes();
-        void AddWhitelistedRoute(const path& targetPath);
-        void RemoveWhitelistedRoute(const path& targetPath);
-
-        void ImportWhitelistedRoutes(const path& targetPath);
-        void ExportWhitelistedRoutes(const path& targetPath);
-
+        //All IPs that are banned, they will never be able to
+        //connect to the server unless removed from the banned IPs list
         vector<string> GetBannedIPs();
         void BanIP(string_view IP);
         void UnbanIP(string_view IP);
 
+        //Expects a text file which lists each IP in a new line with no commas, spaces, tabs or other symbols
         void ImportBannedIPs(const path& targetPath);
         void ExportBannedIPs(const path& targetPath);
-
-        vector<string> GetBlacklistedKeywords();
-        void AddBlacklistedKeyword(string_view newValue);
-        void RemoveBlacklistedKeyword(string_view newValue);
-
-        void ImportBlacklistedKeywords(const path& targetPath);
-        void ExportBlacklistedKeywords(const path& targetPath);
 
         //Disconnects clients from this server before destroying this server
         void Destroy();
@@ -117,11 +93,7 @@ namespace KalaServer::Connection
         string serverName{};
         u16 serverPort{};
 
-        path serverRoot{};
-        vector<path> whitelistedRoutes{};
-
         vector<string> bannedIPs{};
-        vector<string> blacklistedKeywords{};
 
         function<void(string, u16, vector<u8>)> messageCallback{};
     };

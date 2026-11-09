@@ -34,7 +34,6 @@ using KalaHeaders::KalaLog::TimeFormat;
 using KalaHeaders::KalaLog::DateFormat;
 
 using KalaHeaders::KalaString::TrimString;
-using KalaHeaders::KalaString::DecToHex;
 using KalaHeaders::KalaString::IsNumber;
 
 using KalaServer::Connection::Server;
