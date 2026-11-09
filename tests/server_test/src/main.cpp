@@ -32,7 +32,7 @@ using std::array;
 
 Server* server{};
 
-static constexpr array<string_view, 12> blacklistedKeywords =
+static constexpr array<string_view, 13> blacklistedKeywords =
 {
     "/.env",
     "/env",
@@ -42,6 +42,7 @@ static constexpr array<string_view, 12> blacklistedKeywords =
     "/cgi",
     "/.git",
     "admin",
+    "/SDK/webLanguage",
     "__proto__",
     "constructor:constructor",
     "process.mainModule",
@@ -104,7 +105,7 @@ static vector<u8> HandleResponse(
         "HTTP/1.1 418 I'm a teapot\r\n"
         "Content-Type: text/plain; charset=utf-8\r\n"
         "Content-Length: " + to_string(responseBody.size()) + "\r\n"
-        "Connection: close\r\n"
+        "Connection: keep-alive\r\n"
         "\r\n"
         + string(responseBody);
 
