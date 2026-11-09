@@ -34,19 +34,19 @@ Server* server{};
 
 static constexpr array<string_view, 13> blacklistedKeywords =
 {
-    "/.env",
-    "/env",
-    "/.aws",
-    "php",
-    "secret",
-    "/cgi",
-    "/.git",
-    "admin",
-    "/SDK/webLanguage",
-    "__proto__",
-    "constructor:constructor",
-    "process.mainModule",
-    "child_process"
+    "/.env",                   //exposed env vulnerability scanners
+    "/env",                    //exposed env vulnerability scanners
+    "/.aws",                   //exposed aws server scanners
+    "php",                     //php vulnerability scanners
+    "secret",                  //exposed secret scanners
+    "/cgi",                    //old server scanners (like apache)
+    "/.git",                   //exposed git scanners
+    "admin",                   //scanners trying to find admin endpoints
+    "/SDK/webLanguage",        //hikvision camera scanners
+    "__proto__",               //nodejs vulnerability scanners
+    "constructor:constructor", //nodejs vulnerability scanners
+    "process.mainModule",      //nodejs vulnerability scanners
+    "child_process"            //nodejs vulnerability scanners
 };
 
 static vector<u8> HandleResponse(
