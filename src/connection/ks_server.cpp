@@ -94,12 +94,24 @@ static vector<pair<u32, ServerData>> serverData{};
 
 static void _StartConnection(
     const u32 serverDataID,
-    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback);
+    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback,
+    const vector<u8>& bannedIPResponse);
 
 static void _StartClient(
     const u32 serverDataID,
     const u32 clientDataID,
-    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback);
+    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback,
+    const vector<u8>& bannedIPResponse);
+
+static bool SendResponse(
+    const bool isIPv4,
+    const string serverStr,
+    const string clientStr,
+    const sockaddr_storage addr,
+    const i32 addrLen,
+    const TransportProtocol transportProtocol,
+    ksocket& targetSocket,
+    const vector<u8>& payload);
 
 namespace KalaServer::Connection
 {
@@ -108,7 +120,8 @@ namespace KalaServer::Connection
     Server* Server::Initialize(
         string_view serverName,
         u16 serverPort,
-        const function<vector<u8>(string, u16, vector<u8>)>& messageCallback)
+        const function<vector<u8>(string, u16, vector<u8>)>& messageCallback,
+        const vector<u8>& bannedIPResponse)
     {
         if (!KalaServerCore::IsInitialized())
         {
@@ -249,7 +262,8 @@ namespace KalaServer::Connection
 
         _StartConnection(
             nextServerDataID,
-            messageCallback);
+            messageCallback,
+            bannedIPResponse);
 
 		return serverPtr;
     }
@@ -493,11 +507,13 @@ namespace KalaServer::Connection
 
 void _StartConnection(
     const u32 thisServerDataID,
-    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback)
+    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback,
+    const vector<u8>& bannedIPResponse)
 {
     auto worker_thread = [
         thisServerDataID,
-        messageCallback](
+        messageCallback,
+        bannedIPResponse](
         const string serverStr,
         const u32 serverID,
         const u8 timeout,
@@ -539,7 +555,10 @@ void _StartConnection(
                         }
                     }
 
+                    //Log::Print("@@@@@ closed socket '" + to_string(targetSocket) + "'...");
+
                     kclose(targetSocket);
+                    targetSocket = invalid_socket;
                 };
 
             string err = registry.LockRegistry([serverID, &serverPort]()
@@ -575,6 +594,32 @@ void _StartConnection(
                         "KalaServer Server error",
                         "Failed to start connection for " + string(serverStr) 
                         + " because socket creation failed! Reason: " + err);
+                }
+
+                int reuse = 1;
+
+#if defined(KWIN_ANY)
+                constexpr int socketOption = SO_EXCLUSIVEADDRUSE;
+#else
+                constexpr int socketOption = SO_REUSEADDR;
+#endif
+
+                if (setsockopt(
+                    serverSocket,
+                    SOL_SOCKET,
+                    socketOption,
+                    rcast<const char*>(&reuse),
+                    sizeof(reuse)) != 0)
+                {
+#if defined(KWIN_ANY)
+                    string err = KalaServerCore::ErrorToString(WSAGetLastError());
+#else
+                    string err = KalaServerCore::ErrorToString(errno);
+#endif
+
+                    KalaServerCore::ForceClose(
+                        "KalaServer Server error",
+                        "Failed to configure socket options for " + serverStr + "! Reason: " + err);
                 }
 
                 if (bind(
@@ -797,6 +842,34 @@ void _StartConnection(
                         "KS_SERVER",
                         LogType::LOG_WARNING);
 
+                    if (!bannedIPResponse.empty())
+                    {
+                        const string clientStr = 
+                            "client '" + string(ipBuffer) + "' at port '" 
+                            + to_string(ntohs(clientAddr.sin_port)) + "'";
+
+                        sockaddr_storage storage{};
+                        memcpy(&storage, &clientAddr, sizeof(clientAddr));
+
+                        if (!SendResponse(
+                            isIPv4,
+                            serverStr,
+                            clientStr,
+                            storage,
+                            sizeof(clientAddr),
+                            transportProtocol,
+                            clientSocket,
+                            bannedIPResponse))
+                        {
+                            Log::Print(
+                                "Failed to send ban payload from " + serverStr 
+                                + " to " + clientStr + " because response send failed.",
+                                "KS_SERVER",
+                                LogType::LOG_ERROR,
+                                2);
+                        }
+                    }
+
                     kclose(clientSocket);
                     continue;
                 }
@@ -828,7 +901,8 @@ void _StartConnection(
                 _StartClient(
                     thisServerDataID,
                     nextServerDataID,
-                    messageCallback);
+                    messageCallback,
+                    bannedIPResponse);
             }
 
             close_socket(serverSocket);
@@ -871,12 +945,14 @@ void _StartConnection(
 void _StartClient(
     const u32 originServerDataID,
     const u32 clientDataID,
-    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback)
+    const function<vector<u8>(string, u16, vector<u8>)>& messageCallback,
+    const vector<u8>& bannedIPResponse)
 {
     auto worker_thread = [
         originServerDataID,
         clientDataID,
-        messageCallback](
+        messageCallback,
+        bannedIPResponse](
         const string serverStr,
         const string clientStr,
         const u32 serverID,
@@ -902,116 +978,10 @@ void _StartClient(
                         }
                     }
 
+                    //Log::Print("@@@@@ closed socket '" + to_string(targetSocket) + "'...");
+
                     kclose(targetSocket);
-                };
-
-            auto send_response = [
-                isIPv4,
-                serverStr,
-                clientStr,
-                addr,
-                addrLen,
-                transportProtocol](
-                ksocket& targetSocket,
-                const vector<u8>& payload) -> bool
-                {
-                    if (transportProtocol == TransportProtocol::TP_TCP)
-                    {
-                        size_t totalSent{};
-
-                        while (totalSent < payload.size())
-                        {
-                            int sent = send(
-                                targetSocket,
-                                rcast<const char*>(payload.data() + totalSent),
-                                scast<int>(payload.size() - totalSent),
-                                0);
-
-                            if (sent > 0)
-                            {
-                                totalSent += sent;
-                                continue;
-                            }
-
-                            if (sent == 0)
-                            {
-                                Log::Print(
-                                    "Cannot send response to client! "
-                                    "Closing connection between " + serverStr + " and " + clientStr 
-                                    + " because TCP socket transmission returned zero bytes!",
-                                    "KS_SERVER",
-                                    LogType::LOG_ERROR,
-                                    2);
-
-                                return false;
-                            }
-
-#if defined(KWIN_ANY)
-                            int error = WSAGetLastError();
-                            bool wouldBlock = error == WSAEWOULDBLOCK;
-#else
-                            int error = errno;
-                            bool wouldBlock = error == EWOULDBLOCK || error == EAGAIN;
-#endif
-
-                            if (wouldBlock)
-                            {
-                                fd_set writeSet{};
-                                FD_ZERO(&writeSet);
-                                FD_SET(targetSocket, &writeSet);
-
-                                timeval timeoutVal{};
-                                timeoutVal.tv_usec = 500000;
-
-#if defined(KWIN_ANY)
-                                int ready = select(
-                                    0,
-                                    nullptr,
-                                    &writeSet,
-                                    nullptr,
-                                    &timeoutVal);
-#else
-                                int ready = select(
-                                    targetSocket + 1,
-                                    nullptr,
-                                    &writeSet,
-                                    nullptr,
-                                    &timeoutVal);
-#endif
-
-                                if (ready <= 0)
-                                {
-                                    Log::Print(
-                                        "Cannot send response to client! "
-                                        "Closing connection between " + serverStr + " and " + clientStr 
-                                        + " because TCP socket transmission timed out or select failed!",
-                                        "KS_SERVER",
-                                        LogType::LOG_ERROR,
-                                        2);
-
-                                    return false;
-                                }
-                            }
-                            else
-                            {
-                                Log::Print(
-                                    "Cannot send response to client! "
-                                    "Closing connection between " + serverStr + " and " + clientStr 
-                                    + " because TCP socket transmission failed!",
-                                    "KS_SERVER",
-                                    LogType::LOG_ERROR,
-                                    2);
-
-                                return false;
-                            }
-                        }
-                    }
-                    else
-                    {
-
-                    }
-
-                    return true;
+                    targetSocket = invalid_socket;
                 };
 
             bool isAlive = true;
@@ -1118,6 +1088,27 @@ void _StartClient(
                         "KS_SERVER",
                         LogType::LOG_WARNING);
 
+                    if (!bannedIPResponse.empty())
+                    {
+                        if (!SendResponse(
+                            isIPv4,
+                            serverStr,
+                            clientStr,
+                            addr,
+                            addrLen,
+                            transportProtocol,
+                            clientSocket,
+                            bannedIPResponse))
+                        {
+                            Log::Print(
+                                "Failed to send ban payload from " + serverStr 
+                                + " to " + clientStr + " because response send failed.",
+                                "KS_SERVER",
+                                LogType::LOG_ERROR,
+                                2);
+                        }
+                    }
+
                     close_socket(clientSocket);
                     return;
                 }
@@ -1161,7 +1152,13 @@ void _StartClient(
                         }
 
                         if (!serverClosed
-                            && !send_response(
+                            && !SendResponse(
+                                isIPv4,
+                                serverStr,
+                                clientStr,
+                                addr,
+                                addrLen,
+                                transportProtocol,
                                 clientSocket,
                                 response))
                         {
@@ -1170,7 +1167,8 @@ void _StartClient(
                                 "Closing connection between " + serverStr + " and " + clientStr 
                                 + " because response send failed.",
                                 "KS_SERVER",
-                                LogType::LOG_INFO);
+                                LogType::LOG_ERROR,
+                                2);
 
                             close_socket(clientSocket);
                             return;
@@ -1183,7 +1181,8 @@ void _StartClient(
                                 "Closing connection between " + serverStr + " and " + clientStr 
                                 + " because server has closed the connection.",
                                 "KS_SERVER",
-                                LogType::LOG_INFO);
+                                LogType::LOG_ERROR,
+                                2);
 
                             close_socket(clientSocket);
                             return;
@@ -1258,4 +1257,113 @@ void _StartClient(
             break;
         }
     }
+}
+
+bool SendResponse(
+    const bool isIPv4,
+    const string serverStr,
+    const string clientStr,
+    const sockaddr_storage addr,
+    const i32 addrLen,
+    const TransportProtocol transportProtocol,
+    ksocket& targetSocket,
+    const vector<u8>& payload)
+{
+    if (transportProtocol == TransportProtocol::TP_TCP)
+    {
+        size_t totalSent{};
+
+        while (totalSent < payload.size())
+        {
+            int sent = send(
+                targetSocket,
+                rcast<const char*>(payload.data() + totalSent),
+                scast<int>(payload.size() - totalSent),
+                0);
+
+            if (sent > 0)
+            {
+                totalSent += sent;
+                continue;
+            }
+
+            if (sent == 0)
+            {
+                Log::Print(
+                    "Cannot send response to client! "
+                    "Closing connection between " + serverStr + " and " + clientStr 
+                    + " because TCP socket transmission returned zero bytes!",
+                    "KS_SERVER",
+                    LogType::LOG_ERROR,
+                    2);
+
+                return false;
+            }
+
+#if defined(KWIN_ANY)
+            int error = WSAGetLastError();
+            bool wouldBlock = error == WSAEWOULDBLOCK;
+#else
+            int error = errno;
+            bool wouldBlock = error == EWOULDBLOCK || error == EAGAIN;
+#endif
+
+            if (wouldBlock)
+            {
+                fd_set writeSet{};
+                FD_ZERO(&writeSet);
+                FD_SET(targetSocket, &writeSet);
+
+                timeval timeoutVal{};
+                timeoutVal.tv_usec = 500000;
+
+#if defined(KWIN_ANY)
+                int ready = select(
+                    0,
+                    nullptr,
+                    &writeSet,
+                    nullptr,
+                    &timeoutVal);
+#else
+                int ready = select(
+                    targetSocket + 1,
+                    nullptr,
+                    &writeSet,
+                    nullptr,
+                    &timeoutVal);
+#endif
+
+                if (ready <= 0)
+                {
+                    Log::Print(
+                        "Cannot send response to client! "
+                        "Closing connection between " + serverStr + " and " + clientStr 
+                        + " because TCP socket transmission timed out or select failed!",
+                        "KS_SERVER",
+                        LogType::LOG_ERROR,
+                        2);
+
+                    return false;
+                }
+            }
+            else
+            {
+                Log::Print(
+                    "Cannot send response to client! "
+                    "Closing connection between " + serverStr + " and " + clientStr 
+                    + " because TCP socket transmission failed!",
+                    "KS_SERVER",
+                    LogType::LOG_ERROR,
+                    2);
+
+                return false;
+            }
+        }
+    }
+    else
+    {
+
+    }
+
+    return true;
 }

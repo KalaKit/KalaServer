@@ -451,6 +451,7 @@ void _SendPacket(
                     }
 
                     kclose(targetSocket);
+                    targetSocket = invalid_socket;
                 };
 
             ksocket targetSocket{};

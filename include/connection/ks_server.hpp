@@ -53,11 +53,13 @@ namespace KalaServer::Connection
 
         //Create a new server for accepting incoming UDP and TCP connections,
         //set messageCallback to decide how to parse a client-sent message,
-        //set messageCallback return value to decide how to respond to a client-sent message
+        //set messageCallback return value to decide how to respond to a client-sent message,
+        //set bannedIPResponse to decide what to respond when a client gets banned or when a banned client tries to reconnect
         static Server* Initialize(
             string_view serverName,
             u16 serverPort,
-            const function<vector<u8>(string, u16, vector<u8>)>& messageCallback = {});
+            const function<vector<u8>(string, u16, vector<u8>)>& messageCallback = {},
+            const vector<u8>& bannedIPResponse = {});
 
         u32 GetID() const;
 
