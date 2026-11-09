@@ -32,7 +32,7 @@ using std::array;
 
 Server* server{};
 
-static constexpr array<string_view, 8> blacklistedKeywords = 
+static constexpr array<string_view, 12> blacklistedKeywords =
 {
     "/.env",
     "/env",
@@ -41,7 +41,11 @@ static constexpr array<string_view, 8> blacklistedKeywords =
     "secret",
     "/cgi",
     "/.git",
-    "admin"
+    "admin",
+    "__proto__",
+    "constructor:constructor",
+    "process.mainModule",
+    "child_process"
 };
 
 static vector<u8> HandleResponse(
