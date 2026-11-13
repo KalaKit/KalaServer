@@ -12,8 +12,6 @@
 #include <thread>
 #include <memory>
 
-#include "core_utils.hpp"
-
 #include "core/ks_registry.hpp"
 
 namespace KalaServer::Core

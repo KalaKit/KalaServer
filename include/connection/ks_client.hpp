@@ -10,8 +10,6 @@
 #include <atomic>
 #include <mutex>
 
-#include "core_utils.hpp"
-
 #include "core/ks_registry.hpp"
 
 namespace KalaServer::Core

@@ -10,8 +10,6 @@
 #include <filesystem>
 #include <memory>
 
-#include "core_utils.hpp"
-
 #include "core/ks_registry.hpp"
 #include "connection/ks_link.hpp"
 

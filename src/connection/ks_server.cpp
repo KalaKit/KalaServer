@@ -16,6 +16,7 @@
 
 #include <thread>
 
+#include "core_utils.hpp"
 #include "log_utils.hpp"
 #include "file_utils.hpp"
 #include "string_utils.hpp"
@@ -561,6 +562,13 @@ void _StartConnection(
                     targetSocket = invalid_socket;
                 };
 
+            auto has_become_invisible = [
+                thisServerDataID,
+                serverStr]() -> bool
+                {
+
+                };
+
             string err = registry.LockRegistry([serverID, &serverPort]()
                 {
                     for (const Server* s : registry.GetAllContent())
@@ -668,6 +676,8 @@ void _StartConnection(
 
             while (isAlive)
             {
+                
+
                 fd_set readSet{};
                 FD_ZERO(&readSet);
                 FD_SET(serverSocket, &readSet);

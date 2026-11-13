@@ -32,23 +32,29 @@ using std::array;
 
 Server* server{};
 
-
-
-static constexpr array<string_view, 13> blacklistedKeywords =
+static constexpr array<string_view, 17> blacklistedKeywords =
 {
-    "/.env",                   //exposed env vulnerability scanners
-    "/env",                    //exposed env vulnerability scanners
+    "/.env",                   //exposed env scanners
+    "/env",                    //exposed env scanners
     "/.aws",                   //exposed aws server scanners
-    "php",                     //php vulnerability scanners
-    "secret",                  //exposed secret scanners
-    "/cgi",                    //old server scanners (like apache)
     "/.git",                   //exposed git scanners
-    "admin",                   //scanners trying to find admin endpoints
+
+    "/cgi",                    //old server scanners (like apache)
     "/SDK/webLanguage",        //hikvision camera scanners
-    "__proto__",               //nodejs vulnerability scanners
-    "constructor:constructor", //nodejs vulnerability scanners
-    "process.mainModule",      //nodejs vulnerability scanners
-    "child_process"            //nodejs vulnerability scanners
+
+    "secret",                  //exposed secret scanners
+    "php",                     //php scanners
+    "admin",                   //scanners trying to find admin endpoints
+    "debug",                   //scanners trying to find debug endpoints
+
+    "__proto__",               //nodejs scanners
+    "constructor:constructor", //nodejs scanners
+    "process.mainModule",      //nodejs scanners
+    "child_process",           //nodejs scanners
+
+    "/graphql",                //graphql scanners
+    "__schema",                //graphql scanners
+    "__type"                   //graphql scanners
 };
 
 static vector<u8> GetNormalPayload()
@@ -198,12 +204,13 @@ int main()
         80,
         HandleResponse,
         GetBannedPayload());
-
+    server->ImportBannedIPs("../../../../bannedips.txt");
     server->SetVisibility(true);
 
     //press Enter to exit
     cin.get();
 
+    server->ExportBannedIPs("../../../../bannedips.txt");
     KalaServerCore::Shutdown();
 
     return 0;
