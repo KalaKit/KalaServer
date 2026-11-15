@@ -35,28 +35,28 @@ namespace KalaServer::Connection
     //How many milliseconds to wait at the start of each while loop to check for responses
     static constexpr u16 WHILE_LOOP_IDLE_WAIT_MS = 500;
 
-    enum class TransportProtocol : u8
+    enum class TransportProtocol
     {
-        TP_TCP = 0,
-        TP_UDP = 1
+        TCP,
+        UDP
     };
 
-    enum class PacketConnectionMode : u8
+    enum class PacketConnectionMode
     {
         //The socket between sender and receiver stays alive after sending this packet
         //and can receive additional messages without needing to send a new packet
-        PCM_KeepAlive = 0,
+        KeepAlive,
         //The socket for this packet gets closed and you have to send another packet to start receiving responses
-        PCM_DisconnectAfterSend = 1
+        DisconnectAfterSend
     };
 
-    enum class ResponseType : u8
+    enum class ResponseType
     {
         //The packet ignores whatever response it gets
-        RT_IgnoreResponse = 0,
+        IgnoreResponse,
         //The packet waits for a response and calls the response callback,
         //response callback must be assigned to use this option
-        RT_AcceptResponse = 1
+        AcceptResponse
     };
 
     class LIB_API Link

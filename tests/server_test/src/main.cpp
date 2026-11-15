@@ -168,7 +168,7 @@ static vector<u8> HandleResponse(
             "Target '" + string(targetIP) + "' via port '" + to_string(targetPort) + "'"
             " did not send a valid payload because it did not resemble real HTTP!",
             "SERVER_TEST",
-            LogType::LOG_WARNING);
+            LogType::WARNING);
     }
 
     for (const string_view kw : blacklistedKeywords)
@@ -179,7 +179,7 @@ static vector<u8> HandleResponse(
             "Target '" + string(targetIP) + "' via port '" + to_string(targetPort) + "'"
             " was banned because it used blacklisted keyword '" + string(kw) + "'!",
             "SERVER_TEST",
-            LogType::LOG_WARNING);
+            LogType::WARNING);
 
         server->BanIP(targetIP);
         return {};
@@ -190,7 +190,7 @@ static vector<u8> HandleResponse(
         "port: " + to_string(targetPort) + "\n"
         "payload:\n" + payloadString,
         "SERVER_TEST",
-        LogType::LOG_INFO);
+        LogType::INFO);
 
     return GetNormalPayload();
 }

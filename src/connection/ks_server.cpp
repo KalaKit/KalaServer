@@ -129,7 +129,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize server because KalaServer has not been initialized!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return nullptr;
         }
@@ -139,7 +139,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize server because KalaServer is shutting down!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return nullptr;
         }
@@ -150,7 +150,7 @@ namespace KalaServer::Connection
                 "Failed to initialize server for IP '" 
                 + string(KalaServerCore::GetIP()) + "' because the server name was empty!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return nullptr;
         }
@@ -168,7 +168,7 @@ namespace KalaServer::Connection
                 "Failed to initialize server for IP '" 
                 + string(KalaServerCore::GetIP()) + "'! Reason: " + err,
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return nullptr;
         }
@@ -178,7 +178,7 @@ namespace KalaServer::Connection
                 "Failed to initialize server for IP '" 
                 + string(KalaServerCore::GetIP()) + "' because the server name length was out of range!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return nullptr;
         }
@@ -193,7 +193,7 @@ namespace KalaServer::Connection
                         Log::Print(
                             "Failed to initialize server because the server name '" + string(serverName) + "' is already in use!",
                             "KS_SERVER",
-                            LogType::LOG_WARNING);
+                            LogType::WARNING);
 
                         continueInit = false;
                         return;
@@ -216,7 +216,7 @@ namespace KalaServer::Connection
                 "Failed to initialize server for IP '" 
                 + string(KalaServerCore::GetIP()) + "' because the server port '" + to_string(serverPort) + "' was out of range!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return nullptr;
         }
@@ -245,7 +245,7 @@ namespace KalaServer::Connection
 		Log::Print(
 			"Created new server '" + to_string(newID) + "'!",
 			"KS_SERVER",
-			LogType::LOG_SUCCESS);
+			LogType::SUCCESS);
 
         u32 nextServerDataID = serverDataID.fetch_add(1) + 1;
         {
@@ -256,7 +256,7 @@ namespace KalaServer::Connection
                     ServerData{
                         .serverID = newID,
                         .timeout = 5,
-                        .transportProtocol = TransportProtocol::TP_TCP
+                        .transportProtocol = TransportProtocol::TCP
                     }
                 });
         }
@@ -290,7 +290,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to set server '" + to_string(ID) + "' visible because it already was visible!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -300,7 +300,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to set server '" + to_string(ID) + "' invisible because it already was invisible!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -310,7 +310,7 @@ namespace KalaServer::Connection
         Log::Print(
             "Changed server '" + to_string(ID) + "' visibility to '" + (isVisible ? "on" : "off") + "'.",
             "KS_SERVER",
-            LogType::LOG_SUCCESS);
+            LogType::SUCCESS);
     }
 
     string Server::GetServerName() const
@@ -337,7 +337,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to ban IP '" + string(IP) + "' because it is already banned!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -347,7 +347,7 @@ namespace KalaServer::Connection
         Log::Print(
             "IP '" + string(IP) + "' has been banned!",
             "KS_SERVER",
-            LogType::LOG_SUCCESS);
+            LogType::SUCCESS);
     }
     void Server::UnbanIP(string_view IP)
     {
@@ -359,7 +359,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to unban IP '" + string(IP) + "' because it has not been banned!",
                 "KS_SERVER",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -368,7 +368,7 @@ namespace KalaServer::Connection
         Log::Print(
             "IP '" + string(IP) + "' has been unbanned!",
             "KS_SERVER",
-            LogType::LOG_SUCCESS);
+            LogType::SUCCESS);
     }
 
     void Server::ImportBannedIPs(const path& targetPath)
@@ -502,7 +502,7 @@ namespace KalaServer::Connection
 		Log::Print(
 			"Destroying server '" + to_string(ID) + "'.",
 			"KS_SERVER",
-			LogType::LOG_INFO);
+			LogType::INFO);
     }
 }
 
@@ -533,11 +533,11 @@ void _StartConnection(
                         ? AF_INET
                         : AF_INET6;
 
-                    int type = transportProtocol == TransportProtocol::TP_TCP
+                    int type = transportProtocol == TransportProtocol::TCP
                         ? SOCK_STREAM
                         : SOCK_DGRAM;
 
-                    int protocol = transportProtocol == TransportProtocol::TP_TCP
+                    int protocol = transportProtocol == TransportProtocol::TCP
                         ? IPPROTO_TCP
                         : IPPROTO_UDP;
                     
@@ -580,7 +580,7 @@ void _StartConnection(
                     } 
                 });
 
-            if (transportProtocol == TransportProtocol::TP_TCP)
+            if (transportProtocol == TransportProtocol::TCP)
             {
                 sockaddr_in addr{};
                 addr.sin_family = AF_INET;
@@ -714,7 +714,7 @@ void _StartConnection(
                     Log::Print(
                         "Failed to select socket for " + serverStr + "! Reason: " + err,
                         "KS_SERVER",
-                        LogType::LOG_ERROR,
+                        LogType::ERROR,
                         2);
 
                     break;
@@ -729,7 +729,7 @@ void _StartConnection(
                         "Closing connection for " + serverStr 
                         + " because server has closed the connection.",
                         "KS_SERVER",
-                        LogType::LOG_INFO);
+                        LogType::INFO);
                     
                     break;
                 }
@@ -752,7 +752,7 @@ void _StartConnection(
                     Log::Print(
                         "Failed to accept client socket! Reason: " + err,
                         "KS_SERVER",
-                        LogType::LOG_ERROR,
+                        LogType::ERROR,
                         2);
 
 #if defined (KWIN_ANY)
@@ -781,7 +781,7 @@ void _StartConnection(
                     Log::Print(
                         "Failed to convert incoming client IP address! Reason: " + err,
                         "KS_SERVER",
-                        LogType::LOG_ERROR,
+                        LogType::ERROR,
                         2);
 
                     kclose(clientSocket);
@@ -804,7 +804,7 @@ void _StartConnection(
                     Log::Print(
                         "Failed to check IP '" + string(ipBuffer) + "' status because " + serverStr + " is invalid!",
                         "KS_SERVER",
-                        LogType::LOG_ERROR,
+                        LogType::ERROR,
                         2);
 
                     kclose(clientSocket);
@@ -850,7 +850,7 @@ void _StartConnection(
                     Log::Print(
                         "Banned IP '" + string(ipBuffer) + "' tried to reconnect to " + serverStr + ".",
                         "KS_SERVER",
-                        LogType::LOG_WARNING);
+                        LogType::WARNING);
 
                     if (!bannedIPResponse.empty())
                     {
@@ -875,7 +875,7 @@ void _StartConnection(
                                 "Failed to send ban payload from " + serverStr 
                                 + " to " + clientStr + " because response send failed.",
                                 "KS_SERVER",
-                                LogType::LOG_ERROR,
+                                LogType::ERROR,
                                 2);
                         }
                     }
@@ -898,9 +898,9 @@ void _StartConnection(
                                 .clientIP = ipBuffer,
                                 .clientPort = ntohs(clientAddr.sin_port),
                                 .timeout = 5,
-                                .transportProtocol = TransportProtocol::TP_TCP,
-                                .packetConnectionMode = PacketConnectionMode::PCM_KeepAlive,
-                                .responseType = ResponseType::RT_AcceptResponse,
+                                .transportProtocol = TransportProtocol::TCP,
+                                .packetConnectionMode = PacketConnectionMode::KeepAlive,
+                                .responseType = ResponseType::AcceptResponse,
                                 .socket = clientSocket,
                                 .addr = storage,
                                 .addrLen = sizeof(clientAddr)
@@ -1034,7 +1034,7 @@ void _StartClient(
                             Log::Print(
                                 "Failed to check IP '" + clientIP + "' status because " + serverStr + " is invalid!",
                                 "KS_SERVER",
-                                LogType::LOG_ERROR,
+                                LogType::ERROR,
                                 2);
 
                             serverClosed = true;
@@ -1083,7 +1083,7 @@ void _StartClient(
                         "Closing connection between " + serverStr + " and " + clientStr 
                         + " because server has closed the connection.",
                         "KS_SERVER",
-                        LogType::LOG_INFO);
+                        LogType::INFO);
 
                     close_socket(clientSocket);
                     return;
@@ -1096,7 +1096,7 @@ void _StartClient(
                         "Closing connection between " + serverStr + " and " + clientStr 
                         + " because client was banned.",
                         "KS_SERVER",
-                        LogType::LOG_WARNING);
+                        LogType::WARNING);
 
                     if (!bannedIPResponse.empty())
                     {
@@ -1114,7 +1114,7 @@ void _StartClient(
                                 "Failed to send ban payload from " + serverStr 
                                 + " to " + clientStr + " because response send failed.",
                                 "KS_SERVER",
-                                LogType::LOG_ERROR,
+                                LogType::ERROR,
                                 2);
                         }
                     }
@@ -1177,7 +1177,7 @@ void _StartClient(
                                 "Closing connection between " + serverStr + " and " + clientStr 
                                 + " because response send failed.",
                                 "KS_SERVER",
-                                LogType::LOG_ERROR,
+                                LogType::ERROR,
                                 2);
 
                             close_socket(clientSocket);
@@ -1191,7 +1191,7 @@ void _StartClient(
                                 "Closing connection between " + serverStr + " and " + clientStr 
                                 + " because server has closed the connection.",
                                 "KS_SERVER",
-                                LogType::LOG_ERROR,
+                                LogType::ERROR,
                                 2);
 
                             close_socket(clientSocket);
@@ -1205,7 +1205,7 @@ void _StartClient(
                         "Closing connection between " + serverStr + " and " + clientStr 
                         + " because client has closed the connection.",
                         "KS_SERVER",
-                        LogType::LOG_INFO);
+                        LogType::INFO);
 
                     close_socket(clientSocket);
                     return;
@@ -1216,7 +1216,7 @@ void _StartClient(
                         "Closing connection between " + serverStr + " and " + clientStr 
                         + " because receiving data failed!",
                         "KS_SERVER",
-                        LogType::LOG_ERROR,
+                        LogType::ERROR,
                         2);
 
                     close_socket(clientSocket);
@@ -1279,7 +1279,7 @@ bool SendResponse(
     ksocket& targetSocket,
     const vector<u8>& payload)
 {
-    if (transportProtocol == TransportProtocol::TP_TCP)
+    if (transportProtocol == TransportProtocol::TCP)
     {
         size_t totalSent{};
 
@@ -1304,7 +1304,7 @@ bool SendResponse(
                     "Closing connection between " + serverStr + " and " + clientStr 
                     + " because TCP socket transmission returned zero bytes!",
                     "KS_SERVER",
-                    LogType::LOG_ERROR,
+                    LogType::ERROR,
                     2);
 
                 return false;
@@ -1350,7 +1350,7 @@ bool SendResponse(
                         "Closing connection between " + serverStr + " and " + clientStr 
                         + " because TCP socket transmission timed out or select failed!",
                         "KS_SERVER",
-                        LogType::LOG_ERROR,
+                        LogType::ERROR,
                         2);
 
                     return false;
@@ -1363,7 +1363,7 @@ bool SendResponse(
                     "Closing connection between " + serverStr + " and " + clientStr 
                     + " because TCP socket transmission failed!",
                     "KS_SERVER",
-                    LogType::LOG_ERROR,
+                    LogType::ERROR,
                     2);
 
                 return false;

@@ -69,7 +69,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize client because KalaServer has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -79,7 +79,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize client because KalaServer is shutting down!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -91,7 +91,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize client because it has already been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -101,7 +101,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize client because the username was empty!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -118,7 +118,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize client! Reason: " + err,
                 "KS_CLIENT", 
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -127,7 +127,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize client because the username length was out of range!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -139,7 +139,7 @@ namespace KalaServer::Connection
         Log::Print(
             "Created new client '" + username + "'!",
             "KS_CLIENT",
-            LogType::LOG_SUCCESS);
+            LogType::SUCCESS);
     }
 
     vector<u32> Client::GetLinkIDs() 
@@ -149,7 +149,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to get client link IDs because KalaServer has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return {};
         }
@@ -161,7 +161,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to get client link IDs because it has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return {};
         }
@@ -176,7 +176,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to get client visibility state because KalaServer has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return {};
         }
@@ -188,7 +188,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to get client visibility state because it has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return false;
         }
@@ -202,7 +202,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to set client visibility state because KalaServer has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -214,7 +214,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to set client visibility state because it has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -225,7 +225,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to set client '" + username + "' visible because it already was visible!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -235,7 +235,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to set client '" + username + "' invisible because it already was invisible!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -245,7 +245,7 @@ namespace KalaServer::Connection
         Log::Print(
             "Changed client '" + username + "' visibility to '" + (isVisible ? "on" : "off") + "'.",
             "KS_CLIENT",
-            LogType::LOG_SUCCESS);
+            LogType::SUCCESS);
     }
 
     string Client::GetUsername()
@@ -261,7 +261,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to destroy client because KalaServer has not been initialized!",
                 "KS_CLIENT",
-                LogType::LOG_WARNING);
+                LogType::WARNING);
 
             return;
         }
@@ -277,7 +277,7 @@ namespace KalaServer::Connection
                 Log::Print(
                     "Failed to destroy client because it has not been initialized!",
                     "KS_CLIENT",
-                    LogType::LOG_WARNING);
+                    LogType::WARNING);
 
                 return;
             }
@@ -310,6 +310,6 @@ namespace KalaServer::Connection
 		Log::Print(
 			"Destroying client '" + usernameCopy + "'.",
 			"KS_CLIENT",
-			LogType::LOG_INFO);
+			LogType::INFO);
     }
 }

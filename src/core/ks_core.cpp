@@ -87,7 +87,7 @@ namespace KalaServer::Core
 				"Failed to initialize KalaServer via IP '" 
 				+ string(newIP) + "' because it is already initialized!",
 				"KS_CORE",
-				LogType::LOG_WARNING);
+				LogType::WARNING);
 
 			return false;
 		}
@@ -99,7 +99,7 @@ namespace KalaServer::Core
 				"Failed to initialize KalaServer via IP '" 
 				+ string(newIP) + "' because the IP is not valid!",
 				"KS_CORE",
-				LogType::LOG_WARNING);
+				LogType::WARNING);
 
 			return false;
 		}
@@ -127,7 +127,7 @@ namespace KalaServer::Core
 				"Failed to initialize KalaServer via IP '" 
 				+ string(newIP) + "' because a working internet connection couldn't be confirmed!",
 				"KS_CORE",
-				LogType::LOG_WARNING);
+				LogType::WARNING);
 
 			return false;
 		}
@@ -138,7 +138,7 @@ namespace KalaServer::Core
 		Log::Print(
 			"Initialized KalaServer via IP '" + string(newIP) + "'!",
 			"KS_CORE",
-			LogType::LOG_SUCCESS);
+			LogType::SUCCESS);
 
 		return true;
 	}
@@ -333,7 +333,7 @@ namespace KalaServer::Core
 			Log::Print(
 				"Failed to get IP because KalaServer has not been initialized!",
 				"KS_CORE",
-				LogType::LOG_WARNING);
+				LogType::WARNING);
 
 			return empty;
 		}
@@ -377,7 +377,7 @@ namespace KalaServer::Core
 			Log::Print(
 				"Failed to check for internet access because KalaServer has not yet been initalized!",
 				"KS_CORE",
-				LogType::LOG_WARNING);
+				LogType::WARNING);
 
 			return false;
 		}
@@ -593,7 +593,7 @@ namespace KalaServer::Core
 			Log::Print(
 				reasonStr,
 				title,
-				LogType::LOG_ERROR,
+				LogType::ERROR,
 				2,
 				true,
 				TimeFormat::TIME_NONE,
@@ -620,7 +620,7 @@ namespace KalaServer::Core
 			Log::Print(
 				"Failed to shut down KalaServer because it has not been initialized!",
 				"KS_CORE",
-				LogType::LOG_WARNING);
+				LogType::WARNING);
 
 			return;
 		}
@@ -643,7 +643,7 @@ namespace KalaServer::Core
 		Log::Print(
 			"Finished shutting down KalaServer for IP '" + string(IP) + "'!",
 			"KS_CORE",
-			LogType::LOG_SUCCESS);
+			LogType::SUCCESS);
 
 		if (closeExecutableAfterShutdown) exit(0);
 

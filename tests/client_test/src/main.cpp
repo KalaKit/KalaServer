@@ -58,7 +58,7 @@ static void PrintResponse(
         "target port: " + to_string(targetPort) + "\n"
         "target payload:\n" + payloadString,
         "CLIENT_TEST",
-        LogType::LOG_INFO);
+        LogType::INFO);
 }
 
 static void SendMessage(
@@ -121,8 +121,8 @@ static void Test_Python_Server()
         0,
         "127.0.0.1",
         8080,
-        TransportProtocol::TP_TCP,
-        ResponseType::RT_AcceptResponse,
+        TransportProtocol::TCP,
+        ResponseType::AcceptResponse,
         "hello");
 }
 
@@ -134,8 +134,8 @@ static void Test_Wikipedia()
         0,
         "185.15.59.226",
         80,
-        TransportProtocol::TP_TCP,
-        ResponseType::RT_AcceptResponse,
+        TransportProtocol::TCP,
+        ResponseType::AcceptResponse,
         "GET / HTTP/1.1\r\n"
         "Host: wikipedia.com\r\n"
         "Connection: close\r\n"
@@ -149,8 +149,8 @@ static void Test_Cloudflare()
         0,
         "1.1.1.1",
         53,
-        TransportProtocol::TP_UDP,
-        ResponseType::RT_AcceptResponse,
+        TransportProtocol::UDP,
+        ResponseType::AcceptResponse,
         "",
         {
             0x12, 0x34, 0x01, 0x00,
@@ -238,7 +238,7 @@ int main()
                     Log::Print(
                         "Failed to cast port to u16 because it was not a valid number! Try again.",
                         "CLIENT_TEST",
-                        LogType::LOG_ERROR,
+                        LogType::ERROR,
                         2);
 
                     port = 0;
@@ -252,7 +252,7 @@ int main()
                     Log::Print(
                         "Failed to cast port to u16 because it was out of range! Try again.",
                         "CLIENT_TEST",
-                        LogType::LOG_WARNING);
+                        LogType::WARNING);
 
                     port = 0;
 
@@ -269,8 +269,8 @@ int main()
                     0,
                     ip,
                     port,
-                    TransportProtocol::TP_TCP,
-                    ResponseType::RT_AcceptResponse,
+                    TransportProtocol::TCP,
+                    ResponseType::AcceptResponse,
                     payload);
 
                 ip.clear();
