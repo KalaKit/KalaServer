@@ -172,7 +172,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize link because KalaServer has not been initialized!",
                 "KS_LINK",
-                LogType::WARNING);
+                LogType::LOG_WARNING);
 
             return nullptr;
         }
@@ -182,7 +182,7 @@ namespace KalaServer::Connection
             Log::Print(
                 "Failed to initialize link because KalaServer is shutting down!",
                 "KS_LINK",
-                LogType::WARNING);
+                LogType::LOG_WARNING);
 
             return nullptr;
         }
@@ -216,7 +216,7 @@ namespace KalaServer::Connection
 			"Created new link '" + to_string(newID) + "' between '" + to_string(senderID) 
             + "' and '" + string(receiverIP) + "' via port '" + to_string(receiverPort) + "'!",
 			"KS_LINK",
-			LogType::SUCCESS);
+			LogType::LOG_SUCCESS);
 
 		return linkPtr;
     }
@@ -394,7 +394,7 @@ namespace KalaServer::Connection
 		Log::Print(
 			"Destroying link '" + to_string(ID) + "'.",
 			"KS_LINK",
-			LogType::INFO);
+			LogType::LOG_INFO);
     }
 }
 
@@ -552,7 +552,7 @@ void _SendPacket(
                                 "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                 + " because ipv4 inet_ptons failed!",
                                 "KS_LINK",
-                                LogType::ERROR,
+                                LogType::LOG_ERROR,
                                 2);
 
                             close_socket(targetSocket);
@@ -573,7 +573,7 @@ void _SendPacket(
                                 "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                 + " because ipv6 inet_ptons failed!",
                                 "KS_LINK",
-                                LogType::ERROR,
+                                LogType::LOG_ERROR,
                                 2);
 
                             close_socket(targetSocket);
@@ -662,7 +662,7 @@ void _SendPacket(
                                 "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                 + " because the connection could not be established!",
                                 "KS_LINK",
-                                LogType::ERROR,
+                                LogType::LOG_ERROR,
                                 2);
 
                             close_socket(targetSocket);
@@ -713,7 +713,7 @@ void _SendPacket(
                                     "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                     + " because TCP socket transmission returned zero bytes!",
                                     "KS_LINK",
-                                    LogType::ERROR,
+                                    LogType::LOG_ERROR,
                                     2);
 
                                 close_socket(targetSocket);
@@ -759,7 +759,7 @@ void _SendPacket(
                                         "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                         + " because TCP socket transmission timed out or select failed!",
                                         "KS_LINK",
-                                        LogType::ERROR,
+                                        LogType::LOG_ERROR,
                                         2);
 
                                     close_socket(targetSocket);
@@ -772,7 +772,7 @@ void _SendPacket(
                                     "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                     + " because TCP socket transmission failed!",
                                     "KS_LINK",
-                                    LogType::ERROR,
+                                    LogType::LOG_ERROR,
                                     2);
 
                                 close_socket(targetSocket);
@@ -788,7 +788,7 @@ void _SendPacket(
                                 "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                 + " because UDP payload exceeds maximum UDP payload send size!",
                                 "KS_LINK",
-                                LogType::ERROR,
+                                LogType::LOG_ERROR,
                                 2);
 
                             close_socket(targetSocket);
@@ -846,7 +846,7 @@ void _SendPacket(
                                         "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                         + " because UDP socket transmission timed out or select failed!",
                                         "KS_LINK",
-                                        LogType::ERROR,
+                                        LogType::LOG_ERROR,
                                         2);
 
                                     close_socket(targetSocket);
@@ -859,7 +859,7 @@ void _SendPacket(
                                     "Failed to send packet via " + string(senderStr) + " to " + string(receiverStr) 
                                     + " because UDP socket transmission failed!",
                                     "KS_LINK",
-                                    LogType::ERROR,
+                                    LogType::LOG_ERROR,
                                     2);
 
                                 close_socket(targetSocket);
@@ -871,7 +871,7 @@ void _SendPacket(
                     Log::Print(
                         "Packet has been sent from " + string(senderStr) + " to " + string(receiverStr) + "!",
                         "KS_LINK",
-                        LogType::SUCCESS);
+                        LogType::LOG_SUCCESS);
 
                     return true;
                 };
@@ -926,7 +926,7 @@ void _SendPacket(
                                         "Response for " + string(senderStr) + " was discarded from " 
                                         + string(receiverStr) + " because the server was shut down.",
                                         "KS_LINK",
-                                        LogType::WARNING);
+                                        LogType::LOG_WARNING);
 
                                     shouldExit = true;
                                     return;
@@ -940,7 +940,7 @@ void _SendPacket(
                                         "Response for " + string(senderStr) + " was discarded from " 
                                         + string(receiverStr) + " because the client was shut down.",
                                         "KS_LINK",
-                                        LogType::WARNING);
+                                        LogType::LOG_WARNING);
 
                                     shouldExit = true;
                                     return;
@@ -956,7 +956,7 @@ void _SendPacket(
                                     "Response for " + string(senderStr) + " was discarded from " 
                                     + string(receiverStr) + " because the sender was set as invisible.",
                                     "KS_LINK",
-                                    LogType::INFO);
+                                    LogType::LOG_INFO);
 
                                 shouldExit = true;
                             }
@@ -967,7 +967,7 @@ void _SendPacket(
                         Log::Print(
                             "Response for " + string(senderStr) + " couldn't be received! Reason: " + err,
                             "KS_LINK",
-                            LogType::ERROR,
+                            LogType::LOG_ERROR,
                             2);
 
                         shouldExit = true;
@@ -1017,7 +1017,7 @@ void _SendPacket(
                                                         "Dropping connection for " + string(senderStr) 
                                                         + " and " + string(receiverStr) + " because server has become invisible.",
                                                         "KS_LINK",
-                                                        LogType::INFO);
+                                                        LogType::LOG_INFO);
 
                                                     invisible = true;
                                                 }
@@ -1041,7 +1041,7 @@ void _SendPacket(
                                     "Dropping connection for " + string(senderStr) 
                                     + " and " + string(receiverStr) + " because client has become invisible.",
                                     "KS_LINK",
-                                    LogType::INFO);
+                                    LogType::LOG_INFO);
 
                                 invisible = true;
                             }
@@ -1059,7 +1059,7 @@ void _SendPacket(
                                 "Closing connection between " + string(senderStr) 
                                 + " and " + string(receiverStr) + " because KalaServer is shutting down.",
                                 "KS_LINK",
-                                LogType::INFO);
+                                LogType::LOG_INFO);
 
                             isAlive = false;
                             break;
@@ -1144,7 +1144,7 @@ void _SendPacket(
                                         "Closing connection between " + string(senderStr) 
                                         + " and " + string(receiverStr) + " because KalaServer is shutting down.",
                                         "KS_LINK",
-                                        LogType::INFO);
+                                        LogType::LOG_INFO);
                                 }
                                 else
                                 {
@@ -1152,7 +1152,7 @@ void _SendPacket(
                                         "Closing connection between " + string(senderStr) 
                                         + " and " + string(receiverStr) + " because receiver did not send any data.",
                                         "KS_LINK",
-                                        LogType::INFO);
+                                        LogType::LOG_INFO);
                                 }
 
                                 isAlive = false;
@@ -1170,7 +1170,7 @@ void _SendPacket(
                                 "Failed receive response for " + string(senderStr) 
                                 + " from " + string(receiverStr) + " because select failed!",
                                 "KS_LINK",
-                                LogType::ERROR,
+                                LogType::LOG_ERROR,
                                 2);
 
                             close_socket(targetSocket);
@@ -1235,7 +1235,7 @@ void _SendPacket(
                                     "Failed receive response for " + string(senderStr) 
                                     + " from " + string(receiverStr) + " because receiving data failed!",
                                     "KS_LINK",
-                                    LogType::ERROR,
+                                    LogType::LOG_ERROR,
                                     2);
 
                                 break;
@@ -1247,7 +1247,7 @@ void _SendPacket(
                                     "Closing connection between " + string(senderStr) 
                                     + " and " + string(receiverStr) + " because receiver has closed the connection.",
                                     "KS_LINK",
-                                    LogType::INFO);
+                                    LogType::LOG_INFO);
 
                                 break;
                             }
@@ -1271,7 +1271,7 @@ void _SendPacket(
                                     "Closing connection between " + string(senderStr) 
                                     + " and " + string(receiverStr) + " because KalaServer is shutting down.",
                                     "KS_LINK",
-                                    LogType::INFO);
+                                    LogType::LOG_INFO);
 
                                 isAlive = false;
                                 break;
@@ -1282,7 +1282,7 @@ void _SendPacket(
                                     "Closing connection between " + string(senderStr) 
                                     + " and " + string(receiverStr) + " because the connection is not long lasting.",
                                     "KS_LINK",
-                                    LogType::INFO);
+                                    LogType::LOG_INFO);
                             }
 
                             response.resize(received);
@@ -1344,7 +1344,7 @@ void _SendPacket(
                             "Failed to send packet to " + receiverStr +
                             " because the link was invalid! Reason: " + err,
                             "KS_LINK",
-                            LogType::WARNING);
+                            LogType::LOG_WARNING);
 
                         return;
                     }
@@ -1361,7 +1361,7 @@ void _SendPacket(
                             "Failed to send packet via server '" + to_string(data.senderID) + "' to " + receiverStr +
                             " because the sender ID for server type was invalid! Reason: " + err,
                             "KS_LINK",
-                            LogType::WARNING);
+                            LogType::LOG_WARNING);
 
                         return;
                     }
@@ -1374,7 +1374,7 @@ void _SendPacket(
                             "Failed to send packet via client to " + receiverStr +
                             " because the client has not been initialized",
                             "KS_LINK",
-                            LogType::WARNING);
+                            LogType::LOG_WARNING);
 
                         return;
                     }
@@ -1391,7 +1391,7 @@ void _SendPacket(
                         "Failed to send packet via " + senderStr + " to " + receiverStr 
                         + " because the payload was empty!",
                         "KS_LINK",
-                        LogType::WARNING);
+                        LogType::LOG_WARNING);
 
                     return;
                 }

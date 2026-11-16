@@ -58,7 +58,7 @@ static void PrintResponse(
         "target port: " + to_string(targetPort) + "\n"
         "target payload:\n" + payloadString,
         "CLIENT_TEST",
-        LogType::INFO);
+        LogType::LOG_INFO);
 }
 
 static void SendMessage(
@@ -238,7 +238,7 @@ int main()
                     Log::Print(
                         "Failed to cast port to u16 because it was not a valid number! Try again.",
                         "CLIENT_TEST",
-                        LogType::ERROR,
+                        LogType::LOG_ERROR,
                         2);
 
                     port = 0;
@@ -252,7 +252,7 @@ int main()
                     Log::Print(
                         "Failed to cast port to u16 because it was out of range! Try again.",
                         "CLIENT_TEST",
-                        LogType::WARNING);
+                        LogType::LOG_WARNING);
 
                     port = 0;
 
