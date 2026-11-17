@@ -10,7 +10,6 @@
 #include <functional>
 #include <atomic>
 #include <thread>
-#include <memory>
 
 #include "core/ks_registry.hpp"
 
@@ -30,7 +29,6 @@ namespace KalaServer::Connection
     using std::atomic;
     using std::shared_mutex;
     using std::thread;
-    using std::default_delete;
 
     //How many milliseconds to wait at the start of each while loop to check for responses
     static constexpr u16 WHILE_LOOP_IDLE_WAIT_MS = 500;
@@ -63,7 +61,7 @@ namespace KalaServer::Connection
     {
     friend class KalaServer::Core::KalaServerCore;
     friend class Server;
-    friend struct default_delete<Link>;
+    friend struct KalaServerRegistry<Link>;
     public:
         KNODISCARD
         static KalaServerRegistry<Link>& GetRegistry();

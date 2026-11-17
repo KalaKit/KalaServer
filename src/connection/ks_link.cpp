@@ -51,8 +51,6 @@ using std::this_thread::sleep_for;
 using std::chrono::milliseconds;
 using std::shared_lock;
 using std::scoped_lock;
-using std::unique_ptr;
-using std::make_unique;
 
 #if defined(KWIN_ANY)
 using ksocket = SOCKET;
@@ -190,8 +188,14 @@ namespace KalaServer::Connection
 		u32 newID = KalaServerCore::GetGlobalID() + 1;
 		KalaServerCore::SetGlobalID(newID);
 
-		unique_ptr<Link> newLink = make_unique<Link>();
-		Link* linkPtr = newLink.get();
+		Link* linkPtr{};
+		string err = registry.AddContent(newID, linkPtr);
+		if (!err.empty())
+		{
+			KalaServerCore::ForceClose(
+				"KalaServer Link error",
+				"Failed to initialize link! Reason: " + err);
+		}
 
         linkPtr->ID = newID;
         linkPtr->senderID = senderID;
@@ -201,16 +205,6 @@ namespace KalaServer::Connection
 
         linkPtr->transportProtocol = transportProtocol;
         linkPtr->responseCallback = responseCallback;
-
-		string err = registry.AddContent(
-			newID, 
-			std::move(newLink));
-		if (!err.empty())
-		{
-			KalaServerCore::ForceClose(
-				"KalaServer Link error",
-				"Failed to initialize link! Reason: " + err);
-		}
 
 		Log::Print(
 			"Created new link '" + to_string(newID) + "' between '" + to_string(senderID) 

@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 #include <filesystem>
-#include <memory>
 
 #include "core/ks_registry.hpp"
 #include "connection/ks_link.hpp"
@@ -30,7 +29,6 @@ namespace KalaServer::Connection
     using std::vector;
     using std::filesystem::path;
     using std::shared_mutex;
-    using std::default_delete;
 
     static constexpr u8 MIN_SERVER_NAME_LENGTH = 3;
     static constexpr u8 MAX_SERVER_NAME_LENGTH = 20;
@@ -44,7 +42,7 @@ namespace KalaServer::Connection
     {
     friend class KalaServer::Core::KalaServerCore;
     friend class Link;
-    friend struct default_delete<Server>;
+    friend struct KalaServerRegistry<Server>;
     public:
         KNODISCARD
         static KalaServerRegistry<Server>& GetRegistry();

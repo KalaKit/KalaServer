@@ -53,8 +53,6 @@ using std::atomic;
 using std::shared_mutex;
 using std::shared_lock;
 using std::scoped_lock;
-using std::unique_ptr;
-using std::make_unique;
 
 #if defined(KWIN_ANY)
 using ksocket = SOCKET;
@@ -224,23 +222,19 @@ namespace KalaServer::Connection
 		u32 newID = KalaServerCore::GetGlobalID() + 1;
 		KalaServerCore::SetGlobalID(newID);
 
-		unique_ptr<Server> newServer = make_unique<Server>();
-		Server* serverPtr = newServer.get();
-
-        serverPtr->ID = newID;
-        serverPtr->serverName = serverName;
-        serverPtr->serverPort = serverPort;
-        serverPtr->messageCallback = messageCallback;
-
-		err = registry.AddContent(
-			newID, 
-			std::move(newServer));
+		Server* serverPtr{};
+		err = registry.AddContent(newID, serverPtr);
 		if (!err.empty())
 		{
 			KalaServerCore::ForceClose(
 				"KalaServer Server error",
 				"Failed to initialize server! Reason: " + err);
 		}
+
+        serverPtr->ID = newID;
+        serverPtr->serverName = serverName;
+        serverPtr->serverPort = serverPort;
+        serverPtr->messageCallback = messageCallback;
 
 		Log::Print(
 			"Created new server '" + to_string(newID) + "'!",
